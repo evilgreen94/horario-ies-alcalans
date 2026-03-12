@@ -7,6 +7,7 @@ const KEY_TAREAS='IES_Alcalans_Tareas_Profesorado';
 const KEY_TEACHER_USER='IES_Alcalans_Profesorado_Actual';
 const KEY_SESSION_OVERRIDES='IES_Alcalans_Sesiones_Profesorado';
 const KEY_BIBLIOTECA='IES_Alcalans_Biblioteca_Guardias';
+const KEY_HISTORIAL='IES_Alcalans_Historial_Cambios';
 const RAW_PROFESORADO=(window.PROFESORADO_SOURCE&&Array.isArray(window.PROFESORADO_SOURCE.teachers))?window.PROFESORADO_SOURCE.teachers:[];
 const GRUPOS_PROFESORADO={};
 function decodeMojibake(value){
@@ -128,6 +129,59 @@ function persistTeacherUser(nombre){try{localStorage.setItem(KEY_TEACHER_USER,no
 function loadSessionOverrides(){try{const d=localStorage.getItem(KEY_SESSION_OVERRIDES);return d?JSON.parse(d):{};}catch(e){return {};}}
 function persistSessionOverrides(d){try{localStorage.setItem(KEY_SESSION_OVERRIDES,JSON.stringify(d));}catch(e){}}
 function persistBibliotecaAssignments(d){try{localStorage.setItem(KEY_BIBLIOTECA,JSON.stringify(d));}catch(e){}}
+function loadHistorial(){try{const d=localStorage.getItem(KEY_HISTORIAL);return d?JSON.parse(d):[];}catch(e){return [];}}
+function persistHistorial(d){try{localStorage.setItem(KEY_HISTORIAL,JSON.stringify(d));}catch(e){}}
+function cloneJson(value){return JSON.parse(JSON.stringify(value));}
+function computeNextId(rows){return (rows||[]).reduce((m,g)=>Math.max(m,g.id||0),0)+1;}
+function formatHoraLabel(hora){
+  const info=HORA_MAP[hora];
+  return info?`${info.label} hora (${info.rango})`:`Hora ${hora}`;
+}
+function formatDiaHora(dia,hora){
+  return `${DIAS[dia]||'Dia'} · ${formatHoraLabel(hora)}`;
+}
+function formatHistoryAbsence(row){
+  if(!row) return '';
+  const partes=[formatDiaHora(row.dia,row.hora),row.ausente];
+  const aula=resolveAulaRegistro(row)||row.aula||'';
+  if(aula) partes.push(aula);
+  if(row.guardia) partes.push(`Guardia: ${row.guardia}`);
+  return partes.join(' · ');
+}
+function buildUndoState(targetDay){
+  return {
+    data:cloneJson(data),
+    biblioteca:cloneJson(bibliotecaGuardias),
+    day:typeof targetDay==='number'?targetDay:day
+  };
+}
+function addHistoryEntry(title,detail,type,options){
+  historialCambios.unshift({
+    id:`hist-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    title,
+    detail,
+    type:type||'other',
+    undoState:options?.undoState||null,
+    actor:'Jefatura',
+    ts:new Date().toISOString()
+  });
+  historialCambios=historialCambios.slice(0,200);
+  persistHistorial(historialCambios);
+}
+function formatHistoryTimestamp(value){
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('es-ES',{
+    day:'2-digit',
+    month:'2-digit',
+    year:'numeric',
+    hour:'2-digit',
+    minute:'2-digit'
+  });
+}
+function getLastUndoableHistoryEntry(){
+  return historialCambios.find(entry=>entry?.undoState&&entry.type!=='undo')||null;
+}
 function shuffle(arr){const copy=[...arr];for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}return copy;}
 function makeOrdenHora(dia,hora){return shuffle(HORARIO_GUARDIAS[dia]?.[hora]||[]).map((nombre,index)=>({nombre,numero:index+1}));}
 function buildInitialOrden(){const orden={};for(let dia=0;dia<5;dia++){orden[dia]={};for(let hora=1;hora<=9;hora++){orden[dia][hora]=makeOrdenHora(dia,hora);}}persistOrden(orden);return orden;}
@@ -209,6 +263,13 @@ function getGuardiaNombreSeleccionado(valor,dia,hora){
   return getGuardiasDisponibles(dia,hora).find(nombre=>nombre.toLowerCase()===texto.toLowerCase())||'';
 }
 function getHorarioProfesorDia(nombre,dia){return getProfesor(nombre)?.horario?.[dia]||{};}
+function getHorasLectivasProfesorDia(nombre,dia){
+  const sesiones=getHorarioProfesorDia(nombre,dia);
+  return Object.keys(sesiones)
+    .map(Number)
+    .filter(hora=>!HORAS_PATIO.has(hora)&&sesiones[hora]&&sesiones[hora].tipo!=='guardia')
+    .sort((a,b)=>a-b);
+}
 function getAulaProfesor(nombre,dia,hora){
   const sesion=resolveTeacherSession(nombre,dia,hora);
   return sesion?.aula||'';
@@ -270,6 +331,9 @@ let nid=data.reduce((m,g)=>Math.max(m,g.id),0)+1;
 let ordenGuardias=loadOrden();
 let bibliotecaGuardias=loadBibliotecaAssignments();
 let tareasProfesorado=loadTareas();
+let historialCambios=loadHistorial();
+let historyFilter='all';
+let dialogResolver=null;
 (function(){const wd=new Date().getDay();day=(wd>=1&&wd<=5)?wd-1:0;})();
 teacherName=getProfesorNombreSeleccionado(loadTeacherUser())||'';
 teacherDay=day;
@@ -283,6 +347,72 @@ function updateAdminControls(){
   if(btnSorteo) btnSorteo.style.display=isAdmin?'':'none';
   // if(btnInforme) btnInforme.style.display=(isAdmin&&isReportAvailable())?'':'none';
   if(btnInforme) btnInforme.style.display=isAdmin?'':'none';
+}
+function showToast(message,type){
+  const toastStack=document.getElementById('toastStack');
+  if(!toastStack||!message) return;
+  const toast=document.createElement('div');
+  toast.className=`toast is-${type||'info'}`;
+  toast.textContent=message;
+  toastStack.appendChild(toast);
+  window.setTimeout(()=>{
+    toast.remove();
+  },3200);
+}
+function openDialog(config){
+  const dialogOverlay=document.getElementById('dialogOverlay');
+  const dialogTitle=document.getElementById('dialogTitle');
+  const dialogText=document.getElementById('dialogText');
+  const dialogInput=document.getElementById('dialogInput');
+  const dialogCancel=document.getElementById('dialogCancel');
+  const dialogConfirm=document.getElementById('dialogConfirm');
+  if(!dialogOverlay||!dialogTitle||!dialogText||!dialogInput||!dialogCancel||!dialogConfirm){
+    return Promise.resolve({confirmed:false,value:''});
+  }
+  dialogTitle.textContent=config?.title||'Aviso';
+  dialogText.textContent=config?.message||'';
+  dialogConfirm.textContent=config?.confirmText||'Aceptar';
+  dialogCancel.textContent=config?.cancelText||'Cancelar';
+  dialogCancel.style.display=config?.showCancel?'':'none';
+  dialogInput.style.display=config?.input?'block':'none';
+  dialogInput.type=config?.inputType||'text';
+  dialogInput.value=config?.defaultValue||'';
+  dialogInput.placeholder=config?.placeholder||'';
+  dialogInput.onkeydown=config?.input?event=>{
+    if(event.key==='Enter'){
+      event.preventDefault();
+      closeDialog(true);
+    }
+  }:null;
+  dialogOverlay.classList.add('open');
+  if(config?.input){
+    window.setTimeout(()=>{
+      dialogInput.focus();
+      dialogInput.select();
+    },0);
+  }else{
+    window.setTimeout(()=>dialogConfirm.focus(),0);
+  }
+  return new Promise(resolve=>{
+    dialogResolver=resolve;
+  });
+}
+function closeDialog(confirmed){
+  const dialogOverlay=document.getElementById('dialogOverlay');
+  const dialogInput=document.getElementById('dialogInput');
+  if(dialogOverlay) dialogOverlay.classList.remove('open');
+  const resolver=dialogResolver;
+  dialogResolver=null;
+  if(resolver) resolver({confirmed:!!confirmed,value:dialogInput?dialogInput.value:''});
+}
+function bgDialogClose(e){if(e.target.id==='dialogOverlay') closeDialog(false);}
+async function askConfirm(title,message,confirmText){
+  const result=await openDialog({title,message,confirmText:confirmText||'Aceptar',showCancel:true});
+  return result.confirmed;
+}
+async function askPassword(title,message){
+  const result=await openDialog({title,message,confirmText:'Entrar',showCancel:true,input:true,inputType:'password',placeholder:'Introduce la contraseña'});
+  return result.confirmed?result.value:'';
 }
 setInterval(()=>{
   document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
@@ -428,6 +558,88 @@ function closeBibliotecaModal(){
   if(bibliotecaOverlay) bibliotecaOverlay.classList.remove('open');
 }
 function bgBibliotecaClose(e){if(e.target.id==='bibliotecaOverlay')closeBibliotecaModal();}
+function renderHistoryList(){
+  const historyList=document.getElementById('historyList');
+  const undoButton=document.getElementById('btnUndoHistory');
+  if(!historyList) return;
+  if(undoButton) undoButton.disabled=!getLastUndoableHistoryEntry();
+  const visibles=historyFilter==='all'
+    ? historialCambios
+    : historialCambios.filter(entry=>(entry.type||'other')===historyFilter);
+  const filterButtons=document.querySelectorAll('#historyFilters .history-filter');
+  filterButtons.forEach(button=>{
+    button.classList.toggle('active',button.dataset.filter===historyFilter);
+  });
+  if(!visibles.length){
+    const texto=historyFilter==='all'
+      ? 'Todavia no hay cambios registrados.'
+      : 'No hay cambios de este tipo en el historial.';
+    historyList.innerHTML=`<div class="history-empty">${texto}</div>`;
+    return;
+  }
+  historyList.innerHTML=visibles.map(entry=>`<article class="history-item">
+    <div class="history-item-head">
+      <div class="history-item-title">${escapeHtml(entry.title||'Cambio')}</div>
+      <div class="history-item-time">${escapeHtml(formatHistoryTimestamp(entry.ts))}</div>
+    </div>
+    <div class="history-item-body">${escapeHtml(entry.detail||'')}</div>
+  </article>`).join('');
+}
+function setHistoryFilter(filter){
+  historyFilter=filter||'all';
+  renderHistoryList();
+}
+function restoreUndoState(state){
+  if(!state) return false;
+  data=normalizeStoredRows(cloneJson(state.data||[]));
+  persist(data);
+  bibliotecaGuardias=ensureBibliotecaAssignments(cloneJson(state.biblioteca||{}));
+  persistBibliotecaAssignments(bibliotecaGuardias);
+  nid=computeNextId(data);
+  day=typeof state.day==='number'?state.day:day;
+  renderPills();
+  renderGuardiaBoard();
+  renderTable();
+  return true;
+}
+function openHistoryModal(){
+  if(!isAdmin) return;
+  renderHistoryList();
+  document.getElementById('historyOverlay')?.classList.add('open');
+}
+function closeHistoryModal(){
+  document.getElementById('historyOverlay')?.classList.remove('open');
+}
+function bgHistoryClose(e){if(e.target.id==='historyOverlay') closeHistoryModal();}
+async function clearHistory(){
+  if(!isAdmin) return;
+  if(!await askConfirm('Borrar historial','Se eliminaran todas las entradas del historial de cambios.','Borrar')) return;
+  historialCambios=[];
+  persistHistorial(historialCambios);
+  renderHistoryList();
+  showToast('Historial borrado.','success');
+}
+async function undoLastHistoryChange(){
+  if(!isAdmin) return;
+  const entry=getLastUndoableHistoryEntry();
+  if(!entry){
+    showToast('No hay cambios para deshacer.','info');
+    return;
+  }
+  if(!await askConfirm('Deshacer ultimo cambio',`Se revertira: ${entry.title}.`,'Deshacer')) return;
+  const currentState=buildUndoState(typeof entry.undoState?.day==='number'?entry.undoState.day:day);
+  if(!restoreUndoState(entry.undoState)){
+    showToast('No se pudo deshacer el cambio.','error');
+    return;
+  }
+  entry.undoState=null;
+  entry.reverted=true;
+  persistHistorial(historialCambios);
+  addHistoryEntry('Cambio deshecho',`Se revirtio: ${entry.title}`,'undo',{undoState:currentState});
+  renderHistoryList();
+  document.getElementById('saveTs').textContent='Deshecho - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  showToast('Ultimo cambio deshecho.','success');
+}
 function updateBibliotecaProfesorOptions(){
   const bHora=document.getElementById('bHora');
   const bProfesor=document.getElementById('bProfesor');
@@ -445,14 +657,18 @@ function saveBibliotecaAssignment(){
   if(!bHora||!bProfesor) return;
   const hora=+bHora.value;
   const nombre=bProfesor.value;
+  const anterior=getBibliotecaAsignada(day,hora);
+  const undoState=buildUndoState(day);
   const disponibles=getProfesHora(day,hora);
-  if(!nombre||!disponibles.includes(nombre)){alert('Selecciona un profesor válido para esa hora.');return;}
+  if(!nombre||!disponibles.includes(nombre)){showToast('Selecciona un profesor válido para esa hora.','error');return;}
   bibliotecaGuardias[day][hora]=nombre;
   persistBibliotecaAssignments(bibliotecaGuardias);
+  addHistoryEntry('Biblioteca actualizada',`${formatDiaHora(day,hora)} · ${anterior||'Sin asignar'} -> ${nombre}`,'biblioteca',{undoState});
   closeBibliotecaModal();
   renderGuardiaBoard();
   renderTable();
   document.getElementById('saveTs').textContent=`Biblioteca actualizada - ${new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`;
+  showToast('Biblioteca actualizada correctamente.','success');
 }
 function renderTable(){
   const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
@@ -469,11 +685,11 @@ function renderTable(){
       const aula=resolveAulaRegistro(g);
       return `<tr>
         <td><div class="hora-num">${h.rango.replace('-', ' - ')}</div></td>
-        <td><div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">Ausente</span><div class="chip"><div class="avatar av-red">${initials(g.ausente)}</div>${g.ausente}</div></div></div></td>
-        <td>${sugerido?`<div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">${cub?'Guardia asignada':'Turno 1'}</span><div class="chip guardia-chip${cub?' guardia-chip-assigned':''}"><div class="avatar av-yellow">${initials(sugerido)}</div>${sugerido}</div></div></div>`:`<span class="sin-asignar">Sin asignar</span>`}</td>
-        <td><div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">Aula</span><span class="aula-tag">${aula||'-'}</span></div></div></td>
-        <td><div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">Faena</span>${faenaInfo.faena?`<div class="faena-box"><span class="badge b-ok">Con tarea</span>${faenaInfo.obs?`<details class="faena-toggle"><summary></summary><div class="faena-text">${faenaInfo.obs}</div></details>`:''}</div>`:`<span class="badge b-nok">Sin tarea</span>`}</div></div></td>
-        <td><div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">Estado</span>${sugerido?`<span class="badge b-ok">${cub?'Asignada':'Turno 1'}</span>`:'<span class="badge b-nok">Sin cubrir</span>'}</div></div></td>
+        <td><div class="cell-stack"><div class="guardia-slot"><div class="chip"><div class="avatar av-red">${initials(g.ausente)}</div>${g.ausente}</div></div></div></td>
+        <td>${sugerido?`<div class="cell-stack"><div class="guardia-slot"><div class="chip guardia-chip${cub?' guardia-chip-assigned':''}"><div class="avatar av-yellow">${initials(sugerido)}</div>${sugerido}</div></div></div>`:`<span class="sin-asignar">Sin asignar</span>`}</td>
+        <td><div class="cell-stack"><div class="guardia-slot"><span class="aula-tag">${aula||'-'}</span></div></div></td>
+        <td><div class="cell-stack"><div class="guardia-slot">${faenaInfo.faena?`<div class="faena-box"><span class="badge b-ok">Con tarea</span>${faenaInfo.obs?`<details class="faena-toggle"><summary></summary><div class="faena-text">${faenaInfo.obs}</div></details>`:''}</div>`:`<span class="badge b-nok">Sin tarea</span>`}</div></div></td>
+        <td><div class="cell-stack"><div class="guardia-slot">${sugerido?`<span class="badge b-ok">${cub?'Asignada':'Turno 1'}</span>`:'<span class="badge b-nok">Sin cubrir</span>'}</div></div></td>
         <td style="${isAdmin?'':'display:none'}"><button class="btn-edit" onclick="openModal(${g.id})">Editar</button></td>
       </tr>`;
     }).join('');
@@ -486,7 +702,26 @@ function renderTable(){
   document.getElementById('sSin').textContent=Math.max(aus-asig,0);
   document.getElementById('sFaena').textContent=rows.filter(g=>resolveFaena(g).faena).length;
 }
-function toggleAdmin(){if(!isAdmin){const pw=prompt('Contraseña de jefe de estudios:');if(pw!=='jefe2025'){alert('Contraseña incorrecta.');return;}}isAdmin=!isAdmin;document.getElementById('btnAdmin').classList.toggle('on',isAdmin);document.getElementById('adminBar').classList.toggle('show',isAdmin);document.getElementById('btnSorteo').style.display=isAdmin?'':'none';renderTable();}
+async function toggleAdmin(){
+  const btnAdmin=document.getElementById('btnAdmin');
+  if(!isAdmin){
+    const pw=await askPassword('Acceso Jefatura','Introduce la contraseña de Jefatura de Estudios.');
+    if(pw!=='jefe2025'){
+      if(pw) showToast('Contraseña incorrecta.','error');
+      return;
+    }
+  }
+  isAdmin=!isAdmin;
+  if(btnAdmin){
+    btnAdmin.classList.toggle('on',isAdmin);
+    btnAdmin.textContent=isAdmin?'Salir Jefatura':'Jefe de estudios';
+  }
+  document.getElementById('adminBar').classList.toggle('show',isAdmin);
+  document.getElementById('btnSorteo').style.display=isAdmin?'':'none';
+  renderTable();
+  updateAdminControls();
+  showToast(isAdmin?'Modo Jefatura activado.':'Modo Jefatura desactivado.','info');
+}
 function renderTeacherAccessPreview(){
   const teacherLoginInput=document.getElementById('teacherLoginName');
   const preview=document.getElementById('teacherAccessPreview');
@@ -496,7 +731,7 @@ function renderTeacherAccessPreview(){
     preview.textContent='Selecciona tu nombre para entrar en tu panel.';
     return;
   }
-  preview.textContent=`EntrarÃ¡s como ${nombre}. Usuario: ${makeTeacherUsername(nombre)}.`;
+  preview.textContent=`Entrarás como ${nombre}. Usuario: ${makeTeacherUsername(nombre)}.`;
 }
 function openTeacherAccess(resetSelection){
   const teacherLoginList=document.getElementById('teacherLoginList');
@@ -520,7 +755,7 @@ function loginTeacher(){
   const teacherLoginInput=document.getElementById('teacherLoginName');
   if(!teacherLoginInput) return;
   const nombre=getProfesorNombreSeleccionado(teacherLoginInput.value);
-  if(!nombre){alert('Selecciona tu nombre del listado.');return;}
+  if(!nombre){showToast('Selecciona tu nombre del listado.','error');teacherLoginInput.focus();return;}
   teacherName=nombre;
   teacherDay=day;
   persistTeacherUser(nombre);
@@ -634,7 +869,21 @@ function renderTeacherPanel(){
     </div>`;
   }).join('');
 }
-function openModal(id){editId=id||null;const g=id?data.find(x=>x.id===id):null;const aula=g?resolveAulaRegistro(g):'';document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?g.ausente:'';document.getElementById('fGuardia').value=g?g.guardia:'';document.getElementById('fAula').value=aula;document.getElementById('fFaena').checked=g?g.faena:false;document.getElementById('fObs').value=g?g.obs:'';populateProfesoresGuardia();syncAulaFromProfesor(!g||!aula);document.getElementById('overlay').classList.add('open');}
+function syncTodoDiaMode(){
+  const todoDiaInput=document.getElementById('fTodoDia');
+  const guardiaInput=document.getElementById('fGuardia');
+  if(!todoDiaInput||!guardiaInput) return;
+  if(todoDiaInput.checked){
+    guardiaInput.value='';
+    guardiaInput.disabled=true;
+    guardiaInput.placeholder='La guardia se gestiona por cada hora';
+    setFieldError('fGuardia','');
+  }else{
+    guardiaInput.disabled=false;
+    guardiaInput.placeholder='Selecciona un profesor de guardia';
+  }
+}
+function openModal(id){editId=id||null;const g=id?data.find(x=>x.id===id):null;const aula=g?resolveAulaRegistro(g):'';clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?g.ausente:'';document.getElementById('fGuardia').value=g?g.guardia:'';document.getElementById('fAula').value=aula;document.getElementById('fTodoDia').checked=false;document.getElementById('fFaena').checked=g?g.faena:false;document.getElementById('fObs').value=g?g.obs:'';populateProfesoresGuardia();syncAulaFromProfesor(!g||!aula);syncTodoDiaMode();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
 function bgClose(e){if(e.target.id==='overlay')closeModal();}
 function populateProfesoresAusencias(){
@@ -650,6 +899,69 @@ function syncAulaFromProfesor(force){
   const aulaReal=ausente?getAulaProfesor(ausente,dia,hora):'';
   if(force||!aulaInput.value.trim()) aulaInput.value=aulaReal;
 }
+function setFieldError(fieldId,message){
+  const input=document.getElementById(fieldId);
+  const error=document.getElementById(`${fieldId}Error`);
+  if(input) input.classList.toggle('is-invalid',!!message);
+  if(error) error.textContent=message||'';
+}
+function clearAbsenceFormErrors(){
+  ['fDia','fHora','fAusente','fGuardia','fAula'].forEach(fieldId=>setFieldError(fieldId,''));
+}
+function findDuplicateAbsence(dia,hora,ausente){
+  return data.find(item=>item.dia===dia&&item.hora===hora&&item.ausente===ausente&&item.id!==editId) || null;
+}
+function validateAbsenceForm(){
+  const dia=+document.getElementById('fDia').value;
+  const hora=+document.getElementById('fHora').value;
+  const todoDia=document.getElementById('fTodoDia').checked;
+  const ausenteInput=document.getElementById('fAusente');
+  const guardiaInput=document.getElementById('fGuardia');
+  const aulaInput=document.getElementById('fAula');
+  const ausente=getProfesorNombreSeleccionado(ausenteInput.value);
+  const guardiaTexto=guardiaInput.value.trim();
+  const guardia=todoDia?'':getGuardiaNombreSeleccionado(guardiaTexto,dia,hora);
+  clearAbsenceFormErrors();
+  if(!ausente){
+    setFieldError('fAusente','Selecciona un profesor ausente del listado.');
+    return {valid:false,focus:ausenteInput};
+  }
+  if(!todoDia && findDuplicateAbsence(dia,hora,ausente)){
+    setFieldError('fAusente','Ya existe una ausencia registrada para ese profesor en esa hora.');
+    return {valid:false,focus:ausenteInput};
+  }
+  if(!todoDia && guardiaTexto && !guardia){
+    setFieldError('fGuardia','Selecciona un profesor de guardia válido para esa hora.');
+    return {valid:false,focus:guardiaInput};
+  }
+  if(guardia && guardia===ausente){
+    setFieldError('fGuardia','El profesor ausente no puede cubrir su propia guardia.');
+    return {valid:false,focus:guardiaInput};
+  }
+  if(todoDia){
+    const horasLectivas=getHorasLectivasProfesorDia(ausente,dia);
+    if(!horasLectivas.length){
+      setFieldError('fAusente','Ese profesor no tiene horas lectivas registradas ese día.');
+      return {valid:false,focus:ausenteInput};
+    }
+    return {valid:true,ausente,guardia:'',todoDia:true,horasLectivas};
+  }
+  if(!aulaInput.value.trim() && !getAulaProfesor(ausente,dia,hora)){
+    setFieldError('fAula','Indica el aula o lugar de la ausencia.');
+    return {valid:false,focus:aulaInput};
+  }
+  return {valid:true,ausente,guardia,todoDia:false,horasLectivas:[hora]};
+}
+function clearAusenteSelection(){
+  const ausenteInput=document.getElementById('fAusente');
+  const aulaInput=document.getElementById('fAula');
+  if(!ausenteInput||!aulaInput) return;
+  ausenteInput.value='';
+  aulaInput.value='';
+  clearAbsenceFormErrors();
+  populateProfesoresAusencias();
+  ausenteInput.focus();
+}
 function populateProfesoresGuardia(){
   const fDia=document.getElementById('fDia');
   const fHora=document.getElementById('fHora');
@@ -662,14 +974,83 @@ function populateProfesoresGuardia(){
   profesoresGuardia.innerHTML=guardias.map(nombre=>`<option value="${nombre}"></option>`).join('');
   if(guardiaInput.value && !getGuardiaNombreSeleccionado(guardiaInput.value,dia,hora)) guardiaInput.value='';
 }
-function save(){const dia=+document.getElementById('fDia').value;const hora=+document.getElementById('fHora').value;const ausente=getProfesorNombreSeleccionado(document.getElementById('fAusente').value);const guardia=getGuardiaNombreSeleccionado(document.getElementById('fGuardia').value,dia,hora);const aulaReal=ausente?getAulaProfesor(ausente,dia,hora):'';const entry={dia,hora,ausente,guardia,aula:document.getElementById('fAula').value.trim()||aulaReal,faena:document.getElementById('fFaena').checked,obs:document.getElementById('fObs').value.trim()};if(!entry.ausente){alert('Selecciona un profesor ausente del desplegable.');return;}if(document.getElementById('fGuardia').value.trim()&&!entry.guardia){alert('Selecciona un profesor de guardia valido para esa hora.');return;}document.getElementById('fAusente').value=entry.ausente;document.getElementById('fGuardia').value=entry.guardia;document.getElementById('fAula').value=entry.aula;if(editId){const i=data.findIndex(g=>g.id===editId);data[i]={...entry,id:editId};}else{data.push({...entry,id:nid++});}persist(data);closeModal();if(day!==entry.dia)setDay(entry.dia);else renderTable();document.getElementById('saveTs').textContent='Guardado - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});}
-function del(){if(!confirm('Eliminar este registro?'))return;data=data.filter(g=>g.id!==editId);persist(data);closeModal();renderTable();}
-document.getElementById('fDia').addEventListener('change',populateProfesoresGuardia);
-document.getElementById('fHora').addEventListener('change',populateProfesoresGuardia);
+function save(){
+  const dia=+document.getElementById('fDia').value;
+  const hora=+document.getElementById('fHora').value;
+  const validation=validateAbsenceForm();
+  if(!validation.valid){
+    showToast('Revisa los campos marcados antes de guardar.','error');
+    if(validation.focus) validation.focus.focus();
+    return;
+  }
+  const ausente=validation.ausente;
+  const guardia=validation.guardia;
+  const todoDia=validation.todoDia;
+  const faena=document.getElementById('fFaena').checked;
+  const obs=document.getElementById('fObs').value.trim();
+  const aulaManual=document.getElementById('fAula').value.trim();
+  const horasObjetivo=validation.horasLectivas;
+  const previousRow=editId?data.find(g=>g.id===editId):null;
+  const undoState=buildUndoState(dia);
+
+  document.getElementById('fAusente').value=ausente;
+  document.getElementById('fGuardia').value=guardia;
+
+  if(editId&&!todoDia){
+    const aulaReal=getAulaProfesor(ausente,dia,hora)||aulaManual;
+    const i=data.findIndex(g=>g.id===editId);
+    data[i]={dia,hora,ausente,guardia,aula:aulaReal,faena,obs,id:editId};
+    addHistoryEntry('Ausencia editada',`${formatHistoryAbsence(previousRow)} -> ${formatHistoryAbsence(data[i])}`,'edit',{undoState});
+  }else{
+    if(editId){
+      data=data.filter(g=>g.id!==editId);
+    }
+    horasObjetivo.forEach(horaItem=>{
+      const aulaReal=getAulaProfesor(ausente,dia,horaItem)||aulaManual;
+      const existing=data.find(g=>g.dia===dia&&g.hora===horaItem&&g.ausente===ausente);
+      const entry={dia,hora:horaItem,ausente,guardia:'',aula:aulaReal,faena,obs};
+      if(existing){
+        Object.assign(existing,entry);
+      }else{
+        data.push({...entry,id:nid++});
+      }
+    });
+    if(todoDia){
+      addHistoryEntry('Ausencia de dia completo',`${DIAS[dia]} · ${ausente} · ${horasObjetivo.map(formatHoraLabel).join(', ')}`,'create',{undoState});
+    }else{
+      const savedRow=data.find(g=>g.dia===dia&&g.hora===hora&&g.ausente===ausente);
+      addHistoryEntry('Nueva ausencia',formatHistoryAbsence(savedRow),'create',{undoState});
+    }
+  }
+
+  persist(data);
+  clearAbsenceFormErrors();
+  closeModal();
+  if(day!==dia) setDay(dia); else renderTable();
+  document.getElementById('saveTs').textContent='Guardado - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  showToast(todoDia?`Ausencia de día completo registrada en ${horasObjetivo.length} horas.`:'Ausencia guardada correctamente.','success');
+}
+async function del(){
+  if(!await askConfirm('Eliminar registro','¿Quieres eliminar este registro de ausencia?','Eliminar')) return;
+  const previousRow=data.find(g=>g.id===editId);
+  const undoState=buildUndoState(previousRow?.dia ?? day);
+  data=data.filter(g=>g.id!==editId);
+  persist(data);
+  if(previousRow) addHistoryEntry('Ausencia eliminada',formatHistoryAbsence(previousRow),'delete',{undoState});
+  closeModal();
+  renderTable();
+  showToast('Registro eliminado.','success');
+}
+document.getElementById('fDia').addEventListener('change',()=>{populateProfesoresGuardia();setFieldError('fDia','');});
+document.getElementById('fHora').addEventListener('change',()=>{populateProfesoresGuardia();setFieldError('fHora','');});
 document.getElementById('fDia').addEventListener('change',()=>syncAulaFromProfesor(true));
 document.getElementById('fHora').addEventListener('change',()=>syncAulaFromProfesor(true));
-document.getElementById('fAusente').addEventListener('change',()=>syncAulaFromProfesor(true));
-document.getElementById('fAusente').addEventListener('input',()=>syncAulaFromProfesor(false));
+document.getElementById('fTodoDia').addEventListener('change',syncTodoDiaMode);
+document.getElementById('fAusente').addEventListener('change',()=>{syncAulaFromProfesor(true);setFieldError('fAusente','');});
+document.getElementById('fAusente').addEventListener('input',()=>{syncAulaFromProfesor(false);setFieldError('fAusente','');});
+document.getElementById('fGuardia').addEventListener('input',()=>setFieldError('fGuardia',''));
+document.getElementById('fGuardia').addEventListener('change',()=>setFieldError('fGuardia',''));
+document.getElementById('fAula').addEventListener('input',()=>setFieldError('fAula',''));
 const teacherLoginInput=document.getElementById('teacherLoginName');
 if(teacherLoginInput){
   teacherLoginInput.addEventListener('input',renderTeacherAccessPreview);
@@ -685,11 +1066,6 @@ function safeInitStep(fn,name){
     console.error(`Init step failed: ${name}`,error);
   }
 }
-const originalToggleAdmin=toggleAdmin;
-toggleAdmin=function(){
-  originalToggleAdmin();
-  updateAdminControls();
-};
 safeInitStep(populateProfesoresAusencias,'populateProfesoresAusencias');
 safeInitStep(populateProfesoresGuardia,'populateProfesoresGuardia');
 safeInitStep(renderPills,'renderPills');

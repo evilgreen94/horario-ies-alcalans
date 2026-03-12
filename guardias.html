@@ -9,16 +9,19 @@
 </head>
 <body>
 <header>
-  <div class="logo">
-    <a class="logo-link" href="https://portal.edu.gva.es/iesalcalans/es/" target="_blank" rel="noopener noreferrer">
-      <div class="logo-icon"><img src="imagenes/logo-ies-alcalans.jpg" alt="Logo del IES Alcalans"></div>
-      <span class="logo-sub">IES Alcalans</span>
-    </a>
+  <div class="header-center">
+    <div class="logo">
+      <a class="logo-link" href="https://portal.edu.gva.es/iesalcalans/es/" target="_blank" rel="noopener noreferrer">
+        <span class="logo-title">IES <span class="logo-title-accent">Alcalans</span></span>
+      </a>
+    </div>
+    <div class="clock" id="clock"></div>
   </div>
-  <div class="pulse-badge"><div class="pulse-dot"></div>En directo</div>
-  <div class="clock" id="clock"></div>
-  <button class="btn" id="btnTeacher" onclick="openTeacherPanel()">Profesorado</button>
-  <button class="btn" id="btnAdmin" onclick="toggleAdmin()">Jefe de estudios</button>
+  <div class="header-actions">
+    <div class="pulse-badge"><div class="pulse-dot"></div>En directo</div>
+    <button class="btn" id="btnTeacher" onclick="openTeacherPanel()">Profesorado</button>
+    <button class="btn" id="btnAdmin" onclick="toggleAdmin()">Jefe de estudios</button>
+  </div>
 </header>
 <main>
   <div class="day-strip">
@@ -43,7 +46,9 @@
     <span class="admin-tag">Modo Jefe de Estudios</span>
     <button class="btn-add" onclick="openModal()">+ Añadir ausencia</button>
     <button class="btn-add" onclick="editBibliotecaAssignment()">Asignar biblioteca</button>
+    <button class="btn-add btn-add-secondary" type="button" onclick="openHistoryModal()">Historial</button>
     <button class="btn-add" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe PDF</button>
+    <button class="btn-add btn-add-ghost" type="button" onclick="toggleAdmin()">Salir de Jefatura</button>
     <span class="save-ts" id="saveTs">Toca una fila para editar</span>
   </div>
   <div class="teacher-bar" id="teacherBar">
@@ -80,28 +85,39 @@
       <div class="fg">
         <label>Día</label>
         <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Miércoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
+        <div class="field-error" id="fDiaError"></div>
       </div>
       <div class="fg">
         <label>Hora</label>
         <select id="fHora"><option value="1">1a hora (08:15-09:10)</option><option value="2">2a hora (09:10-10:05)</option><option value="3">3a hora (10:05-11:00)</option><option value="4">4a hora (11:00-11:25)</option><option value="5">5a hora (11:25-12:20)</option><option value="6">6a hora (12:20-13:15)</option><option value="7">7a hora (13:15-14:10)</option><option value="8">8a hora (14:10-14:25)</option><option value="9">9a hora (14:25-15:20)</option></select>
+        <div class="field-error" id="fHoraError"></div>
       </div>
     </div>
     <div class="fg">
       <label>Profesor ausente</label>
-      <input type="text" id="fAusente" list="profesoresAusencias" placeholder="Selecciona o busca un profesor" autocomplete="off">
+      <div class="input-with-action">
+        <input type="text" id="fAusente" list="profesoresAusencias" placeholder="Selecciona o busca un profesor" autocomplete="off">
+        <button class="btn-inline-clear" type="button" onclick="clearAusenteSelection()">Cambiar</button>
+      </div>
       <datalist id="profesoresAusencias"></datalist>
+      <div class="field-error" id="fAusenteError"></div>
     </div>
     <div class="fg-row">
       <div class="fg">
         <label>Profesor de guardia</label>
         <input type="text" id="fGuardia" list="profesoresGuardia" placeholder="Selecciona un profesor de guardia" autocomplete="off">
         <datalist id="profesoresGuardia"></datalist>
+        <div class="field-error" id="fGuardiaError"></div>
       </div>
-      <div class="fg"><label>Aula / Lugar</label><input type="text" id="fAula" placeholder="Ej: 2oA - Aula 12"></div>
+      <div class="fg"><label>Aula / Lugar</label><input type="text" id="fAula" placeholder="Ej: 2oA - Aula 12"><div class="field-error" id="fAulaError"></div></div>
     </div>
     <div class="fg"><label>Descripción de la faena (opcional)</label><textarea id="fObs" placeholder="Describe la tarea que han de hacer los alumnos..."></textarea></div>
+    <label class="check-block"><input type="checkbox" id="fTodoDia"><span>Ausencia todo el día según su horario</span></label>
     <label class="check-block"><input type="checkbox" id="fFaena"><span>Ha dejado faena / actividad para los alumnos</span></label>
-    <button class="btn-save" onclick="save()">Guardar</button>
+    <div class="modal-actions">
+      <button class="btn-cancel" type="button" onclick="closeModal()">Cancelar</button>
+      <button class="btn-save" type="button" onclick="save()">Guardar</button>
+    </div>
     <button class="btn-del" id="btnDel" style="display:none" onclick="del()">Eliminar registro</button>
   </div>
 </div>
@@ -117,7 +133,13 @@
         <div class="teacher-meta" id="teacherMeta">Horario del profesorado</div>
         <div class="teacher-user" id="teacherUser"></div>
       </div>
-      <div class="teacher-meta" id="teacherSummary">Sesiones del día</div>
+      <div>
+        <div class="teacher-meta" id="teacherSummary">Sesiones del día</div>
+        <div class="teacher-panel-actions">
+          <button class="btn-teacher-panel" type="button" onclick="closeTeacherPanel()">Cerrar panel</button>
+          <button class="btn-teacher-panel btn-teacher-panel-danger" type="button" onclick="exitTeacherMode()">Salir del modo</button>
+        </div>
+      </div>
     </div>
     <div class="teacher-day-pills" id="teacherDayPills"></div>
     <div class="teacher-sessions" id="teacherSessions"></div>
@@ -135,7 +157,10 @@
       <datalist id="teacherLoginList"></datalist>
     </div>
     <div class="teacher-access-preview" id="teacherAccessPreview">Selecciona tu nombre para entrar en tu panel.</div>
-    <button class="btn-save" type="button" onclick="loginTeacher()">Entrar al modo profesorado</button>
+    <div class="modal-actions">
+      <button class="btn-cancel" type="button" onclick="closeTeacherAccess()">Cancelar</button>
+      <button class="btn-save" type="button" onclick="loginTeacher()">Entrar al modo profesorado</button>
+    </div>
   </div>
 </div>
 <div class="overlay" id="bibliotecaOverlay" onclick="bgBibliotecaClose(event)">
@@ -159,7 +184,67 @@
       <label>Profesor de biblioteca</label>
       <select id="bProfesor"></select>
     </div>
-    <button class="btn-save" type="button" onclick="saveBibliotecaAssignment()">Guardar biblioteca</button>
+    <div class="modal-actions">
+      <button class="btn-cancel" type="button" onclick="closeBibliotecaModal()">Cancelar</button>
+      <button class="btn-save" type="button" onclick="saveBibliotecaAssignment()">Guardar biblioteca</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="historyOverlay" onclick="bgHistoryClose(event)">
+  <div class="modal history-modal">
+    <div class="modal-hd">
+      <span>Historial de cambios</span>
+      <button class="modal-x" type="button" onclick="closeHistoryModal()">x</button>
+    </div>
+    <div class="history-head">
+      <div class="history-copy">Registro reciente de cambios realizados desde Jefatura.</div>
+      <div class="history-head-actions">
+        <button class="btn-dialog btn-dialog-secondary" id="btnUndoHistory" type="button" onclick="undoLastHistoryChange()">Deshacer ultimo</button>
+        <button class="btn-dialog btn-dialog-secondary" type="button" onclick="clearHistory()">Borrar historial</button>
+      </div>
+    </div>
+    <div class="history-filters" id="historyFilters">
+      <button class="history-filter active" data-filter="all" type="button" onclick="setHistoryFilter('all')">Todo</button>
+      <button class="history-filter" data-filter="create" type="button" onclick="setHistoryFilter('create')">Altas</button>
+      <button class="history-filter" data-filter="edit" type="button" onclick="setHistoryFilter('edit')">Ediciones</button>
+      <button class="history-filter" data-filter="delete" type="button" onclick="setHistoryFilter('delete')">Borrados</button>
+      <button class="history-filter" data-filter="biblioteca" type="button" onclick="setHistoryFilter('biblioteca')">Biblioteca</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+<footer class="site-footer">
+  <a class="site-footer-link" href="https://portal.edu.gva.es/iesalcalans/es/" target="_blank" rel="noopener noreferrer">
+    <img
+      class="site-footer-logo site-footer-logo-ies"
+      src="imagenes/logo-ies-alcalans.jpg"
+      alt="Logo del IES Alcalans"
+    >
+  </a>
+  <a class="site-footer-link" href="https://ceice.gva.es/es/" target="_blank" rel="noopener noreferrer">
+    <img
+      class="site-footer-logo site-footer-logo-conselleria"
+      src="imagenes/gv_conselleria_educacion_cmyk_cast-1024x505-2.png"
+      alt="Logo de la Conselleria de Educación"
+    >
+  </a>
+  <div class="site-footer-credit">Ash nazg durbatuluk, ash nazg gimbatul, ash nazg thrakatuluk agh burzum-ishi krimpatul. rm sai 2026</div>
+</footer>
+<div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+<div class="overlay" id="dialogOverlay" onclick="bgDialogClose(event)">
+  <div class="modal dialog-modal">
+    <div class="modal-hd">
+      <span id="dialogTitle">Aviso</span>
+      <button class="modal-x" type="button" onclick="closeDialog(false)">x</button>
+    </div>
+    <div class="dialog-body">
+      <p class="dialog-text" id="dialogText"></p>
+      <input class="dialog-input" id="dialogInput" type="password" autocomplete="off" style="display:none">
+    </div>
+    <div class="dialog-actions" id="dialogActions">
+      <button class="btn-dialog btn-dialog-secondary" id="dialogCancel" type="button" onclick="closeDialog(false)" style="display:none">Cancelar</button>
+      <button class="btn-dialog btn-dialog-primary" id="dialogConfirm" type="button" onclick="closeDialog(true)">Aceptar</button>
+    </div>
   </div>
 </div>
 <script src="js/data/profesorado_horarios_guardias.js"></script>
