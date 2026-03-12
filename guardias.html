@@ -5,163 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Guardias IES</title>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #f4f7fb;
-    --surface: #ffffff;
-    --surface2: #f7f9fc;
-    --surface3: #f0f4f8;
-    --border: #dbe3ee;
-    --accent: #d9a11d;
-    --green: #1f9d63;
-    --red: #d9534f;
-    --blue: #3d74c5;
-    --text: #1f2937;
-    --muted: #6b7280;
-    --muted2: #8a94a6;
-    --font-h: 'Manrope', sans-serif;
-    --font-b: 'Manrope', sans-serif;
-    --radius: 12px;
-  }
-  body.theme-dark {
-    --bg: #0f1722;
-    --surface: #18212f;
-    --surface2: #1e2939;
-    --surface3: #243244;
-    --border: #314255;
-    --accent: #f0bf3c;
-    --green: #41c784;
-    --red: #f06b67;
-    --blue: #7fb0ff;
-    --text: #eef3fb;
-    --muted: #94a3b8;
-    --muted2: #b0bccd;
-  }
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: var(--font-b); font-size: 14px; min-height: 100vh; }
-  header {
-    position: sticky; top: 0; z-index: 50;
-    background: rgba(244,247,251,0.92); backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-    min-height: 96px; display: flex; align-items: center; gap: 1rem;
-    padding: 10px 1.75rem;
-  }
-  body.theme-dark header { background: rgba(15,23,34,0.92); }
-  .logo { margin-right: auto; }
-  .logo-link { display: flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; font-family: var(--font-h); font-weight: 800; font-size: 1.24rem; letter-spacing: -0.5px; }
-  .logo-icon { width: 75px; height: 75px; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 16px; }
-  .logo-icon img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 16px; }
-  .logo-sub { color: var(--muted); font-weight: 400; }
-  .pulse-badge { display: flex; align-items: center; gap: 6px; background: rgba(31,157,99,0.08); border: 1px solid rgba(31,157,99,0.14); color: var(--green); font-size: .72rem; font-weight: 600; padding: 4px 11px; border-radius: 20px; letter-spacing: .4px; text-transform: uppercase; }
-  .pulse-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: blink 1.6s infinite; }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
-  .clock { font-size: .8rem; color: var(--muted2); min-width: 44px; text-align: right; }
-  .btn { font-family: var(--font-b); font-size: .8rem; font-weight: 500; padding: 6px 14px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--text); transition: all .18s; white-space: nowrap; }
-  .btn:hover { border-color: var(--accent); color: var(--accent); }
-  .btn.on { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
-  .btn-theme { min-width: 102px; text-align: center; }
-  main { max-width: 1180px; margin: 0 auto; padding: 1.75rem 1.75rem 4rem; }
-  .day-strip { display: flex; align-items: center; gap: .5rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
-  .day-strip-title { font-family: var(--font-h); font-size: 1.55rem; font-weight: 800; letter-spacing: -.6px; margin-right: auto; }
-  .day-strip-title em { font-style: normal; color: var(--accent); }
-  .day-pill { font-size: .78rem; font-weight: 600; padding: 5px 14px; border-radius: 20px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--muted2); transition: all .18s; }
-  .day-pill:hover { color: var(--text); border-color: var(--muted); }
-  .day-pill.active { background: var(--accent); color: #000; border-color: var(--accent); }
-  .guardia-board { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; margin-bottom: 1.25rem; }
-  .guardia-board-head { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: .9rem; }
-  .guardia-board-title { font-family: var(--font-h); font-size: 1rem; font-weight: 800; letter-spacing: -.3px; }
-  .guardia-board-note { font-size: .78rem; color: var(--muted2); margin-right: auto; }
-  .guardia-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .7rem; }
-  .guardia-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: .85rem .95rem; }
-  .guardia-card-head { display: flex; align-items: center; gap: .65rem; margin-bottom: .5rem; }
-  .guardia-num { color: var(--muted); font-weight: 700; font-size: .85rem; min-width: 58px; }
-  .guardia-list { display: flex; flex-wrap: wrap; gap: .45rem; }
-  .guardia-mini { padding: 5px 8px; border-radius: 999px; background: var(--surface3); border: 1px solid var(--border); font-size: .74rem; font-weight: 600; }
-  .guardia-mini-assigned { background: #e7f5ec; border-color: #7ac89c; color: #0f6a3e; box-shadow: inset 0 0 0 1px rgba(31,157,99,0.12); }
-  body.theme-dark .guardia-mini-assigned { background: #183526; border-color: #41c784; color: #9be2bd; }
-  .btn-mini { font-family: var(--font-b); font-size: .74rem; font-weight: 700; padding: 6px 11px; border-radius: 8px; cursor: pointer; border: 1px solid rgba(217,161,29,0.22); background: rgba(217,161,29,0.08); color: #8c6707; transition: all .18s; }
-  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: .9rem; margin-bottom: 1.25rem; }
-  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.15rem; }
-  .stat-l { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.1px; color: var(--muted); margin-bottom: 5px; }
-  .stat-n { font-family: var(--font-h); font-size: 2.1rem; font-weight: 800; line-height: 1; }
-  .c-yellow{color:var(--accent)} .c-red{color:var(--red)} .c-green{color:var(--green)} .c-blue{color:var(--blue)}
-  .admin-bar { display: none; align-items: center; gap: .75rem; flex-wrap: wrap; background: rgba(245,197,66,0.05); border: 1px solid rgba(245,197,66,0.18); border-radius: var(--radius); padding: .75rem 1.1rem; margin-bottom: 1.25rem; }
-  .admin-bar.show { display: flex; }
-  .admin-tag { font-size: .72rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
-  .btn-add { background: var(--accent); color: #000; border: none; font-family: var(--font-h); font-weight: 800; font-size: .82rem; padding: 7px 16px; border-radius: 8px; cursor: pointer; }
-  .save-ts { font-size: .72rem; color: var(--muted); margin-left: auto; }
-  .teacher-bar { display: none; align-items: center; gap: .75rem; flex-wrap: wrap; background: rgba(61,116,197,0.05); border: 1px solid rgba(61,116,197,0.18); border-radius: var(--radius); padding: .75rem 1.1rem; margin-bottom: 1.25rem; }
-  .teacher-bar.show { display: flex; }
-  .teacher-tag { font-size: .72rem; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 1px; }
-  .btn-teacher { background: var(--blue); color: #fff; border: none; font-family: var(--font-h); font-weight: 800; font-size: .82rem; padding: 7px 16px; border-radius: 8px; cursor: pointer; }
-  .teacher-name { font-size: .82rem; color: var(--muted); }
-  .tbl-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); }
-  table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); }
-  thead { background: var(--surface2); }
-  th { font-family: var(--font-h); font-weight: 700; font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: .9rem 1rem; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
-  td { padding: 1rem; border-bottom: 1px solid rgba(40,40,58,0.12); vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  .hora-num { font-weight: 700; font-size: 1rem; color: var(--text); line-height: 1; }
-  .hora-range { font-size: .7rem; color: var(--muted); margin-top: 2px; }
-  .cell-stack { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .guardia-slot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .slot-tag { font-size: .68rem; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); min-width: 64px; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; background: var(--surface3); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: .84rem; font-weight: 600; white-space: nowrap; color: var(--text); }
-  .avatar { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: .6rem; font-weight: 800; color: #fff; }
-  .av-red{background:var(--red)} .av-yellow{background:var(--accent);color:#000}
-  .guardia-chip { background: #fff8e6; border-color: #efdba6; }
-  .guardia-chip-assigned { background: #e7f5ec; border-color: #7ac89c; color: #0f6a3e; }
-  body.theme-dark .guardia-chip-assigned { background: #183526; border-color: #41c784; color: #9be2bd; }
-  .aula-tag { display: inline-flex; align-items: center; font-size: .92rem; font-weight: 700; color: var(--blue); background: #eef4ff; border: 1px solid #d7e4fb; padding: 7px 10px; border-radius: 8px; white-space: nowrap; }
-  .sin-asignar { color: var(--red); font-size: .82rem; font-weight: 700; }
-  .faena-box { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-  .faena-toggle summary { list-style: none; cursor: pointer; }
-  .faena-toggle summary::-webkit-details-marker { display: none; }
-  .faena-toggle summary::after { content: 'Ver tarea'; font-size: .74rem; font-weight: 700; color: var(--blue); }
-  .faena-toggle[open] summary::after { content: 'Ocultar tarea'; }
-  .faena-text { margin-top: 6px; padding: 9px 10px; border-radius: 8px; background: var(--surface3); border: 1px solid var(--border); color: var(--text); font-size: .8rem; line-height: 1.35; max-width: 280px; }
-  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 20px; font-size: .72rem; font-weight: 700; letter-spacing: .3px; white-space: nowrap; }
-  .b-ok  { background: #edf9f3; color: var(--green); border: 1px solid #cdebd9; }
-  .b-nok { background: #fff1f1; color: var(--red); border: 1px solid #f3d1d1; }
-  .b-banos { background: #fff1cc; color: #8c6707; border: 1px solid #f0bf3c; }
-  .row-support td { padding-top: 0; }
-  .row-support-block { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: .7rem .9rem; margin: 0 .35rem .75rem; border-radius: 10px; background: #fff8e6; border: 1px solid #efdba6; }
-  body.theme-dark .row-support-block { background: #3b311c; border-color: #8c6707; }
-  .row-support-text { font-size: .82rem; font-weight: 700; color: #8c6707; }
-  body.theme-dark .row-support-text { color: #ffd86f; }
-  .btn-edit { font-family: var(--font-b); font-size: .72rem; padding: 3px 9px; border-radius: 5px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
-  .empty-row td { text-align: center; color: var(--muted); padding: 3rem 1rem; font-size: .88rem; }
-  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 200; align-items: center; justify-content: center; }
-  .overlay.open { display: flex; }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.75rem; width: 520px; max-width: 95vw; max-height: 92vh; overflow-y: auto; }
-  .modal-hd { font-family: var(--font-h); font-size: 1.2rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-  .modal-x { width: 28px; height: 28px; border-radius: 7px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; }
-  .fg { margin-bottom: 1.1rem; }
-  .fg label { display: block; font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .9px; margin-bottom: 5px; }
-  .fg input, .fg select, .fg textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--font-b); font-size: .88rem; padding: 8px 11px; border-radius: 8px; outline: none; }
-  .fg textarea { resize: vertical; min-height: 65px; }
-  .fg-row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
-  .check-block { display: flex; align-items: center; gap: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 13px; cursor: pointer; }
-  .btn-save { width: 100%; margin-top: .75rem; background: var(--accent); color: #000; border: none; font-family: var(--font-h); font-weight: 800; font-size: .95rem; padding: 11px; border-radius: 9px; cursor: pointer; }
-  .btn-del { width: 100%; margin-top: .5rem; background: rgba(240,79,79,.08); color: var(--red); border: 1px solid rgba(240,79,79,.25); font-family: var(--font-b); font-size: .82rem; padding: 9px; border-radius: 9px; cursor: pointer; }
-  .teacher-modal { width: 720px; }
-  .teacher-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-  .teacher-meta { color: var(--muted); font-size: .82rem; }
-  .teacher-day-pills { display: flex; gap: .45rem; flex-wrap: wrap; margin-bottom: 1rem; }
-  .teacher-day-pills button { font-family: var(--font-b); font-size: .74rem; font-weight: 700; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; }
-  .teacher-day-pills button.active { background: var(--blue); color: #fff; border-color: var(--blue); }
-  .teacher-sessions { display: grid; gap: .85rem; }
-  .teacher-session { border: 1px solid var(--border); background: var(--surface2); border-radius: 12px; padding: .95rem; }
-  .teacher-session-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .7rem; }
-  .teacher-session-title { font-weight: 800; }
-  .teacher-session-meta { font-size: .8rem; color: var(--muted); }
-  .teacher-session-empty { color: var(--muted); font-size: .9rem; padding: .5rem 0; }
-  .teacher-check { display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; }
-  .teacher-check input { accent-color: var(--blue); }
-  .teacher-save { background: var(--blue); color: #fff; border: none; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; }
-  @media(max-width:800px) { .stats{grid-template-columns:repeat(2,1fr)} th:nth-child(6),td:nth-child(6){display:none} }
-  @media(max-width:560px) { header{padding:0 1rem} main{padding:1rem 1rem 3rem} .day-strip-title{font-size:1.2rem;width:100%} .clock{display:none} .fg-row{grid-template-columns:1fr} }
-</style>
+<link rel="stylesheet" href="css/guardias.css">
 </head>
 <body>
 <header>
@@ -186,25 +30,26 @@
     <div class="stat"><div class="stat-l">Ausencias hoy</div><div class="stat-n c-red" id="sAus">0</div></div>
     <div class="stat"><div class="stat-l">Guardias asignadas</div><div class="stat-n c-green" id="sAsig">0</div></div>
     <div class="stat"><div class="stat-l">Sin cubrir</div><div class="stat-n c-yellow" id="sSin">0</div></div>
-    <div class="stat"><div class="stat-l">Con faena dejada</div><div class="stat-n c-blue" id="sFaena">0</div></div>
+    <div class="stat"><div class="stat-l">Han dejado faena</div><div class="stat-n c-blue" id="sFaena">0</div></div>
   </div>
   <section class="guardia-board">
     <div class="guardia-board-head">
       <div class="guardia-board-title">Guardias previstas por hora</div>
-      <div class="guardia-board-note">Preparado por dia y hora. Luego podras sustituir esta plantilla por la lista oficial.</div>
-      <button class="btn-mini" type="button" onclick="sortearGuardiasDia()">Sortear orden del dia</button>
+      <div class="guardia-board-note">Preparado por día y hora. Luego podrás sustituir esta plantilla por la lista oficial.</div>
+      <button class="btn-mini" type="button" onclick="sortearGuardiasDia()">Sortear orden del día</button>
     </div>
     <div class="guardia-grid" id="guardiaGrid"></div>
   </section>
   <div class="admin-bar" id="adminBar">
     <span class="admin-tag">Modo Jefe de Estudios</span>
-    <button class="btn-add" onclick="openModal()">+ Anadir ausencia</button>
+    <button class="btn-add" onclick="openModal()">+ Añadir ausencia</button>
     <span class="save-ts" id="saveTs">Toca una fila para editar</span>
   </div>
   <div class="teacher-bar" id="teacherBar">
     <span class="teacher-tag">Modo Profesorado</span>
     <button class="btn-teacher" onclick="openTeacherPanel()">Mis tareas</button>
-    <span class="teacher-name" id="teacherBarName">Rafa Minana · Informatica</span>
+    <button class="btn-teacher" onclick="exitTeacherMode()">Salir</button>
+    <span class="teacher-name" id="teacherBarName">Profesorado</span>
   </div>
   <div class="tbl-wrap">
     <table>
@@ -231,20 +76,28 @@
     </div>
     <div class="fg-row">
       <div class="fg">
-        <label>Dia</label>
-        <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Miercoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
+        <label>Día</label>
+        <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Miércoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
       </div>
       <div class="fg">
         <label>Hora</label>
         <select id="fHora"><option value="1">1a hora (08:15-09:10)</option><option value="2">2a hora (09:10-10:05)</option><option value="3">3a hora (10:05-11:00)</option><option value="4">4a hora (11:00-11:25)</option><option value="5">5a hora (11:25-12:20)</option><option value="6">6a hora (12:20-13:15)</option><option value="7">7a hora (13:15-14:10)</option><option value="8">8a hora (14:10-14:25)</option><option value="9">9a hora (14:25-15:20)</option></select>
       </div>
     </div>
-    <div class="fg"><label>Profesor ausente</label><input type="text" id="fAusente" placeholder="Apellidos, Nombre"></div>
+    <div class="fg">
+      <label>Profesor ausente</label>
+      <input type="text" id="fAusente" list="profesoresAusencias" placeholder="Selecciona o busca un profesor" autocomplete="off">
+      <datalist id="profesoresAusencias"></datalist>
+    </div>
     <div class="fg-row">
-      <div class="fg"><label>Profesor de guardia</label><input type="text" id="fGuardia" placeholder="Quien cubre la guardia"></div>
+      <div class="fg">
+        <label>Profesor de guardia</label>
+        <input type="text" id="fGuardia" list="profesoresGuardia" placeholder="Selecciona un profesor de guardia" autocomplete="off">
+        <datalist id="profesoresGuardia"></datalist>
+      </div>
       <div class="fg"><label>Aula / Lugar</label><input type="text" id="fAula" placeholder="Ej: 2oA - Aula 12"></div>
     </div>
-    <div class="fg"><label>Descripcion de la faena (opcional)</label><textarea id="fObs" placeholder="Describe la tarea que han de hacer los alumnos..."></textarea></div>
+    <div class="fg"><label>Descripción de la faena (opcional)</label><textarea id="fObs" placeholder="Describe la tarea que han de hacer los alumnos..."></textarea></div>
     <label class="check-block"><input type="checkbox" id="fFaena"><span>Ha dejado faena / actividad para los alumnos</span></label>
     <button class="btn-save" onclick="save()">Guardar</button>
     <button class="btn-del" id="btnDel" style="display:none" onclick="del()">Eliminar registro</button>
@@ -258,277 +111,16 @@
     </div>
     <div class="teacher-head">
       <div>
-        <div class="teacher-session-title" id="teacherName">Rafa Minana</div>
-        <div class="teacher-meta" id="teacherMeta">Departamento de Informatica</div>
+        <div class="teacher-session-title" id="teacherName">Profesorado</div>
+        <div class="teacher-meta" id="teacherMeta">Horario del profesorado</div>
       </div>
-      <div class="teacher-meta" id="teacherSummary">Sesiones del dia</div>
+      <div class="teacher-meta" id="teacherSummary">Sesiones del día</div>
     </div>
     <div class="teacher-day-pills" id="teacherDayPills"></div>
     <div class="teacher-sessions" id="teacherSessions"></div>
   </div>
 </div>
-<script>
-const HORA_MAP={1:{label:'1a',rango:'08:15-09:10'},2:{label:'2a',rango:'09:10-10:05'},3:{label:'3a',rango:'10:05-11:00'},4:{label:'4a',rango:'11:00-11:25'},5:{label:'5a',rango:'11:25-12:20'},6:{label:'6a',rango:'12:20-13:15'},7:{label:'7a',rango:'13:15-14:10'},8:{label:'8a',rango:'14:10-14:25'},9:{label:'9a',rango:'14:25-15:20'}};
-const DIAS=['Lunes','Martes','Miercoles','Jueves','Viernes'];
-const KEY='IES_Alcalans_Guardias';
-const KEY_ORDEN='IES_Alcalans_Guardias_OrdenHora';
-const KEY_THEME='IES_Alcalans_Theme';
-const KEY_TAREAS='IES_Alcalans_Tareas_Profesorado';
-const PROFES_PLANTILLA=[
-  'Rafa Minana','Adria Soler','Aina Ferrer','Alba Cervera','Alberto Tormo','Alicia Beltran','Amparo Esteve','Ana Rubio',
-  'Andres Torres','Angela Vilar','Beatriz Pardo','Carla Marin','Carlos Segura','Carmen Blasco','Clara Giner','Cristina Mora',
-  'David Sanchis','Diego Campos','Elena Roig','Enrique Pastor','Eva Peris','Fernando Vidal','Gemma Dura','Hector Molla',
-  'Helena Gil','Hugo Navarro','Ines Serra','Irene Pascual','Isabel Orts','Jaime Mico','Javier Roca','Joan Campos',
-  'Jorge Calatayud','Josep Penya','Juanma Estelles','Julia Cifre','Laia Monzo','Laura Belda','Lorena Llopis','Lucia Marti',
-  'Manuel Aparicio','Marc Ferrando','Maria Albero','Marta Gomis','Mireia Ribes','Monica Sancho','Nacho Valls','Neus Tomas',
-  'Nuria Femenia','Olga Crespo','Oscar Cuenca','Pablo Benavent','Pau Fornes','Paula Oltra','Pedro Pons','Pilar Sifre',
-  'Raquel Soria','Raul Ferris','Rebeca Llacer','Ricard Miralles','Rocio Vives','Ruben Serra','Salva Noguera','Sandra Mira',
-  'Sara Campos','Sergi Cerdan','Silvia Pina','Sonia Bataller','Susana Piera','Tamara Llinares','Teresa Molins','Tomas Requena',
-  'Vicent Perello','Victor Lloret','Virginia Abad','Xavi Montoro','Yolanda Selles','Zoe Aranda','Adela Garrido','Belen Crespi'
-];
-const GUARDIAS_FIJAS={
-  '3-7':['Rafa Minana'],
-  '4-2':['Rafa Minana'],
-  '4-7':['Rafa Minana']
-};
-const GRUPOS_PROFESORADO={
-  '2CFBINF':{nombre:'2FPB Informatica',etapa:'FP Basica',abreviatura:'2FPB INF'},
-  '1CFMINF':{nombre:'1GM Informatica',etapa:'Grado Medio',abreviatura:'1GM INF'}
-};
-const PROFESORES_BASE={
-  'Rafa Minana':{
-    nombre:'Rafa Minana',
-    nombreCompleto:'Minana Llibrer, Rafael Maria',
-    departamento:'Informatica',
-    grupos:['2CFBINF','1CFMINF'],
-    horario:{
-      0:{
-        1:{tipo:'clase',grupo:'2CFBINF',materia:'IMR',detalle:'Instalacion y mantenimiento de redes para transmision de datos'},
-        2:{tipo:'clase',grupo:'2CFBINF',materia:'IMR',detalle:'Instalacion y mantenimiento de redes para transmision de datos'},
-        3:{tipo:'tutoria',detalle:'2a hora tutoria individualizada'},
-        5:{tipo:'clase',grupo:'2CFBINF',materia:'IMR',detalle:'Instalacion y mantenimiento de redes para transmision de datos'},
-        6:{tipo:'clase',grupo:'1CFMINF',materia:'SOM',detalle:'Sistemas operativos monopuesto'}
-      },
-      1:{
-        3:{tipo:'tutoria',detalle:'2a hora tutoria individualizada'},
-        5:{tipo:'clase',grupo:'2CFBINF',materia:'IMR',detalle:'Instalacion y mantenimiento de redes para transmision de datos'},
-        6:{tipo:'clase',grupo:'2CFBINF',materia:'IMR',detalle:'Instalacion y mantenimiento de redes para transmision de datos'},
-        7:{tipo:'clase',grupo:'2CFBINF',materia:'IMR',detalle:'Instalacion y mantenimiento de redes para transmision de datos'},
-        9:{tipo:'tutoria',detalle:'2a hora tutoria individualizada'}
-      },
-      2:{
-        1:{tipo:'clase',grupo:'1CFMINF',materia:'SOM',detalle:'Sistemas operativos monopuesto'},
-        2:{tipo:'clase',grupo:'1CFMINF',materia:'SOM',detalle:'Sistemas operativos monopuesto'},
-        3:{tipo:'clase',grupo:'2CFBINF',materia:'IMR',detalle:'Instalacion y mantenimiento de redes para transmision de datos'},
-        9:{tipo:'departamento',detalle:'Reunion de departamento didactico'}
-      },
-      3:{
-        1:{tipo:'tutoria_grupo',grupo:'2CFBINF',materia:'TUTOCF',detalle:'Tutoria segundo 2FPB Informatica'},
-        2:{tipo:'familias',detalle:'Atencion a familias'},
-        3:{tipo:'clase',grupo:'2CFBINF',materia:'IMR',detalle:'Instalacion y mantenimiento de redes para transmision de datos'},
-        5:{tipo:'complementaria',detalle:'Complementarias autorizadas'},
-        6:{tipo:'clase',grupo:'2CFBINF',materia:'IMR',detalle:'Instalacion y mantenimiento de redes para transmision de datos'},
-        7:{tipo:'guardia',detalle:'Guardia'}
-      },
-      4:{
-        1:{tipo:'clase',grupo:'2CFBINF',materia:'IMR',detalle:'Instalacion y mantenimiento de redes para transmision de datos'},
-        2:{tipo:'guardia',detalle:'Guardia'},
-        3:{tipo:'complementaria',detalle:'Complementarias autorizadas'},
-        6:{tipo:'clase',grupo:'1CFMINF',materia:'SOM',detalle:'Sistemas operativos monopuesto'},
-        7:{tipo:'guardia',detalle:'Guardia'}
-      }
-    }
-  }
-};
-let isAdmin=false,day=0,editId=null;
-let teacherName='Rafa Minana';
-let teacherDay=0;
-const demo=[
-  {id:1,dia:0,hora:1,ausente:'Garcia Lopez, Ana',guardia:'',aula:'2oA - Aula 12',faena:true,obs:'Ejercicios pag. 34-35 del libro'},
-  {id:2,dia:0,hora:3,ausente:'Perez Sanchez, Luis',guardia:'',aula:'1oB - Sala estudio',faena:false,obs:''},
-  {id:3,dia:0,hora:5,ausente:'Torres Vidal, Marta',guardia:'',aula:'3oA - Aula 7',faena:true,obs:'Redaccion tema 5 - entregar manana'},
-  {id:4,dia:1,hora:1,ausente:'Romero Diaz, Javier',guardia:'',aula:'4oB - Aula 3',faena:false,obs:''},
-  {id:5,dia:1,hora:4,ausente:'Navarro Gil, Carmen',guardia:'',aula:'2oC - Aula 15',faena:true,obs:'Repaso para el examen del jueves'},
-  {id:6,dia:2,hora:2,ausente:'Castro Reyes, David',guardia:'',aula:'1oA - Aula 2',faena:false,obs:''},
-  {id:7,dia:3,hora:5,ausente:'Blanco Munoz, Rosa',guardia:'',aula:'3oB - Biblioteca',faena:true,obs:'Lectura libre + ficha de comprension'},
-  {id:8,dia:4,hora:1,ausente:'Serrano Lara, Miguel',guardia:'',aula:'2oD - Aula 9',faena:false,obs:''}
-];
-function buildHorarioBase(){
-  const horario={};
-  let cursor=0;
-  for(let dia=0;dia<5;dia++){
-    horario[dia]={};
-    for(let hora=1;hora<=9;hora++){
-      const key=`${dia}-${hora}`;
-      const fijas=GUARDIAS_FIJAS[key]?[...GUARDIAS_FIJAS[key]]:[];
-      const usados=new Set(fijas);
-      const lista=[...fijas];
-      while(lista.length<4){
-        const nombre=PROFES_PLANTILLA[cursor%PROFES_PLANTILLA.length];
-        cursor++;
-        if(usados.has(nombre)) continue;
-        usados.add(nombre);
-        lista.push(nombre);
-      }
-      horario[dia][hora]=lista;
-    }
-  }
-  return horario;
-}
-const HORARIO_GUARDIAS=buildHorarioBase();
-function load(){try{const d=localStorage.getItem(KEY);return d?JSON.parse(d):demo;}catch(e){return demo;}}
-function persist(d){try{localStorage.setItem(KEY,JSON.stringify(d));}catch(e){}}
-function persistOrden(d){try{localStorage.setItem(KEY_ORDEN,JSON.stringify(d));}catch(e){}}
-function loadTareas(){try{const d=localStorage.getItem(KEY_TAREAS);return d?JSON.parse(d):{};}catch(e){return {};}}
-function persistTareas(d){try{localStorage.setItem(KEY_TAREAS,JSON.stringify(d));}catch(e){}}
-function shuffle(arr){const copy=[...arr];for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}return copy;}
-function makeOrdenHora(dia,hora){return shuffle(HORARIO_GUARDIAS[dia]?.[hora]||[]).map((nombre,index)=>({nombre,numero:index+1}));}
-function buildInitialOrden(){const orden={};for(let dia=0;dia<5;dia++){orden[dia]={};for(let hora=1;hora<=9;hora++){orden[dia][hora]=makeOrdenHora(dia,hora);}}persistOrden(orden);return orden;}
-function ensureOrden(base){
-  const orden={...base};
-  for(let dia=0;dia<5;dia++){
-    if(!orden[dia]) orden[dia]={};
-    for(let hora=1;hora<=9;hora++){
-      const esperados=HORARIO_GUARDIAS[dia]?.[hora]||[];
-      const actuales=Array.isArray(orden[dia][hora])?orden[dia][hora]:[];
-      const nombres=actuales.map(item=>item.nombre);
-      const invalido=actuales.length!==esperados.length||esperados.some(nombre=>!nombres.includes(nombre));
-      if(invalido) orden[dia][hora]=makeOrdenHora(dia,hora);
-    }
-  }
-  persistOrden(orden);
-  return orden;
-}
-function loadOrden(){try{const d=localStorage.getItem(KEY_ORDEN);return d?ensureOrden(JSON.parse(d)):buildInitialOrden();}catch(e){return buildInitialOrden();}}
-function getOrdenHora(dia,hora){return (ordenGuardias[dia]?.[hora]||[]).slice().sort((a,b)=>a.numero-b.numero);}
-function getGuardiaSugerida(dia,hora,turno){return getOrdenHora(dia,hora).find(item=>item.numero===turno)?.nombre||'';}
-function getGuardiaBanos(dia,hora,ocupadas){return getOrdenHora(dia,hora)[ocupadas]||null;}
-function getProfesHora(dia,hora){return HORARIO_GUARDIAS[dia]?.[hora]||[];}
-function getProfesor(nombre){return PROFESORES_BASE[nombre]||null;}
-function getHorarioProfesorDia(nombre,dia){return getProfesor(nombre)?.horario?.[dia]||{};}
-function makeTareaKey(nombre,dia,hora){return `${nombre}|${dia}|${hora}`;}
-function getTareaProfesor(nombre,dia,hora){return tareasProfesorado[makeTareaKey(nombre,dia,hora)]||null;}
-function resolveFaena(row){
-  const tarea=getTareaProfesor(row.ausente,row.dia,row.hora);
-  if(tarea) return {faena:!!tarea.dejada,obs:tarea.tarea||''};
-  return {faena:row.faena,obs:row.obs};
-}
-function applyTheme(theme){const dark=theme==='dark';document.body.classList.toggle('theme-dark',dark);const btn=document.getElementById('btnTheme');if(btn)btn.textContent=dark?'Modo claro':'Modo oscuro';}
-function loadTheme(){try{return localStorage.getItem(KEY_THEME)||'light';}catch(e){return'light';}}
-function toggleTheme(){const next=document.body.classList.contains('theme-dark')?'light':'dark';applyTheme(next);try{localStorage.setItem(KEY_THEME,next);}catch(e){}}
-let data=load();
-let nid=data.reduce((m,g)=>Math.max(m,g.id),0)+1;
-let ordenGuardias=loadOrden();
-let tareasProfesorado=loadTareas();
-(function(){const wd=new Date().getDay();day=(wd>=1&&wd<=5)?wd-1:0;})();
-teacherDay=day;
-setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});},1000);
-document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-function initials(n){return(n||'').split(/[\s,]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';}
-function renderPills(){document.getElementById('dNombre').textContent=DIAS[day];document.getElementById('dayPills').innerHTML=DIAS.map((d,i)=>`<button class="day-pill${i===day?' active':''}" onclick="setDay(${i})">${d}</button>`).join('');}
-function renderGuardiaBoard(){
-  const grid=document.getElementById('guardiaGrid');
-  const cards=[];
-  for(let hora=1;hora<=9;hora++){
-    const profes=getProfesHora(day,hora);
-    const asignados=new Set(data.filter(g=>g.dia===day&&g.hora===hora&&g.guardia&&g.guardia.trim()).map(g=>g.guardia.trim()));
-    cards.push(`<div class="guardia-card"><div class="guardia-card-head"><div class="guardia-num">${HORA_MAP[hora].label} hora</div></div><div class="guardia-list">${profes.map(nombre=>`<span class="guardia-mini${asignados.has(nombre)?' guardia-mini-assigned':''}">${nombre}</span>`).join('')}</div></div>`);
-  }
-  grid.innerHTML=cards.join('');
-}
-function setDay(i){day=i;renderPills();renderGuardiaBoard();renderTable();}
-function sortearGuardiasDia(){for(let hora=1;hora<=9;hora++){ordenGuardias[day][hora]=makeOrdenHora(day,hora);}persistOrden(ordenGuardias);renderGuardiaBoard();renderTable();}
-function renderTable(){
-  const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
-  const tb=document.getElementById('tbody');
-  if(!rows.length){tb.innerHTML='<tr class="empty-row"><td colspan="7">No hay ausencias registradas para este dia.</td></tr>';}
-  else{
-    tb.innerHTML=rows.map(g=>{
-      const h=HORA_MAP[g.hora]||{label:g.hora+'a',rango:''};
-      const cub=g.guardia&&g.guardia.trim();
-      const sugerido=cub||getGuardiaSugerida(day,g.hora,1);
-      const banos=getGuardiaBanos(day,g.hora,1);
-      const faenaInfo=resolveFaena(g);
-      return `<tr>
-        <td><div class="hora-num">${h.label} hora</div><div class="hora-range">${h.rango}</div></td>
-        <td><div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">Ausente</span><div class="chip"><div class="avatar av-red">${initials(g.ausente)}</div>${g.ausente}</div></div></div></td>
-        <td>${sugerido?`<div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">${cub?'Guardia asignada':'Turno 1'}</span><div class="chip guardia-chip${cub?' guardia-chip-assigned':''}"><div class="avatar av-yellow">${initials(sugerido)}</div>${sugerido}</div></div></div>`:`<span class="sin-asignar">Sin asignar</span>`}</td>
-        <td><div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">Aula</span><span class="aula-tag">${g.aula||'-'}</span></div></div></td>
-        <td><div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">Faena</span>${faenaInfo.faena?`<div class="faena-box"><span class="badge b-ok">Con tarea</span>${faenaInfo.obs?`<details class="faena-toggle"><summary></summary><div class="faena-text">${faenaInfo.obs}</div></details>`:''}</div>`:`<span class="badge b-nok">Sin tarea</span>`}</div></div></td>
-        <td><div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">Estado</span>${sugerido?`<span class="badge b-ok">${cub?'Asignada':'Turno 1'}</span>`:'<span class="badge b-nok">Sin cubrir</span>'}</div></div></td>
-        <td style="${isAdmin?'':'display:none'}"><button class="btn-edit" onclick="openModal(${g.id})">Editar</button></td>
-      </tr>${banos?`<tr class="row-support"><td colspan="7"><div class="row-support-block"><span class="badge b-banos">Apoyo</span><span class="row-support-text">${banos.nombre} cubre la puerta de los banos en esta hora.</span></div></td></tr>`:''}`;
-    }).join('');
-  }
-  const aus=rows.length;
-  const asig=rows.filter(g=>(g.guardia&&g.guardia.trim())||getGuardiaSugerida(day,g.hora,1)).length;
-  document.getElementById('thAcc').style.display=isAdmin?'':'none';
-  document.getElementById('sAus').textContent=aus;
-  document.getElementById('sAsig').textContent=asig;
-  document.getElementById('sSin').textContent=Math.max(aus-asig,0);
-  document.getElementById('sFaena').textContent=rows.filter(g=>resolveFaena(g).faena).length;
-}
-function toggleAdmin(){if(!isAdmin){const pw=prompt('Contrasena de jefe de estudios:');if(pw!=='jefe2025'){alert('Contrasena incorrecta.');return;}}isAdmin=!isAdmin;document.getElementById('btnAdmin').classList.toggle('on',isAdmin);document.getElementById('adminBar').classList.toggle('show',isAdmin);renderTable();}
-function openTeacherPanel(){teacherDay=day;document.getElementById('teacherOverlay').classList.add('open');document.getElementById('teacherBar').classList.add('show');renderTeacherPanel();}
-function closeTeacherPanel(){document.getElementById('teacherOverlay').classList.remove('open');}
-function bgTeacherClose(e){if(e.target.id==='teacherOverlay')closeTeacherPanel();}
-function setTeacherDay(dia){teacherDay=dia;renderTeacherPanel();}
-function saveTeacherTask(dia,hora){
-  const profesor=getProfesor(teacherName);
-  if(!profesor) return;
-  const dejada=document.getElementById(`taskCheck-${dia}-${hora}`).checked;
-  const tarea=document.getElementById(`taskText-${dia}-${hora}`).value.trim();
-  tareasProfesorado[makeTareaKey(teacherName,dia,hora)]={profesor:teacherName,dia,hora,dejada,tarea};
-  persistTareas(tareasProfesorado);
-  renderTeacherPanel();
-  renderTable();
-}
-function renderTeacherPanel(){
-  const profesor=getProfesor(teacherName);
-  if(!profesor) return;
-  document.getElementById('teacherName').textContent=profesor.nombre;
-  document.getElementById('teacherMeta').textContent=`${profesor.nombreCompleto} · ${profesor.departamento}`;
-  document.getElementById('teacherSummary').textContent=`${DIAS[teacherDay]} · sesiones programadas`;
-  document.getElementById('teacherBarName').textContent=`${profesor.nombre} · ${profesor.departamento}`;
-  document.getElementById('teacherDayPills').innerHTML=DIAS.map((nombreDia,index)=>`<button class="${index===teacherDay?'active':''}" onclick="setTeacherDay(${index})">${nombreDia}</button>`).join('');
-  const sesiones=getHorarioProfesorDia(teacherName,teacherDay);
-  const horas=Object.keys(sesiones).map(Number).sort((a,b)=>a-b);
-  if(!horas.length){
-    document.getElementById('teacherSessions').innerHTML='<div class="teacher-session"><div class="teacher-session-empty">No tienes sesiones registradas para este dia.</div></div>';
-    return;
-  }
-  document.getElementById('teacherSessions').innerHTML=horas.map(hora=>{
-    const sesion=sesiones[hora];
-    const grupo=sesion.grupo?GRUPOS_PROFESORADO[sesion.grupo]?.nombre||sesion.grupo:'';
-    const tarea=getTareaProfesor(teacherName,teacherDay,hora);
-    const checked=tarea?!!tarea.dejada:false;
-    const texto=tarea?.tarea||'';
-    return `<div class="teacher-session">
-      <div class="teacher-session-head">
-        <div>
-          <div class="teacher-session-title">${HORA_MAP[hora].label} hora · ${sesion.materia||sesion.tipo}</div>
-          <div class="teacher-session-meta">${grupo||sesion.detalle}</div>
-        </div>
-        <div class="teacher-session-meta">${HORA_MAP[hora].rango}</div>
-      </div>
-      <label class="teacher-check">
-        <input id="taskCheck-${teacherDay}-${hora}" type="checkbox" ${checked?'checked':''}>
-        <span>He dejado tarea para este grupo</span>
-      </label>
-      <div class="fg">
-        <label>Tarea</label>
-        <textarea id="taskText-${teacherDay}-${hora}" placeholder="Indica que debe hacer el grupo">${texto}</textarea>
-      </div>
-      <button class="teacher-save" type="button" onclick="saveTeacherTask(${teacherDay},${hora})">Guardar tarea</button>
-    </div>`;
-  }).join('');
-}
-function openModal(id){editId=id||null;const g=id?data.find(x=>x.id===id):null;document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?g.ausente:'';document.getElementById('fGuardia').value=g?g.guardia:'';document.getElementById('fAula').value=g?g.aula:'';document.getElementById('fFaena').checked=g?g.faena:false;document.getElementById('fObs').value=g?g.obs:'';document.getElementById('overlay').classList.add('open');}
-function closeModal(){document.getElementById('overlay').classList.remove('open');}
-function bgClose(e){if(e.target.id==='overlay')closeModal();}
-function save(){const entry={dia:+document.getElementById('fDia').value,hora:+document.getElementById('fHora').value,ausente:document.getElementById('fAusente').value.trim(),guardia:document.getElementById('fGuardia').value.trim(),aula:document.getElementById('fAula').value.trim(),faena:document.getElementById('fFaena').checked,obs:document.getElementById('fObs').value.trim()};if(!entry.ausente){alert('Indica el nombre del profesor ausente.');return;}if(editId){const i=data.findIndex(g=>g.id===editId);data[i]={...entry,id:editId};}else{data.push({...entry,id:nid++});}persist(data);closeModal();if(day!==entry.dia)setDay(entry.dia);else renderTable();document.getElementById('saveTs').textContent='Guardado - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});}
-function del(){if(!confirm('Eliminar este registro?'))return;data=data.filter(g=>g.id!==editId);persist(data);closeModal();renderTable();}
-renderPills();renderGuardiaBoard();renderTable();applyTheme(loadTheme());
-</script>
+<script src="js/data/profesorado_horarios_guardias.js"></script>
+<script src="js/app/guardias.js"></script>
 </body>
 </html>
