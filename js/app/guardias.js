@@ -14,7 +14,19 @@ function decodeMojibake(value){
   try{return decodeURIComponent(escape(String(value)));}catch(e){return String(value);}
 }
 function escapeRegExp(value){return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function escapeHtml(value){
+  return String(value)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
 function cleanText(value){return decodeMojibake(value).replace(/\s+/g,' ').trim();}
+function formatNowParts(){
+  const now=new Date();
+  return {hours:now.getHours(),minutes:now.getMinutes(),date:now};
+}
 function stripDiacritics(value){return cleanText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 function toTitleCase(value){return cleanText(value).toLowerCase().replace(/(^|[\s(\/-])([a-záéíóúàèìòùüñç])/g,(m,p1,p2)=>p1+p2.toUpperCase());}
 const DIA_INDEX={'lunes':0,'martes':1,'miercoles':2,'miércoles':2,'jueves':3,'viernes':4};
@@ -261,7 +273,21 @@ let tareasProfesorado=loadTareas();
 (function(){const wd=new Date().getDay();day=(wd>=1&&wd<=5)?wd-1:0;})();
 teacherName=getProfesorNombreSeleccionado(loadTeacherUser())||'';
 teacherDay=day;
-setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});},1000);
+function isReportAvailable(){
+  const now=formatNowParts();
+  return now.hours>14 || (now.hours===14 && now.minutes>=10);
+}
+function updateAdminControls(){
+  const btnSorteo=document.getElementById('btnSorteo');
+  const btnInforme=document.getElementById('btnInforme');
+  if(btnSorteo) btnSorteo.style.display=isAdmin?'':'none';
+  // if(btnInforme) btnInforme.style.display=(isAdmin&&isReportAvailable())?'':'none';
+  if(btnInforme) btnInforme.style.display=isAdmin?'':'none';
+}
+setInterval(()=>{
+  document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  updateAdminControls();
+},1000);
 document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
 function initials(n){return(n||'').split(/[\s,]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';}
 function renderPills(){document.getElementById('dNombre').textContent=DIAS[day];document.getElementById('dayPills').innerHTML=DIAS.map((d,i)=>`<button class="day-pill${i===day?' active':''}" onclick="setDay(${i})">${d}</button>`).join('');}
@@ -299,6 +325,94 @@ function toggleGuardiaCard(button){
 }
 function setDay(i){day=i;renderPills();renderGuardiaBoard();renderTable();}
 function sortearGuardiasDia(){for(let hora=1;hora<=9;hora++){ordenGuardias[day][hora]=makeOrdenHora(day,hora);}persistOrden(ordenGuardias);renderGuardiaBoard();renderTable();}
+function buildDailyReportText(){
+  const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
+  const fecha=formatNowParts().date.toLocaleDateString('es-ES');
+  const cabecera=[
+    `Informe de guardias - ${DIAS[day]}`,
+    `Fecha de generación: ${fecha}`,
+    ''
+  ];
+  if(!rows.length) return cabecera.concat(['No hay ausencias registradas para este día.']).join('\n');
+  const cuerpo=rows.map(g=>{
+    const h=HORA_MAP[g.hora]||{rango:''};
+    const cub=g.guardia&&g.guardia.trim();
+    const sugerido=cub||getGuardiaSugerida(day,g.hora,1)||'Sin asignar';
+    const biblioteca=getBibliotecaAsignada(day,g.hora)||'Sin asignar';
+    const banos=getGuardiaApoyo(day,g.hora,0,[biblioteca,sugerido])?.nombre||'Sin asignar';
+    const faenaInfo=resolveFaena(g);
+    const aula=resolveAulaRegistro(g)||'-';
+    return [
+      `${h.rango.replace('-', ' - ')}`,
+      `Ausente: ${g.ausente}`,
+      `Guardia: ${sugerido}`,
+      `Biblioteca: ${biblioteca}`,
+      `Baños: ${banos}`,
+      `Aula: ${aula}`,
+      `Faena: ${faenaInfo.faena?'Sí':'No'}`,
+      `${faenaInfo.obs?`Tarea: ${faenaInfo.obs}`:'Tarea: -'}`
+    ].join('\n');
+  }).join('\n\n');
+  return cabecera.concat([cuerpo]).join('\n');
+}
+function buildDailyReportHtml(){
+  const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
+  const fecha=formatNowParts().date.toLocaleDateString('es-ES');
+  const cards=rows.length?rows.map(g=>{
+    const h=HORA_MAP[g.hora]||{rango:''};
+    const cub=g.guardia&&g.guardia.trim();
+    const sugerido=cub||getGuardiaSugerida(day,g.hora,1)||'Sin asignar';
+    const biblioteca=getBibliotecaAsignada(day,g.hora)||'Sin asignar';
+    const banos=getGuardiaApoyo(day,g.hora,0,[biblioteca,sugerido])?.nombre||'Sin asignar';
+    const faenaInfo=resolveFaena(g);
+    const aula=resolveAulaRegistro(g)||'-';
+    return `
+      <article class="item">
+        <div class="item-head">${escapeHtml(h.rango.replace('-', ' - '))}</div>
+        <div><strong>Ausente:</strong> ${escapeHtml(g.ausente)}</div>
+        <div><strong>Guardia:</strong> ${escapeHtml(sugerido)}</div>
+        <div><strong>Biblioteca:</strong> ${escapeHtml(biblioteca)}</div>
+        <div><strong>Baños:</strong> ${escapeHtml(banos)}</div>
+        <div><strong>Aula:</strong> ${escapeHtml(aula)}</div>
+        <div><strong>Faena:</strong> ${faenaInfo.faena?'Sí':'No'}</div>
+        <div><strong>Tarea:</strong> ${escapeHtml(faenaInfo.obs||'-')}</div>
+      </article>`;
+  }).join(''):`<p class="empty">No hay ausencias registradas para este día.</p>`;
+  return `<!DOCTYPE html>
+  <html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <title>Informe de guardias</title>
+    <style>
+      body{font-family:Arial,sans-serif;color:#1f2937;margin:32px}
+      h1{margin:0 0 6px;font-size:28px}
+      .meta{margin-bottom:24px;color:#6b7280}
+      .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+      .item{border:1px solid #dbe3ee;border-radius:12px;padding:16px;break-inside:avoid}
+      .item-head{font-weight:700;font-size:18px;margin-bottom:10px}
+      .item div{margin:4px 0}
+      .empty{font-size:16px}
+      @media print{body{margin:16px}.grid{gap:12px}}
+    </style>
+  </head>
+  <body>
+    <h1>Informe de guardias - ${escapeHtml(DIAS[day])}</h1>
+    <div class="meta">Fecha de generación: ${escapeHtml(fecha)}</div>
+    <section class="grid">${cards}</section>
+  </body>
+  </html>`;
+}
+function printDailyReportPdf(){
+  // if(!isAdmin||!isReportAvailable()) return;
+  if(!isAdmin) return;
+  const ventana=window.open('','_blank','noopener,noreferrer,width=980,height=720');
+  if(!ventana) return;
+  ventana.document.open();
+  ventana.document.write(buildDailyReportHtml());
+  ventana.document.close();
+  ventana.focus();
+  ventana.print();
+}
 function editBibliotecaAssignment(){
   if(!isAdmin) return;
   const bibliotecaOverlay=document.getElementById('bibliotecaOverlay');
@@ -571,9 +685,15 @@ function safeInitStep(fn,name){
     console.error(`Init step failed: ${name}`,error);
   }
 }
+const originalToggleAdmin=toggleAdmin;
+toggleAdmin=function(){
+  originalToggleAdmin();
+  updateAdminControls();
+};
 safeInitStep(populateProfesoresAusencias,'populateProfesoresAusencias');
 safeInitStep(populateProfesoresGuardia,'populateProfesoresGuardia');
 safeInitStep(renderPills,'renderPills');
 safeInitStep(renderGuardiaBoard,'renderGuardiaBoard');
 safeInitStep(renderTable,'renderTable');
 safeInitStep(syncTeacherIdentity,'syncTeacherIdentity');
+safeInitStep(updateAdminControls,'updateAdminControls');
