@@ -18,8 +18,7 @@
   <div class="pulse-badge"><div class="pulse-dot"></div>En directo</div>
   <div class="clock" id="clock"></div>
   <button class="btn" id="btnTeacher" onclick="openTeacherPanel()">Profesorado</button>
-  <button class="btn btn-theme" id="btnTheme" onclick="toggleTheme()">Modo oscuro</button>
-  <button class="btn" id="btnAdmin" onclick="toggleAdmin()">⚙ Jefe de estudios</button>
+  <button class="btn" id="btnAdmin" onclick="toggleAdmin()">Jefe de estudios</button>
 </header>
 <main>
   <div class="day-strip">
@@ -43,11 +42,13 @@
   <div class="admin-bar" id="adminBar">
     <span class="admin-tag">Modo Jefe de Estudios</span>
     <button class="btn-add" onclick="openModal()">+ Añadir ausencia</button>
+    <button class="btn-add" onclick="editBibliotecaAssignment()">Asignar biblioteca</button>
     <span class="save-ts" id="saveTs">Toca una fila para editar</span>
   </div>
   <div class="teacher-bar" id="teacherBar">
     <span class="teacher-tag">Modo Profesorado</span>
     <button class="btn-teacher" onclick="openTeacherPanel()">Mis tareas</button>
+    <button class="btn-teacher" onclick="changeTeacherUser()">Cambiar usuario</button>
     <button class="btn-teacher" onclick="exitTeacherMode()">Salir</button>
     <span class="teacher-name" id="teacherBarName">Profesorado</span>
   </div>
@@ -113,11 +114,27 @@
       <div>
         <div class="teacher-session-title" id="teacherName">Profesorado</div>
         <div class="teacher-meta" id="teacherMeta">Horario del profesorado</div>
+        <div class="teacher-user" id="teacherUser"></div>
       </div>
       <div class="teacher-meta" id="teacherSummary">Sesiones del día</div>
     </div>
     <div class="teacher-day-pills" id="teacherDayPills"></div>
     <div class="teacher-sessions" id="teacherSessions"></div>
+  </div>
+</div>
+<div class="overlay" id="teacherAccessOverlay" onclick="bgTeacherAccessClose(event)">
+  <div class="modal teacher-access-modal">
+    <div class="modal-hd">
+      <span>Acceso profesorado</span>
+      <button class="modal-x" onclick="closeTeacherAccess()">x</button>
+    </div>
+    <div class="fg">
+      <label>Profesor</label>
+      <input type="text" id="teacherLoginName" list="teacherLoginList" placeholder="Busca tu nombre" autocomplete="off">
+      <datalist id="teacherLoginList"></datalist>
+    </div>
+    <div class="teacher-access-preview" id="teacherAccessPreview">Selecciona tu nombre para entrar en tu panel.</div>
+    <button class="btn-save" type="button" onclick="loginTeacher()">Entrar al modo profesorado</button>
   </div>
 </div>
 <script src="js/data/profesorado_horarios_guardias.js"></script>
