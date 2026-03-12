@@ -1,5 +1,5 @@
 const HORA_MAP={1:{label:'1a',rango:'08:15-09:10'},2:{label:'2a',rango:'09:10-10:05'},3:{label:'3a',rango:'10:05-11:00'},4:{label:'4a',rango:'11:00-11:25'},5:{label:'5a',rango:'11:25-12:20'},6:{label:'6a',rango:'12:20-13:15'},7:{label:'7a',rango:'13:15-14:10'},8:{label:'8a',rango:'14:10-14:25'},9:{label:'9a',rango:'14:25-15:20'}};
-const HORAS_PATIO=new Set([4,8]);
+const HORAS_PATIO=new Set([4,8,9]);
 const DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes'];
 const KEY='IES_Alcalans_Guardias';
 const KEY_ORDEN='IES_Alcalans_Guardias_OrdenHora';
@@ -13,6 +13,7 @@ function decodeMojibake(value){
   if(value==null) return '';
   try{return decodeURIComponent(escape(String(value)));}catch(e){return String(value);}
 }
+function escapeRegExp(value){return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
 function cleanText(value){return decodeMojibake(value).replace(/\s+/g,' ').trim();}
 function stripDiacritics(value){return cleanText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 function toTitleCase(value){return cleanText(value).toLowerCase().replace(/(^|[\s(\/-])([a-záéíóúàèìòùüñç])/g,(m,p1,p2)=>p1+p2.toUpperCase());}
@@ -273,8 +274,10 @@ function renderGuardiaBoard(){
     const ordenHora=getOrdenHora(day,hora);
     const profes=ordenHora.map(item=>item.nombre);
     const biblioteca=getBibliotecaAsignada(day,hora);
+    const banos=getGuardiaApoyo(day,hora,0,[biblioteca])?.nombre||'';
     const asignados=new Set(data.filter(g=>g.dia===day&&g.hora===hora&&g.guardia&&g.guardia.trim()).map(g=>g.guardia.trim()));
     const nombres=profes.map(nombre=>`<span class="guardia-mini${asignados.has(nombre)?' guardia-mini-assigned':''}${nombre===biblioteca?' guardia-mini-biblio':''}">${nombre}${nombre===biblioteca?' · Biblioteca':''}</span>`).join('')||'<span class="sin-asignar">Sin profesorado asignado</span>';
+    const nombresDecorados=banos?nombres.replace(new RegExp(`<span class="([^"]*)">${escapeRegExp(banos)}</span>`),`<span class="$1 guardia-mini-banos">${banos} · Baños</span>`):nombres;
     cards.push(`<article class="guardia-card${firstMobileCard?' is-open':''}">
       <button class="guardia-card-toggle" type="button" onclick="toggleGuardiaCard(this)">
         <span class="guardia-card-head">
@@ -283,7 +286,7 @@ function renderGuardiaBoard(){
         </span>
       </button>
       <div class="guardia-card-body">
-        <div class="guardia-list">${nombres}</div>
+        <div class="guardia-list">${nombresDecorados}</div>
       </div>
     </article>`);
     firstMobileCard=false;
@@ -298,19 +301,41 @@ function setDay(i){day=i;renderPills();renderGuardiaBoard();renderTable();}
 function sortearGuardiasDia(){for(let hora=1;hora<=9;hora++){ordenGuardias[day][hora]=makeOrdenHora(day,hora);}persistOrden(ordenGuardias);renderGuardiaBoard();renderTable();}
 function editBibliotecaAssignment(){
   if(!isAdmin) return;
-  const horaTexto=prompt(`Hora para biblioteca en ${DIAS[day]} (1,2,3,5,6,7,9):`);
-  if(horaTexto===null) return;
-  const hora=+horaTexto;
-  if(!HORA_MAP[hora]||HORAS_PATIO.has(hora)){alert('Selecciona una hora válida de guardia.');return;}
+  const bibliotecaOverlay=document.getElementById('bibliotecaOverlay');
+  const bHora=document.getElementById('bHora');
+  if(!bibliotecaOverlay||!bHora) return;
+  const primeraHoraDisponible=[1,2,3,5,6,7].find(hora=>getBibliotecaAsignada(day,hora))||1;
+  bHora.value=String(primeraHoraDisponible);
+  updateBibliotecaProfesorOptions();
+  bibliotecaOverlay.classList.add('open');
+}
+function closeBibliotecaModal(){
+  const bibliotecaOverlay=document.getElementById('bibliotecaOverlay');
+  if(bibliotecaOverlay) bibliotecaOverlay.classList.remove('open');
+}
+function bgBibliotecaClose(e){if(e.target.id==='bibliotecaOverlay')closeBibliotecaModal();}
+function updateBibliotecaProfesorOptions(){
+  const bHora=document.getElementById('bHora');
+  const bProfesor=document.getElementById('bProfesor');
+  if(!bHora||!bProfesor) return;
+  const hora=+bHora.value;
   const disponibles=getProfesHora(day,hora);
-  if(!disponibles.length){alert('No hay profesorado de guardia disponible en esa hora.');return;}
-  const actual=getBibliotecaAsignada(day,hora)||disponibles[0];
-  const nombreTexto=prompt(`Profesor de biblioteca para ${DIAS[day]} ${HORA_MAP[hora].label} hora.\nDisponibles: ${disponibles.join(', ')}`,actual);
-  if(nombreTexto===null) return;
-  const nombre=disponibles.find(profe=>profe.toLowerCase()===nombreTexto.trim().toLowerCase());
-  if(!nombre){alert('Selecciona un profesor válido de esa hora.');return;}
+  const actual=getBibliotecaAsignada(day,hora);
+  bProfesor.innerHTML=disponibles.map(nombre=>`<option value="${nombre}">${nombre}</option>`).join('');
+  bProfesor.value=disponibles.includes(actual)?actual:(disponibles[0]||'');
+}
+function saveBibliotecaAssignment(){
+  if(!isAdmin) return;
+  const bHora=document.getElementById('bHora');
+  const bProfesor=document.getElementById('bProfesor');
+  if(!bHora||!bProfesor) return;
+  const hora=+bHora.value;
+  const nombre=bProfesor.value;
+  const disponibles=getProfesHora(day,hora);
+  if(!nombre||!disponibles.includes(nombre)){alert('Selecciona un profesor válido para esa hora.');return;}
   bibliotecaGuardias[day][hora]=nombre;
   persistBibliotecaAssignments(bibliotecaGuardias);
+  closeBibliotecaModal();
   renderGuardiaBoard();
   renderTable();
   document.getElementById('saveTs').textContent=`Biblioteca actualizada - ${new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`;
@@ -336,7 +361,7 @@ function renderTable(){
         <td><div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">Faena</span>${faenaInfo.faena?`<div class="faena-box"><span class="badge b-ok">Con tarea</span>${faenaInfo.obs?`<details class="faena-toggle"><summary></summary><div class="faena-text">${faenaInfo.obs}</div></details>`:''}</div>`:`<span class="badge b-nok">Sin tarea</span>`}</div></div></td>
         <td><div class="cell-stack"><div class="guardia-slot"><span class="slot-tag">Estado</span>${sugerido?`<span class="badge b-ok">${cub?'Asignada':'Turno 1'}</span>`:'<span class="badge b-nok">Sin cubrir</span>'}</div></div></td>
         <td style="${isAdmin?'':'display:none'}"><button class="btn-edit" onclick="openModal(${g.id})">Editar</button></td>
-      </tr>${biblioteca?`<tr class="row-support"><td colspan="7"><div class="row-support-block"><span class="badge b-biblio">Biblioteca</span><span class="row-support-text">${biblioteca} cubre la guardia de la biblioteca en esta hora.</span></div></td></tr>`:''}${banos?`<tr class="row-support"><td colspan="7"><div class="row-support-block"><span class="badge b-banos">Baños</span><span class="row-support-text">${banos.nombre} cubre la puerta de los baños en esta hora.</span></div></td></tr>`:''}`;
+      </tr>`;
     }).join('');
   }
   const aus=rows.length;
@@ -347,7 +372,7 @@ function renderTable(){
   document.getElementById('sSin').textContent=Math.max(aus-asig,0);
   document.getElementById('sFaena').textContent=rows.filter(g=>resolveFaena(g).faena).length;
 }
-function toggleAdmin(){if(!isAdmin){const pw=prompt('Contraseña de jefe de estudios:');if(pw!=='jefe2025'){alert('Contraseña incorrecta.');return;}}isAdmin=!isAdmin;document.getElementById('btnAdmin').classList.toggle('on',isAdmin);document.getElementById('adminBar').classList.toggle('show',isAdmin);renderTable();}
+function toggleAdmin(){if(!isAdmin){const pw=prompt('Contraseña de jefe de estudios:');if(pw!=='jefe2025'){alert('Contraseña incorrecta.');return;}}isAdmin=!isAdmin;document.getElementById('btnAdmin').classList.toggle('on',isAdmin);document.getElementById('adminBar').classList.toggle('show',isAdmin);document.getElementById('btnSorteo').style.display=isAdmin?'':'none';renderTable();}
 function renderTeacherAccessPreview(){
   const teacherLoginInput=document.getElementById('teacherLoginName');
   const preview=document.getElementById('teacherAccessPreview');
@@ -535,6 +560,10 @@ const teacherLoginInput=document.getElementById('teacherLoginName');
 if(teacherLoginInput){
   teacherLoginInput.addEventListener('input',renderTeacherAccessPreview);
   teacherLoginInput.addEventListener('change',renderTeacherAccessPreview);
+}
+const bibliotecaHoraInput=document.getElementById('bHora');
+if(bibliotecaHoraInput){
+  bibliotecaHoraInput.addEventListener('change',updateBibliotecaProfesorOptions);
 }
 function safeInitStep(fn,name){
   try{fn();}
