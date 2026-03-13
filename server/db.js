@@ -8,6 +8,7 @@ const { ADMIN_ROLE, SUPERADMIN_ROLE, hashPassword } = require('./auth');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 const LEGACY_DATA_DIR = path.join(__dirname, 'data');
 const LEGACY_DB_PATH = path.join(LEGACY_DATA_DIR, 'guardias.sqlite');
+const PROJECT_DB_PATH = path.join(__dirname, '..', 'BD', 'guardias.sqlite');
 
 function resolveDefaultDataDir() {
   if (process.platform === 'win32') {
@@ -20,6 +21,9 @@ function resolveDatabasePath() {
   const configuredPath = (process.env.GUARDIAS_DB_PATH || '').trim();
   if (configuredPath) {
     return path.resolve(configuredPath);
+  }
+  if (fs.existsSync(PROJECT_DB_PATH)) {
+    return PROJECT_DB_PATH;
   }
   return path.join(resolveDefaultDataDir(), 'guardias.sqlite');
 }
