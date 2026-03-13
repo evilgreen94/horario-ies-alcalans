@@ -2,10 +2,11 @@ const express = require('express');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 const { getDatabase } = require('../db');
+const { requireRole } = require('../session');
 
 const router = express.Router();
 
-const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+const DIAS = ['Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes'];
 const HORA_MAP = {
   1: '1a hora (08:15-09:10)',
   2: '2a hora (09:10-10:05)',
@@ -17,6 +18,7 @@ const HORA_MAP = {
   8: '8a hora (14:10-14:25)',
   9: '9a hora (14:25-15:20)'
 };
+
 const LOGO_IES_PATH = path.join(__dirname, '..', '..', 'imagenes', 'logo-ies-alcalans.jpg');
 const LOGO_CONSELLERIA_PATH = path.join(__dirname, '..', '..', 'imagenes', 'gv_conselleria_educacion_cmyk_cast-1024x505-2.png');
 
@@ -49,55 +51,84 @@ function ensurePageSpace(doc, minHeight = 110) {
 }
 
 function drawHeader(doc, day, fecha) {
-  const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  const top = doc.page.margins.top;
   const left = doc.page.margins.left;
-  const right = left + pageWidth;
-  const cardHeight = 108;
+  const top = doc.page.margins.top;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const right = left + width;
+  const boxHeight = 148;
+  const titleTop = top + 76;
 
-  doc.roundedRect(left, top, pageWidth, cardHeight, 12).fill('#f8fafc');
-  doc.roundedRect(left, top, pageWidth, cardHeight, 12).stroke('#dbe3ee');
+  doc.roundedRect(left, top, width, boxHeight, 12).fill('#f8fafc');
+  doc.roundedRect(left, top, width, boxHeight, 12).stroke('#dbe3ee');
 
   try {
-    doc.image(LOGO_IES_PATH, left + 18, top + 20, { fit: [96, 44], align: 'left', valign: 'center' });
+    doc.image(LOGO_IES_PATH, left + 18, top + 18, { fit: [118, 54] });
   } catch (_error) {}
+
   try {
-    doc.image(LOGO_CONSELLERIA_PATH, right - 170, top + 18, { fit: [150, 46], align: 'right', valign: 'center' });
+    doc.image(LOGO_CONSELLERIA_PATH, right - 182, top + 18, { fit: [162, 56] });
   } catch (_error) {}
 
   doc.fillColor('#0f172a');
-  doc.font('Helvetica-Bold').fontSize(23).text('Parte diario de faltas', left + 142, top + 18, {
-    width: pageWidth - 330,
-    lineBreak: false
+  doc.font('Helvetica-Bold').fontSize(22).text('Parte diario de faltas del profesorado', left + 20, titleTop, {
+    width: width - 40,
+    align: 'left',
+    lineGap: 0
   });
-  doc.font('Helvetica-Bold').fontSize(23).text('del profesorado', left + 142, top + 44, {
-    width: pageWidth - 330,
-    lineBreak: false
+
+  doc.fillColor('#64748b');
+  doc.font('Helvetica').fontSize(10.5).text('IES Alcalans', left + 20, top + 108, {
+    width: 180,
+    align: 'left'
   });
-  doc.font('Helvetica').fontSize(10.5).fillColor('#64748b');
-  doc.text('IES Alcalans', left + 142, top + 76, { lineBreak: false });
-  doc.font('Helvetica').fontSize(11).fillColor('#334155');
-  doc.text(`Día lectivo: ${DIAS[day]}`, left + 142, top + 91, { lineBreak: false });
-  doc.text(`Fecha de generación: ${fecha}`, right - 178, top + 91, {
-    width: 160,
-    align: 'right',
-    lineBreak: false
+
+  doc.fillColor('#334155');
+  doc.font('Helvetica').fontSize(11).text(`D\u00eda lectivo: ${DIAS[day]}`, left + 20, top + 124, {
+    width: 190,
+    align: 'left'
   });
-  doc.fillColor('#111827');
-  doc.y = top + cardHeight + 18;
+  doc.text(`Fecha de generaci\u00f3n: ${fecha}`, right - 210, top + 124, {
+    width: 190,
+    align: 'right'
+  });
+
+  doc.y = top + boxHeight + 18;
 }
 
-router.get('/daily.pdf', async (req, res, next) => {
+function drawSummary(doc, teacherCount, slotCount) {
+  const left = doc.page.margins.left;
+  const top = doc.y;
+  const cardWidth = 248;
+  const gap = 16;
+
+  doc.roundedRect(left, top, cardWidth, 42, 10).fillAndStroke('#ffffff', '#dbe3ee');
+  doc.roundedRect(left + cardWidth + gap, top, cardWidth, 42, 10).fillAndStroke('#ffffff', '#dbe3ee');
+
+  doc.fillColor('#64748b');
+  doc.font('Helvetica').fontSize(9.5);
+  doc.text('Profesores ausentes registrados', left + 14, top + 10);
+  doc.text('Tramos horarios afectados', left + cardWidth + gap + 14, top + 10);
+
+  doc.fillColor('#0f172a');
+  doc.font('Helvetica-Bold').fontSize(16);
+  doc.text(String(teacherCount), left + 14, top + 22);
+  doc.text(String(slotCount), left + cardWidth + gap + 14, top + 22);
+
+  doc.y = top + 58;
+}
+
+router.get('/daily.pdf', requireRole('admin'), async (req, res, next) => {
   try {
     const day = parseDay(req.query.day);
     const db = await getDatabase();
     const rows = await db.all(
-      `SELECT dia, hora, ausente, guardia, aula, faena, obs
+      `SELECT dia, hora, ausente
        FROM ausencias
        WHERE dia = ?
        ORDER BY hora, ausente, id`,
       [day]
     );
+
     const groupedRows = Array.from(
       rows.reduce((map, row) => {
         const key = row.ausente || 'Profesorado sin identificar';
@@ -105,10 +136,12 @@ router.get('/daily.pdf', async (req, res, next) => {
         map.get(key).push(row.hora);
         return map;
       }, new Map()).entries()
-    ).map(([ausente, horas]) => ({
-      ausente,
-      horas: [...new Set(horas)].sort((a, b) => a - b)
-    })).sort((a, b) => a.ausente.localeCompare(b.ausente, 'es'));
+    )
+      .map(([ausente, horas]) => ({
+        ausente,
+        horas: [...new Set(horas)].sort((a, b) => a - b)
+      }))
+      .sort((a, b) => a.ausente.localeCompare(b.ausente, 'es'));
 
     const fecha = formatReportDate();
     const filename = `informe-guardias-${DIAS[day].toLowerCase()}-${fecha.replace(/\//g, '-')}.pdf`;
@@ -120,7 +153,7 @@ router.get('/daily.pdf', async (req, res, next) => {
       size: 'A4',
       margin: 44,
       info: {
-        Title: `Informe diario de guardias - ${DIAS[day]}`,
+        Title: `Parte diario de faltas - ${DIAS[day]}`,
         Author: 'IES Alcalans',
         Subject: 'Faltas del profesorado',
         Keywords: 'guardias, ausencias, profesorado, ies alcalans'
@@ -128,39 +161,42 @@ router.get('/daily.pdf', async (req, res, next) => {
     });
 
     doc.pipe(res);
-    drawHeader(doc, day, fecha);
-    doc.fontSize(11).font('Helvetica').fillColor('#475569');
-    doc.text(`Profesores ausentes registrados: ${groupedRows.length}`);
-    doc.text(`Tramos horarios afectados: ${rows.length}`);
-    doc.moveDown(0.85);
-    doc.fillColor('#111827');
 
+    drawHeader(doc, day, fecha);
+    drawSummary(doc, groupedRows.length, rows.length);
+
+    doc.fillColor('#111827');
     if (!rows.length) {
-      doc.fontSize(12).font('Helvetica').text('No hay ausencias registradas para este día.');
+      doc.font('Helvetica').fontSize(12).text('No hay ausencias registradas para este d\u00eda.');
       doc.end();
       return;
     }
 
     groupedRows.forEach((row, index) => {
-      ensurePageSpace(doc, 78);
+      ensurePageSpace(doc, 76);
 
-      const cardHeight = 58;
-      const cardTop = doc.y;
       const left = doc.page.margins.left;
+      const top = doc.y;
       const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
-      doc.roundedRect(left, cardTop, width, cardHeight, 10).fillAndStroke('#ffffff', '#dbe3ee');
+      doc.roundedRect(left, top, width, 58, 10).fillAndStroke('#ffffff', '#dbe3ee');
+
       doc.fillColor('#111827');
       doc.font('Helvetica-Bold').fontSize(12);
-      doc.text(`${index + 1}. ${row.ausente}`, left + 14, cardTop + 12, { width: width - 28 });
-      doc.font('Helvetica').fontSize(10.5).fillColor('#334155');
+      doc.text(`${index + 1}. ${row.ausente}`, left + 14, top + 12, {
+        width: width - 28
+      });
+
+      doc.fillColor('#334155');
+      doc.font('Helvetica').fontSize(10.5);
       doc.text(
-        `Horas: ${row.horas.map(hora => HORA_MAP[hora] || `Hora ${hora}`).join(' · ')}`,
+        `Horas: ${row.horas.map(hora => HORA_MAP[hora] || `Hora ${hora}`).join(' | ')}`,
         left + 14,
-        cardTop + 31,
+        top + 31,
         { width: width - 28 }
       );
-      doc.y = cardTop + cardHeight + 12;
+
+      doc.y = top + 70;
     });
 
     doc.end();

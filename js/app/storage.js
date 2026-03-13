@@ -44,6 +44,7 @@
     }
 
     const response = await fetch(`${backendBaseUrl}${path}`, {
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -51,6 +52,9 @@
     });
 
     if (!response.ok) {
+      if (response.status === 401 && path !== '/auth/login') {
+        global.dispatchEvent(new CustomEvent('guardias-auth-invalid'));
+      }
       throw new Error(`Request failed: ${response.status}`);
     }
 
@@ -118,6 +122,32 @@
       return request('/profesorado/session-overrides/replace', {
         method: 'PUT',
         body: JSON.stringify(rows)
+      });
+    },
+    fetchAuthSession(){
+      return request('/auth/session');
+    },
+    loginRole(role, password){
+      return request('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ role, password })
+      });
+    },
+    logoutRole(){
+      return request('/auth/logout', {
+        method: 'POST'
+      });
+    },
+    restoreSnapshot(payload){
+      return request('/export/restore', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+    changeRolePassword(role, currentPassword, newPassword){
+      return request('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ role, currentPassword, newPassword })
       });
     }
   };

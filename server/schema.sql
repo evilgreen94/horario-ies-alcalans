@@ -51,3 +51,10 @@ CREATE TABLE IF NOT EXISTS session_overrides (
   aula TEXT DEFAULT '',
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS auth_credentials (
+  role TEXT PRIMARY KEY,
+  password_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

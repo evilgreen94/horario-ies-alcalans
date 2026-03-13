@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDatabase } = require('../db');
 const { ensureArray, sanitizeAusencia } = require('./validation');
+const { requireRole } = require('../session');
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ router.get('/', async (_req, res, next) => {
   }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', requireRole('admin'), async (req, res, next) => {
   try {
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
     const db = await getDatabase();
@@ -30,7 +31,7 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-router.put('/replace', async (req, res, next) => {
+router.put('/replace', requireRole('admin'), async (req, res, next) => {
   try {
     const rows = ensureArray(req.body, 'Las ausencias').map(sanitizeAusencia);
     const db = await getDatabase();
@@ -60,7 +61,7 @@ router.put('/replace', async (req, res, next) => {
   }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
@@ -78,7 +79,7 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const db = await getDatabase();
     await db.run('DELETE FROM ausencias WHERE id = ?', [req.params.id]);

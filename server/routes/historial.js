@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDatabase } = require('../db');
 const { ensureArray, sanitizeHistorial } = require('./validation');
+const { requireRole } = require('../session');
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.get('/', async (_req, res, next) => {
   }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', requireRole('admin'), async (req, res, next) => {
   try {
     const { id, title, detail, type, actor, ts, undoState } = sanitizeHistorial(req.body);
     const db = await getDatabase();
@@ -34,7 +35,7 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-router.put('/replace', async (req, res, next) => {
+router.put('/replace', requireRole('admin'), async (req, res, next) => {
   try {
     const rows = ensureArray(req.body, 'El historial').map(sanitizeHistorial);
     const db = await getDatabase();

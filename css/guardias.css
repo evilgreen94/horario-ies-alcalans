@@ -17,6 +17,24 @@
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--text); font-family: var(--font-b); font-size: 14px; min-height: 100vh; }
+body.superadmin-active .pulse-badge,
+body.superadmin-active #btnTeacher,
+body.superadmin-active #btnAdmin,
+body.superadmin-active .stats,
+body.superadmin-active .teacher-bar,
+body.superadmin-active .tbl-wrap,
+body.superadmin-active .site-footer {
+  display: none !important;
+}
+body.superadmin-active header {
+  min-height: 108px;
+}
+body.superadmin-active .header-actions {
+  gap: .55rem;
+}
+body.superadmin-active main {
+  padding-top: 1.2rem;
+}
 header {
   position: sticky; top: 0; z-index: 50;
   background: rgba(244,247,251,0.92); backdrop-filter: blur(12px);
@@ -116,6 +134,8 @@ main { width: min(1380px, calc(100vw - 32px)); margin: 0 auto; padding: 1.75rem 
 .admin-bar { display: none; align-items: center; gap: .75rem; flex-wrap: wrap; background: rgba(245,197,66,0.05); border: 1px solid rgba(245,197,66,0.18); border-radius: var(--radius); padding: .75rem 1.1rem; margin-bottom: 1.25rem; }
 .admin-bar.show { display: flex; }
 .admin-tag { font-size: .72rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+.superadmin-bar { background: rgba(217,83,79,0.05); border-color: rgba(217,83,79,0.18); }
+.superadmin-tag { color: var(--red); }
 .btn-add { background: var(--accent); color: #000; border: none; font-family: var(--font-h); font-weight: 800; font-size: .82rem; padding: 7px 16px; border-radius: 8px; cursor: pointer; }
 .btn-add-secondary { background: #eef4ff; color: var(--blue); border: 1px solid rgba(61,116,197,0.24); }
 .btn-add-ghost { background: transparent; color: #8c6707; border: 1px solid rgba(217,161,29,0.35); }

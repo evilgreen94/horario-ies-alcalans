@@ -21,6 +21,7 @@
     <div class="pulse-badge"><div class="pulse-dot"></div>En directo</div>
     <button class="btn" id="btnTeacher" onclick="openTeacherPanel()">Profesorado</button>
     <button class="btn" id="btnAdmin" onclick="toggleAdmin()">Jefe de estudios</button>
+    <button class="btn" id="btnSuperAdmin" onclick="toggleSuperAdmin()" style="display:none">Superadmin</button>
   </div>
 </header>
 <main>
@@ -48,8 +49,19 @@
     <button class="btn-add" onclick="editBibliotecaAssignment()">Asignar biblioteca</button>
     <button class="btn-add btn-add-secondary" type="button" onclick="openHistoryModal()">Historial</button>
     <button class="btn-add" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe PDF</button>
+    <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('admin')">Cambiar contrase&ntilde;a</button>
     <button class="btn-add btn-add-ghost" type="button" onclick="toggleAdmin()">Salir de Jefatura</button>
     <span class="save-ts" id="saveTs">Toca una fila para editar</span>
+  </div>
+  <div class="admin-bar superadmin-bar" id="superAdminBar">
+    <span class="admin-tag superadmin-tag">Modo Superadmin</span>
+    <button class="btn-add btn-add-secondary" type="button" onclick="downloadBackupJson()">Backup JSON</button>
+    <button class="btn-add btn-add-secondary" type="button" onclick="triggerRestoreSnapshot()">Restaurar JSON</button>
+    <button class="btn-add btn-add-secondary" type="button" onclick="downloadDatabaseBackup()">Base SQLite</button>
+    <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('superadmin')">Cambiar contrase&ntilde;a</button>
+    <button class="btn-add btn-add-ghost" type="button" onclick="toggleSuperAdmin()">Salir de Superadmin</button>
+    <span class="save-ts" id="superAdminHint">Acceso t&eacute;cnico oculto por URL especial.</span>
+    <input type="file" id="restoreSnapshotInput" accept="application/json,.json" hidden>
   </div>
   <div class="teacher-bar" id="teacherBar">
     <span class="teacher-tag">Modo Profesorado</span>

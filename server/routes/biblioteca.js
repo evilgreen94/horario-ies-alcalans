@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDatabase } = require('../db');
 const { ensureArray, sanitizeBiblioteca } = require('./validation');
+const { requireRole } = require('../session');
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ router.get('/', async (_req, res, next) => {
   }
 });
 
-router.put('/', async (req, res, next) => {
+router.put('/', requireRole('admin'), async (req, res, next) => {
   try {
     const { dia, hora, profesor } = sanitizeBiblioteca(req.body);
     const db = await getDatabase();
@@ -34,7 +35,7 @@ router.put('/', async (req, res, next) => {
   }
 });
 
-router.put('/replace', async (req, res, next) => {
+router.put('/replace', requireRole('admin'), async (req, res, next) => {
   try {
     const rows = ensureArray(req.body, 'Las guardias de biblioteca').map(sanitizeBiblioteca);
     const db = await getDatabase();

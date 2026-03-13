@@ -87,11 +87,14 @@ const PROFESORES_BASE=PROFESORADO_DATA.profesoresBase;
 const HORARIO_GUARDIAS=PROFESORADO_DATA.guardiasPorHora;
 const ALL_PROFESORES=[...new Set([...PROFES_PLANTILLA,...Object.keys(PROFESORES_BASE)])].sort((a,b)=>a.localeCompare(b,'es'));
 let isAdmin=false,day=0,editId=null;
+let isSuperAdmin=false;
 let teacherName='';
 let teacherDay=0;
 let teacherAccessMatches=[];
 let teacherAccessActiveIndex=-1;
 const demo=[];
+const APP_URL_PARAMS=new URLSearchParams(window.location.search||'');
+const SUPERADMIN_ENABLED=APP_URL_PARAMS.get('panel')==='superadmin';
 const LEGACY_DEMO_NAMES=new Set(['Garcia Lopez, Ana','Perez Sanchez, Luis','Torres Vidal, Marta','Romero Diaz, Javier','Navarro Gil, Carmen','Castro Reyes, David','Blanco Munoz, Rosa','Serrano Lara, Miguel']);
 function syncTeacherIdentity(){
   const profesor=getProfesor(teacherName);
@@ -166,7 +169,7 @@ function addHistoryEntry(title,detail,type,options){
   });
   historialCambios=historialCambios.slice(0,200);
   persistHistorial(historialCambios);
-  syncBackendState();
+  syncAdminState();
 }
 function formatHistoryTimestamp(value){
   const date=new Date(value);
@@ -387,19 +390,31 @@ function serializeSessionOverrides(){
     aula:row.aula||''
   }));
 }
-async function syncBackendState(){
+async function syncAdminState(){
   if(!storage.hasBackend()||backendSyncInFlight) return;
   backendSyncInFlight=true;
   try{
     await Promise.all([
       storage.replaceGuardias(data),
       storage.replaceBiblioteca(serializeBibliotecaAssignments()),
-      storage.replaceHistorial(historialCambios),
+      storage.replaceHistorial(historialCambios)
+    ]);
+  }catch(error){
+    console.warn('Backend sync failed',error);
+  }finally{
+    backendSyncInFlight=false;
+  }
+}
+async function syncTeacherState(){
+  if(!storage.hasBackend()||backendSyncInFlight) return;
+  backendSyncInFlight=true;
+  try{
+    await Promise.all([
       storage.replaceTareasProfesorado(serializeTeacherTasks()),
       storage.replaceSessionOverrides(serializeSessionOverrides())
     ]);
   }catch(error){
-    console.warn('Backend sync failed',error);
+    console.warn('Teacher backend sync failed',error);
   }finally{
     backendSyncInFlight=false;
   }
@@ -481,7 +496,7 @@ async function hydrateFromBackend(){
     renderHistoryList();
 
     if(!backendHasData&&!storage.isBackendOnly()&&(data.length||historialCambios.length)){
-      syncBackendState();
+      syncAdminState();
     }
   }catch(error){
     console.warn('Backend hydration failed',error);
@@ -595,8 +610,26 @@ function updateAdminControls(){
   const btnSorteo=document.getElementById('btnSorteo');
   const btnInforme=document.getElementById('btnInforme');
   if(btnSorteo) btnSorteo.style.display=isAdmin?'':'none';
-  // if(btnInforme) btnInforme.style.display=(isAdmin&&isReportAvailable())?'':'none';
   if(btnInforme) btnInforme.style.display=isAdmin?'':'none';
+}
+function refreshAccessUi(){
+  const btnAdmin=document.getElementById('btnAdmin');
+  const btnSuperAdmin=document.getElementById('btnSuperAdmin');
+  const adminBar=document.getElementById('adminBar');
+  const superAdminBar=document.getElementById('superAdminBar');
+  document.body.classList.toggle('superadmin-active',isSuperAdmin);
+  if(btnAdmin){
+    btnAdmin.classList.toggle('on',isAdmin);
+    btnAdmin.textContent=isAdmin?'Salir Jefatura':'Jefe de estudios';
+  }
+  if(btnSuperAdmin){
+    btnSuperAdmin.style.display=SUPERADMIN_ENABLED?'':'none';
+    btnSuperAdmin.classList.toggle('on',isSuperAdmin);
+    btnSuperAdmin.textContent=isSuperAdmin?'Salir Superadmin':'Superadmin';
+  }
+  if(adminBar) adminBar.classList.toggle('show',isAdmin);
+  if(superAdminBar) superAdminBar.classList.toggle('show',isSuperAdmin);
+  updateAdminControls();
 }
 function showToast(message,type){
   const toastStack=document.getElementById('toastStack');
@@ -663,6 +696,89 @@ async function askConfirm(title,message,confirmText){
 async function askPassword(title,message){
   const result=await openDialog({title,message,confirmText:'Entrar',showCancel:true,input:true,inputType:'password',placeholder:'Introduce la contrase\u00f1a'});
   return result.confirmed?result.value:'';
+}
+async function loadAuthSession(){
+  if(!storage.hasBackend()){
+    isAdmin=false;
+    isSuperAdmin=false;
+    refreshAccessUi();
+    return;
+  }
+  try{
+    const session=await storage.fetchAuthSession();
+    isAdmin=!!session?.isAdmin;
+    isSuperAdmin=!!session?.isSuperAdmin;
+    refreshAccessUi();
+    renderTable();
+  }catch(error){
+    console.warn('Session load failed',error);
+    isAdmin=false;
+    isSuperAdmin=false;
+    refreshAccessUi();
+    renderTable();
+  }
+}
+async function loginRole(role,password){
+  if(!storage.hasBackend()){
+    showToast('Este acceso requiere backend activo.','error');
+    return false;
+  }
+  try{
+    const result=await storage.loginRole(role,password);
+    isAdmin=!!result?.isAdmin;
+    isSuperAdmin=!!result?.isSuperAdmin;
+    refreshAccessUi();
+    return true;
+  }catch(error){
+    if(String(error?.message||'').includes('401')) return false;
+    console.warn('Role login failed',error);
+    showToast('No se pudo iniciar la sesi\u00f3n.','error');
+    return false;
+  }
+}
+async function logoutCurrentRole(){
+  if(storage.hasBackend()){
+    try{
+      await storage.logoutRole();
+    }catch(error){
+      console.warn('Logout failed',error);
+    }
+  }
+  isAdmin=false;
+  isSuperAdmin=false;
+  refreshAccessUi();
+}
+async function changeRolePasswordFlow(role){
+  const roleLabel=role==='superadmin'?'Superadmin':'Jefatura';
+  if(role==='superadmin'&&!isSuperAdmin){
+    showToast('Necesitas sesi\u00f3n de superadmin.','error');
+    return;
+  }
+  if(role==='admin'&&!isAdmin){
+    showToast('Necesitas sesi\u00f3n de Jefatura.','error');
+    return;
+  }
+  const currentPassword=await askPassword(`Cambiar contrase\u00f1a de ${roleLabel}`,'Introduce la contrase\u00f1a actual.');
+  if(!currentPassword) return;
+  const newPassword=await askPassword(`Nueva contrase\u00f1a de ${roleLabel}`,'Introduce la nueva contrase\u00f1a.');
+  if(!newPassword) return;
+  const confirmPassword=await askPassword(`Confirmar contrase\u00f1a de ${roleLabel}`,'Vuelve a introducir la nueva contrase\u00f1a.');
+  if(!confirmPassword) return;
+  if(newPassword!==confirmPassword){
+    showToast('La confirmaci\u00f3n no coincide.','error');
+    return;
+  }
+  try{
+    const result=await storage.changeRolePassword(role,currentPassword,newPassword);
+    if(result?.ok) showToast(`Contrase\u00f1a de ${roleLabel} actualizada.`, 'success');
+  }catch(error){
+    if(String(error?.message||'').includes('401')){
+      showToast('La contrase\u00f1a actual no es correcta.','error');
+      return;
+    }
+    console.warn('Password change failed',error);
+    showToast('No se pudo actualizar la contrase\u00f1a.','error');
+  }
 }
 setInterval(()=>{
   document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
@@ -803,6 +919,54 @@ function printDailyReportPdf(){
   link.click();
   link.remove();
 }
+function downloadBackupJson(){
+  if(!isSuperAdmin||!storage.hasBackend()) return;
+  const link=document.createElement('a');
+  link.href=`${storage.backendBaseUrl}/export/snapshot.json`;
+  link.target='_blank';
+  link.rel='noopener noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+function downloadDatabaseBackup(){
+  if(!isSuperAdmin||!storage.hasBackend()) return;
+  const link=document.createElement('a');
+  link.href=`${storage.backendBaseUrl}/export/database.sqlite`;
+  link.target='_blank';
+  link.rel='noopener noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+function triggerRestoreSnapshot(){
+  if(!isSuperAdmin) return;
+  const input=document.getElementById('restoreSnapshotInput');
+  if(!input) return;
+  input.value='';
+  input.click();
+}
+async function restoreSnapshotFromFile(file){
+  if(!file||!isSuperAdmin||!storage.hasBackend()) return;
+  const confirmed=await askConfirm(
+    'Restaurar copia',
+    'Se reemplazarán guardias, biblioteca, historial y tareas con el contenido del backup seleccionado.',
+    'Restaurar'
+  );
+  if(!confirmed) return;
+  try{
+    const payload=JSON.parse(await file.text());
+    const result=await storage.restoreSnapshot(payload);
+    backendHydrated=false;
+    await hydrateFromBackend();
+    renderTeacherPanel();
+    renderTable();
+    showToast(`Copia restaurada. Guardias: ${result?.counts?.guardias ?? 0}.`,'success');
+  }catch(error){
+    console.warn('Snapshot restore failed',error);
+    showToast('No se pudo restaurar la copia.','error');
+  }
+}
 function editBibliotecaAssignment(){
   if(!isAdmin) return;
   const bibliotecaOverlay=document.getElementById('bibliotecaOverlay');
@@ -878,7 +1042,7 @@ async function clearHistory(){
   persistHistorial(historialCambios);
   renderHistoryList();
   showToast('Historial borrado.','success');
-  syncBackendState();
+  syncAdminState();
 }
 async function undoLastHistoryChange(){
   if(!isAdmin) return;
@@ -930,7 +1094,7 @@ function saveBibliotecaAssignment(){
   renderTable();
   document.getElementById('saveTs').textContent=`Biblioteca actualizada - ${new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`;
   showToast('Biblioteca actualizada correctamente.','success');
-  syncBackendState();
+  syncAdminState();
 }
 function renderTable(){
   const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
@@ -965,24 +1129,37 @@ function renderTable(){
   document.getElementById('sFaena').textContent=rows.filter(g=>resolveFaena(g).faena).length;
 }
 async function toggleAdmin(){
-  const btnAdmin=document.getElementById('btnAdmin');
   if(!isAdmin){
     const pw=await askPassword('Acceso Jefatura','Introduce la contrase\u00f1a de Jefatura de Estudios.');
-    if(pw!=='jefe2025'){
+    if(!pw) return;
+    if(!await loginRole('admin',pw)){
       if(pw) showToast('Contrase\u00f1a incorrecta.','error');
       return;
     }
+    renderTable();
+    showToast('Modo Jefatura activado.','info');
+    return;
   }
-  isAdmin=!isAdmin;
-  if(btnAdmin){
-    btnAdmin.classList.toggle('on',isAdmin);
-    btnAdmin.textContent=isAdmin?'Salir Jefatura':'Jefe de estudios';
-  }
-  document.getElementById('adminBar').classList.toggle('show',isAdmin);
-  document.getElementById('btnSorteo').style.display=isAdmin?'':'none';
+  await logoutCurrentRole();
   renderTable();
-  updateAdminControls();
-  showToast(isAdmin?'Modo Jefatura activado.':'Modo Jefatura desactivado.','info');
+  showToast('Modo Jefatura desactivado.','info');
+}
+async function toggleSuperAdmin(){
+  if(!SUPERADMIN_ENABLED) return;
+  if(!isSuperAdmin){
+    const pw=await askPassword('Acceso Superadmin','Introduce la contrase\u00f1a del modo superadmin.');
+    if(!pw) return;
+    if(!await loginRole('superadmin',pw)){
+      if(pw) showToast('Contrase\u00f1a incorrecta.','error');
+      return;
+    }
+    renderTable();
+    showToast('Modo Superadmin activado.','info');
+    return;
+  }
+  await logoutCurrentRole();
+  renderTable();
+  showToast('Modo Superadmin desactivado.','info');
 }
 function renderTeacherAccessPreview(){
   const teacherLoginInput=document.getElementById('teacherLoginName');
@@ -1143,7 +1320,7 @@ function saveTeacherTask(dia,hora,exitAfter){
   persistSessionOverrides(sessionOverrides);
   tareasProfesorado[makeTareaKey(teacherName,dia,hora)]={profesor:teacherName,dia,hora,dejada,tarea};
   persistTareas(tareasProfesorado);
-  syncBackendState();
+  syncTeacherState();
   if(exitAfter){renderTable();exitTeacherMode();return;}
   renderTeacherPanel();
   renderTable();
@@ -1371,7 +1548,7 @@ function save(){
   if(day!==dia) setDay(dia); else renderTable();
   document.getElementById('saveTs').textContent='Guardado - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
   showToast(todoDia?`Ausencia de d\u00eda completo registrada en ${horasObjetivo.length} horas.`:'Ausencia guardada correctamente.','success');
-  syncBackendState();
+  syncAdminState();
 }
 async function del(){
   if(!await askConfirm('Eliminar registro','\u00bfQuieres eliminar este registro de ausencia?','Eliminar')) return;
@@ -1383,7 +1560,7 @@ async function del(){
   closeModal();
   renderTable();
   showToast('Registro eliminado.','success');
-  syncBackendState();
+  syncAdminState();
 }
 document.getElementById('fDia').addEventListener('change',()=>{populateProfesoresGuardia();setFieldError('fDia','');});
 document.getElementById('fHora').addEventListener('change',()=>{populateProfesoresGuardia();setFieldError('fHora','');});
@@ -1413,6 +1590,13 @@ if(teacherAccessSuggestions){
     selectTeacherAccessSuggestion(button.dataset.teacherName||'');
   });
 }
+const restoreSnapshotInput=document.getElementById('restoreSnapshotInput');
+if(restoreSnapshotInput){
+  restoreSnapshotInput.addEventListener('change',event=>{
+    const file=event.target.files?.[0];
+    if(file) restoreSnapshotFromFile(file);
+  });
+}
 const bibliotecaHoraInput=document.getElementById('bHora');
 if(bibliotecaHoraInput){
   bibliotecaHoraInput.addEventListener('change',updateBibliotecaProfesorOptions);
@@ -1429,9 +1613,18 @@ safeInitStep(renderPills,'renderPills');
 safeInitStep(renderGuardiaBoard,'renderGuardiaBoard');
 safeInitStep(renderTable,'renderTable');
 safeInitStep(syncTeacherIdentity,'syncTeacherIdentity');
-safeInitStep(updateAdminControls,'updateAdminControls');
+safeInitStep(refreshAccessUi,'refreshAccessUi');
+safeInitStep(()=>{loadAuthSession();},'loadAuthSession');
 safeInitStep(()=>{hydrateFromBackend();},'hydrateFromBackend');
 window.setInterval(()=>{pollBackendState();},BACKEND_POLL_INTERVAL_MS);
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden) pollBackendState();
+});
+window.addEventListener('guardias-auth-invalid',()=>{
+  if(!isAdmin&&!isSuperAdmin) return;
+  isAdmin=false;
+  isSuperAdmin=false;
+  refreshAccessUi();
+  renderTable();
+  showToast('La sesi\u00f3n ha caducado.','error');
 });
