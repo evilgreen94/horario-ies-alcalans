@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-const { DB_PATH, initializeDatabase } = require('./db');
+const { initializeDatabase } = require('./db');
 const { rejectWritesDuringRestore } = require('./maintenance');
 const { getSessionSecret } = require('./session');
 const guardiasRouter = require('./routes/guardias');
@@ -16,6 +16,10 @@ const authRouter = require('./routes/auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const TRUST_PROXY = (process.env.GUARDIAS_TRUST_PROXY || '').trim();
+const CORS_ORIGINS = String(process.env.GUARDIAS_CORS_ORIGINS || '')
+  .split(',')
+  .map(value => value.trim())
+  .filter(Boolean);
 
 function configureTrustProxy(value) {
   if (!value) return;
@@ -31,10 +35,32 @@ function configureTrustProxy(value) {
   app.set('trust proxy', Number.isInteger(numeric) ? numeric : value);
 }
 
+function createCorsOptions() {
+  if (!CORS_ORIGINS.length) {
+    return {
+      origin: false
+    };
+  }
+
+  const allowedOrigins = new Set(CORS_ORIGINS);
+  return {
+    credentials: true,
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+      if (allowedOrigins.has(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    }
+  };
+}
+
 getSessionSecret();
 configureTrustProxy(TRUST_PROXY);
 
-app.use(cors());
+app.use(cors(createCorsOptions()));
 app.use(express.json({ limit: '5mb' }));
 app.use('/api', rejectWritesDuringRestore);
 app.use(express.static(path.join(__dirname, '..')));

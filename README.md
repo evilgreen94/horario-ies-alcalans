@@ -126,10 +126,12 @@ Se usa para firmar las cookies de sesion. Si falta, el servidor no arranca.
 ```powershell
 $env:GUARDIAS_DB_PATH="C:\ruta\custom\guardias.sqlite"
 $env:GUARDIAS_TRUST_PROXY="1"
+$env:GUARDIAS_CORS_ORIGINS="https://guardias.centro.es,https://intranet.centro.es"
 ```
 
 - `GUARDIAS_DB_PATH`: fuerza una ruta de base de datos concreta
 - `GUARDIAS_TRUST_PROXY`: util cuando la app este detras de proxy inverso o HTTPS terminado fuera de Node
+- `GUARDIAS_CORS_ORIGINS`: lista separada por comas de origenes permitidos para acceso cross-origin; si no se define, no se habilita CORS cross-origin
 
 ### Solo para inicializar una base nueva
 
@@ -175,6 +177,8 @@ Se han endurecido varios puntos del backend:
 - ya no se crean usuarios nuevos con claves por defecto conocidas
 - el login tiene limitacion basica de intentos: 10 fallos por IP y rol en 15 minutos
 - la cookie de sesion marca `Secure` cuando la peticion entra por HTTPS
+- `guardias`, `historial` y datos de profesorado ya no quedan expuestos sin autenticacion administrativa
+- CORS cross-origin queda deshabilitado por defecto salvo origenes permitidos explicitamente
 
 ## Despliegue futuro en servidor del centro
 
