@@ -147,16 +147,38 @@
 </div>
 <div class="overlay" id="teacherAccessOverlay" onclick="bgTeacherAccessClose(event)">
   <div class="modal teacher-access-modal">
-    <div class="modal-hd">
+    <div class="modal-hd teacher-access-head">
       <span>Acceso profesorado</span>
       <button class="modal-x" onclick="closeTeacherAccess()">x</button>
     </div>
-    <div class="fg">
-      <label>Profesor</label>
-      <input type="text" id="teacherLoginName" list="teacherLoginList" placeholder="Busca tu nombre" autocomplete="off">
-      <datalist id="teacherLoginList"></datalist>
+    <div class="teacher-access-shell">
+      <div class="teacher-access-intro">Escribe tu nombre o búscalo en la lista. La entrada está pensada para que cada profesor se localice rápido a sí mismo.</div>
+      <div class="teacher-access-search-panel">
+        <div class="fg">
+          <label>Profesor</label>
+          <div class="teacher-access-search">
+            <input
+              type="text"
+              id="teacherLoginName"
+              name="profesor_busqueda"
+              placeholder="Busca tu nombre"
+              autocomplete="new-password"
+              autocapitalize="words"
+              autocorrect="off"
+              spellcheck="false"
+              inputmode="text"
+              aria-autocomplete="list"
+              aria-controls="teacherAccessSuggestions"
+              data-form-type="other"
+              data-lpignore="true"
+              data-1p-ignore="true"
+            >
+            <div class="teacher-access-suggestions" id="teacherAccessSuggestions" hidden></div>
+          </div>
+        </div>
+        <div class="teacher-access-preview" id="teacherAccessPreview">Selecciona tu nombre para entrar en tu panel.</div>
+      </div>
     </div>
-    <div class="teacher-access-preview" id="teacherAccessPreview">Selecciona tu nombre para entrar en tu panel.</div>
     <div class="modal-actions">
       <button class="btn-cancel" type="button" onclick="closeTeacherAccess()">Cancelar</button>
       <button class="btn-save" type="button" onclick="loginTeacher()">Entrar al modo profesorado</button>
@@ -265,6 +287,7 @@
   </div>
 </div>
 <script src="js/data/profesorado_horarios_guardias.js"></script>
+<script src="js/app/storage.js"></script>
 <script src="js/app/guardias.js"></script>
 </body>
 </html>

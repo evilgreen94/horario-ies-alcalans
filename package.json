@@ -1,0 +1,19 @@
+{
+  "name": "horario-ies-alcalans",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend and frontend for guardias IES Alcalans",
+  "main": "server/app.js",
+  "scripts": {
+    "dev": "node server/app.js",
+    "start": "node server/app.js",
+    "db:init": "node server/scripts/init-db.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "pdfkit": "^0.17.2",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  }
+}

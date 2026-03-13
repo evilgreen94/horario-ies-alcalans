@@ -8,7 +8,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "2 ESO F",
         "aula": "A16"
       },
@@ -26,7 +26,7 @@
         "inicio": "10:05",
         "fin": "11:00",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "3 ESO F",
         "aula": "A26"
       },
@@ -35,7 +35,7 @@
         "inicio": "11:25",
         "fin": "12:20",
         "tipo": "clase",
-        "asignatura": "",
+        "asignatura": "Laboratorio de Artes",
         "grupo": "1ESOA, 1ESOB, 1ESOC, 1ESOD, 1ESO",
         "aula": "A03"
       },
@@ -46,14 +46,14 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "1 CFB INF",
-        "aula": "A091rFPINF"
+        "aula": "A09"
       },
       {
         "dia": "Martes",
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "2 ESO D",
         "aula": "A14"
       },
@@ -62,7 +62,7 @@
         "inicio": "09:10",
         "fin": "10:05",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "3 ESO F",
         "aula": "A26"
       },
@@ -80,8 +80,8 @@
         "inicio": "13:15",
         "fin": "14:10",
         "tipo": "clase",
-        "asignatura": "",
-        "grupo": "",
+        "asignatura": "Valenciano",
+        "grupo": "2 ESO E",
         "aula": "A05"
       },
       {
@@ -116,8 +116,8 @@
         "inicio": "13:15",
         "fin": "14:10",
         "tipo": "clase",
-        "asignatura": "",
-        "grupo": "",
+        "asignatura": "Valenciano",
+        "grupo": "2 ESO D",
         "aula": "A14"
       },
       {
@@ -152,17 +152,17 @@
         "inicio": "12:20",
         "fin": "13:15",
         "tipo": "clase",
-        "asignatura": "",
+        "asignatura": "Ámbito Lingüístico",
         "grupo": "1 CFB INF",
-        "aula": "A091rFPINF"
+        "aula": "A09"
       },
       {
         "dia": "Jueves",
         "inicio": "13:15",
         "fin": "14:10",
         "tipo": "clase",
-        "asignatura": "",
-        "grupo": "",
+        "asignatura": "Valenciano",
+        "grupo": "2 ESO F",
         "aula": "A16"
       },
       {
@@ -170,7 +170,7 @@
         "inicio": "11:25",
         "fin": "12:20",
         "tipo": "clase",
-        "asignatura": "",
+        "asignatura": "Valenciano",
         "grupo": "2 ESO D",
         "aula": "A14"
       },
@@ -179,7 +179,7 @@
         "inicio": "12:20",
         "fin": "13:15",
         "tipo": "clase",
-        "asignatura": "",
+        "asignatura": "Valenciano",
         "grupo": "3 ESO F",
         "aula": "A26"
       },
@@ -188,9 +188,9 @@
         "inicio": "13:15",
         "fin": "14:10",
         "tipo": "clase",
-        "asignatura": "",
-        "grupo": "",
-        "aula": "A091rFPINF"
+        "asignatura": "Ámbito Lingüístico",
+        "grupo": "1 CFB INF",
+        "aula": "A09"
       }
     ],
     "ÁFRICA ROMERO CENTELLES": [
@@ -199,7 +199,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "1ESOA",
         "aula": "A01"
       },
@@ -208,7 +208,7 @@
         "inicio": "09:10",
         "fin": "10:05",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "3 ESO D",
         "aula": "A24"
       },
@@ -217,7 +217,7 @@
         "inicio": "10:05",
         "fin": "11:00",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "3 ESO A",
         "aula": "A17"
       },
@@ -244,7 +244,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "3 ESO A",
         "aula": "A17"
       },
@@ -253,7 +253,7 @@
         "inicio": "09:10",
         "fin": "10:05",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "1ESOA",
         "aula": "A01"
       },
@@ -3450,7 +3450,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "2 BAT HUMANÍSTIC I G",
         "aula": "PREF5"
       },
@@ -3459,7 +3459,7 @@
         "inicio": "09:10",
         "fin": "10:05",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "4 ESO B",
         "aula": "A14"
       },
@@ -3468,7 +3468,7 @@
         "inicio": "10:05",
         "fin": "11:00",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "1ESOF",
         "aula": "A06"
       },
@@ -3486,7 +3486,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "1ESOB",
         "aula": "A02"
       },
@@ -3495,7 +3495,7 @@
         "inicio": "09:10",
         "fin": "10:05",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "1BACG",
         "aula": "PREF3"
       },
@@ -4598,7 +4598,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "3 ESO E",
         "aula": "A25"
       },
@@ -4616,7 +4616,7 @@
         "inicio": "10:05",
         "fin": "11:00",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "3 ESO B",
         "aula": "A22"
       },
@@ -4634,7 +4634,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "2 ESO A",
         "aula": "A10"
       },
@@ -8408,7 +8408,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "1 BAT HUMANÍSTIC",
         "aula": "PREF2"
       },
@@ -8417,7 +8417,7 @@
         "inicio": "09:10",
         "fin": "10:05",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "2 ESO C",
         "aula": "A13"
       },
@@ -8426,7 +8426,7 @@
         "inicio": "10:05",
         "fin": "11:00",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "2 BAT CIENTÍFIC",
         "aula": "PREF4"
       },
@@ -8444,7 +8444,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "1 BAT HUMANÍSTIC",
         "aula": "PREF2"
       },
@@ -8462,7 +8462,7 @@
         "inicio": "10:05",
         "fin": "11:00",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "2 ESO C",
         "aula": "A13"
       },
@@ -10093,7 +10093,7 @@
         "inicio": "10:05",
         "fin": "11:00",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "1ESOE",
         "aula": "A07"
       },
@@ -10120,7 +10120,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "1ESOD",
         "aula": "A04"
       },
@@ -10138,7 +10138,7 @@
         "inicio": "10:05",
         "fin": "11:00",
         "tipo": "clase",
-        "asignatura": "Valenciano: Lengua y",
+        "asignatura": "Valenciano",
         "grupo": "4 ESO A",
         "aula": "A26"
       },

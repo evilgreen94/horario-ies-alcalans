@@ -10,6 +10,7 @@ const KEY_BIBLIOTECA='IES_Alcalans_Biblioteca_Guardias';
 const KEY_HISTORIAL='IES_Alcalans_Historial_Cambios';
 const RAW_PROFESORADO=(window.PROFESORADO_SOURCE&&Array.isArray(window.PROFESORADO_SOURCE.teachers))?window.PROFESORADO_SOURCE.teachers:[];
 const GRUPOS_PROFESORADO={};
+const storage=window.GuardiasStorage;
 function escapeRegExp(value){return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
 function escapeHtml(value){
   return String(value)
@@ -88,6 +89,8 @@ const ALL_PROFESORES=[...new Set([...PROFES_PLANTILLA,...Object.keys(PROFESORES_
 let isAdmin=false,day=0,editId=null;
 let teacherName='';
 let teacherDay=0;
+let teacherAccessMatches=[];
+let teacherAccessActiveIndex=-1;
 const demo=[];
 const LEGACY_DEMO_NAMES=new Set(['Garcia Lopez, Ana','Perez Sanchez, Luis','Torres Vidal, Marta','Romero Diaz, Javier','Navarro Gil, Carmen','Castro Reyes, David','Blanco Munoz, Rosa','Serrano Lara, Miguel']);
 function syncTeacherIdentity(){
@@ -106,27 +109,27 @@ function syncTeacherIdentity(){
 }
 function load(){
   try{
-    const d=localStorage.getItem(KEY);
+    const d=storage.readText(KEY,'');
     if(!d) return demo;
     const parsed=JSON.parse(d);
     if(Array.isArray(parsed)&&parsed.length&&parsed.every(item=>LEGACY_DEMO_NAMES.has(item.ausente))){
-      localStorage.removeItem(KEY);
+      storage.writeText(KEY,'');
       return demo;
     }
     return parsed;
   }catch(e){return demo;}
 }
-function persist(d){try{localStorage.setItem(KEY,JSON.stringify(d));}catch(e){}}
-function persistOrden(d){try{localStorage.setItem(KEY_ORDEN,JSON.stringify(d));}catch(e){}}
-function loadTareas(){try{const d=localStorage.getItem(KEY_TAREAS);return d?JSON.parse(d):{};}catch(e){return {};}}
-function persistTareas(d){try{localStorage.setItem(KEY_TAREAS,JSON.stringify(d));}catch(e){}}
-function loadTeacherUser(){try{return localStorage.getItem(KEY_TEACHER_USER)||'';}catch(e){return '';}}
-function persistTeacherUser(nombre){try{localStorage.setItem(KEY_TEACHER_USER,nombre||'');}catch(e){}}
-function loadSessionOverrides(){try{const d=localStorage.getItem(KEY_SESSION_OVERRIDES);return d?JSON.parse(d):{};}catch(e){return {};}}
-function persistSessionOverrides(d){try{localStorage.setItem(KEY_SESSION_OVERRIDES,JSON.stringify(d));}catch(e){}}
-function persistBibliotecaAssignments(d){try{localStorage.setItem(KEY_BIBLIOTECA,JSON.stringify(d));}catch(e){}}
-function loadHistorial(){try{const d=localStorage.getItem(KEY_HISTORIAL);return d?JSON.parse(d):[];}catch(e){return [];}}
-function persistHistorial(d){try{localStorage.setItem(KEY_HISTORIAL,JSON.stringify(d));}catch(e){}}
+function persist(d){storage.writeJson(KEY,d);}
+function persistOrden(d){storage.writeJson(KEY_ORDEN,d);}
+function loadTareas(){return storage.readJson(KEY_TAREAS,{});}
+function persistTareas(d){storage.writeJson(KEY_TAREAS,d);}
+function loadTeacherUser(){return storage.readText(KEY_TEACHER_USER,'');}
+function persistTeacherUser(nombre){storage.writeText(KEY_TEACHER_USER,nombre||'');}
+function loadSessionOverrides(){return storage.readJson(KEY_SESSION_OVERRIDES,{});}
+function persistSessionOverrides(d){storage.writeJson(KEY_SESSION_OVERRIDES,d);}
+function persistBibliotecaAssignments(d){storage.writeJson(KEY_BIBLIOTECA,d);}
+function loadHistorial(){return storage.readJson(KEY_HISTORIAL,[]);}
+function persistHistorial(d){storage.writeJson(KEY_HISTORIAL,d);}
 function cloneJson(value){return JSON.parse(JSON.stringify(value));}
 function computeNextId(rows){return (rows||[]).reduce((m,g)=>Math.max(m,g.id||0),0)+1;}
 function formatHoraLabel(hora){
@@ -163,6 +166,7 @@ function addHistoryEntry(title,detail,type,options){
   });
   historialCambios=historialCambios.slice(0,200);
   persistHistorial(historialCambios);
+  syncBackendState();
 }
 function formatHistoryTimestamp(value){
   const date=new Date(value);
@@ -213,8 +217,8 @@ function ensureBibliotecaAssignments(base){
 }
 function loadBibliotecaAssignments(){
   try{
-    const d=localStorage.getItem(KEY_BIBLIOTECA);
-    return d?ensureBibliotecaAssignments(JSON.parse(d)):buildDefaultBibliotecaAssignments();
+    const d=storage.readJson(KEY_BIBLIOTECA,null);
+    return d?ensureBibliotecaAssignments(d):buildDefaultBibliotecaAssignments();
   }catch(e){return buildDefaultBibliotecaAssignments();}
 }
 function ensureOrden(base){
@@ -232,7 +236,7 @@ function ensureOrden(base){
   persistOrden(orden);
   return orden;
 }
-function loadOrden(){try{const d=localStorage.getItem(KEY_ORDEN);return d?ensureOrden(JSON.parse(d)):buildInitialOrden();}catch(e){return buildInitialOrden();}}
+function loadOrden(){try{const d=storage.readJson(KEY_ORDEN,null);return d?ensureOrden(d):buildInitialOrden();}catch(e){return buildInitialOrden();}}
 function getOrdenHora(dia,hora){return (ordenGuardias[dia]?.[hora]||[]).slice().sort((a,b)=>a.numero-b.numero);}
 function getBibliotecaAsignada(dia,hora){return bibliotecaGuardias[dia]?.[hora]||'';}
 function getOrdenHoraDisponible(dia,hora,excluidos){
@@ -252,6 +256,19 @@ function getProfesorNombreSeleccionado(valor){
   const texto=(valor||'').trim();
   if(!texto) return '';
   return ALL_PROFESORES.find(nombre=>nombre.toLowerCase()===texto.toLowerCase())||'';
+}
+function normalizeTeacherSearch(value){return stripDiacritics(value).toLowerCase();}
+function getTeacherAccessMatches(value){
+  const query=normalizeTeacherSearch(value);
+  if(!query) return ALL_PROFESORES;
+  const startsWith=[];
+  const contains=[];
+  ALL_PROFESORES.forEach(nombre=>{
+    const normalized=normalizeTeacherSearch(nombre);
+    if(normalized.startsWith(query)) startsWith.push(nombre);
+    else if(normalized.includes(query)) contains.push(nombre);
+  });
+  return [...startsWith,...contains].slice(0,8);
 }
 function getGuardiaNombreSeleccionado(valor,dia,hora){
   const texto=(valor||'').trim();
@@ -330,9 +347,246 @@ let tareasProfesorado=loadTareas();
 let historialCambios=loadHistorial();
 let historyFilter='all';
 let dialogResolver=null;
+let backendSyncInFlight=false;
+let backendHydrated=false;
+let backendPollingInFlight=false;
+const BACKEND_POLL_INTERVAL_MS=10000;
 (function(){const wd=new Date().getDay();day=(wd>=1&&wd<=5)?wd-1:0;})();
 teacherName=getProfesorNombreSeleccionado(loadTeacherUser())||'';
 teacherDay=day;
+function serializeBibliotecaAssignments(){
+  const rows=[];
+  for(let dia=0;dia<5;dia++){
+    for(let hora=1;hora<=9;hora++){
+      if(HORAS_PATIO.has(hora)) continue;
+      const profesor=bibliotecaGuardias[dia]?.[hora]||'';
+      if(profesor) rows.push({dia,hora,profesor});
+    }
+  }
+  return rows;
+}
+function serializeTeacherTasks(){
+  return Object.entries(tareasProfesorado).map(([id,row])=>({
+    id,
+    profesor:row.profesor,
+    dia:row.dia,
+    hora:row.hora,
+    dejada:!!row.dejada,
+    tarea:row.tarea||''
+  }));
+}
+function serializeSessionOverrides(){
+  return Object.entries(sessionOverrides).map(([id,row])=>({
+    id,
+    profesor:id.split('|')[0]||'',
+    dia:Number(id.split('|')[1]||0),
+    hora:Number(id.split('|')[2]||0),
+    materia:row.materia||'',
+    grupo:row.grupo||'',
+    detalle:row.detalle||'',
+    aula:row.aula||''
+  }));
+}
+async function syncBackendState(){
+  if(!storage.hasBackend()||backendSyncInFlight) return;
+  backendSyncInFlight=true;
+  try{
+    await Promise.all([
+      storage.replaceGuardias(data),
+      storage.replaceBiblioteca(serializeBibliotecaAssignments()),
+      storage.replaceHistorial(historialCambios),
+      storage.replaceTareasProfesorado(serializeTeacherTasks()),
+      storage.replaceSessionOverrides(serializeSessionOverrides())
+    ]);
+  }catch(error){
+    console.warn('Backend sync failed',error);
+  }finally{
+    backendSyncInFlight=false;
+  }
+}
+async function hydrateFromBackend(){
+  if(!storage.hasBackend()||backendHydrated) return;
+  backendHydrated=true;
+  try{
+    const [guardiasRows,bibliotecaRows,historialRows,tareasRows,overridesRows]=await Promise.all([
+      storage.fetchGuardias(),
+      storage.fetchBiblioteca(),
+      storage.fetchHistorial(),
+      storage.fetchTareasProfesorado(),
+      storage.fetchSessionOverrides()
+    ]);
+
+    const backendHasData=
+      (Array.isArray(guardiasRows)&&guardiasRows.length)||
+      (Array.isArray(bibliotecaRows)&&bibliotecaRows.length)||
+      (Array.isArray(historialRows)&&historialRows.length)||
+      (Array.isArray(tareasRows)&&tareasRows.length)||
+      (Array.isArray(overridesRows)&&overridesRows.length);
+
+    if(Array.isArray(guardiasRows)&&guardiasRows.length){
+      data=normalizeStoredRows(guardiasRows.map(row=>({...row,faena:!!row.faena})));
+      nid=computeNextId(data);
+      persist(data);
+    }
+
+    if(Array.isArray(bibliotecaRows)){
+      const nextBiblioteca={};
+      for(let dia=0;dia<5;dia++) nextBiblioteca[dia]={};
+      bibliotecaRows.forEach(row=>{
+        if(!nextBiblioteca[row.dia]) nextBiblioteca[row.dia]={};
+        nextBiblioteca[row.dia][row.hora]=row.profesor;
+      });
+      bibliotecaGuardias=ensureBibliotecaAssignments(nextBiblioteca);
+      persistBibliotecaAssignments(bibliotecaGuardias);
+    }
+
+    if(Array.isArray(historialRows)&&historialRows.length){
+      historialCambios=historialRows;
+      persistHistorial(historialCambios);
+    }
+
+    if(Array.isArray(tareasRows)){
+      tareasProfesorado=Object.fromEntries(
+        tareasRows.map(row=>[
+          row.id||makeTareaKey(row.profesor,row.dia,row.hora),
+          {
+            profesor:row.profesor,
+            dia:row.dia,
+            hora:row.hora,
+            dejada:!!row.dejada,
+            tarea:row.tarea||''
+          }
+        ])
+      );
+      persistTareas(tareasProfesorado);
+    }
+
+    if(Array.isArray(overridesRows)){
+      sessionOverrides=Object.fromEntries(
+        overridesRows.map(row=>[
+          row.id||makeSessionKey(row.profesor,row.dia,row.hora),
+          {
+            materia:row.materia||'',
+            grupo:row.grupo||'',
+            detalle:row.detalle||'',
+            aula:row.aula||''
+          }
+        ])
+      );
+      persistSessionOverrides(sessionOverrides);
+    }
+
+    renderGuardiaBoard();
+    renderTable();
+    renderHistoryList();
+
+    if(!backendHasData&&!storage.isBackendOnly()&&(data.length||historialCambios.length)){
+      syncBackendState();
+    }
+  }catch(error){
+    console.warn('Backend hydration failed',error);
+  }
+}
+function isAnyOverlayOpen(){
+  return ['overlay','teacherOverlay','teacherAccessOverlay','bibliotecaOverlay','historyOverlay','dialogOverlay']
+    .some(id=>document.getElementById(id)?.classList.contains('open'));
+}
+function makeBackendSnapshot(){
+  return JSON.stringify({
+    data,
+    biblioteca:serializeBibliotecaAssignments(),
+    tareas:serializeTeacherTasks(),
+    overrides:serializeSessionOverrides(),
+    historial:historialCambios.map(entry=>({
+      id:entry.id,
+      title:entry.title,
+      detail:entry.detail,
+      type:entry.type,
+      actor:entry.actor,
+      ts:entry.ts,
+      undoState:entry.undoState||null
+    }))
+  });
+}
+async function pollBackendState(){
+  if(!storage.hasBackend()||backendPollingInFlight||backendSyncInFlight) return;
+  if(document.hidden||isAnyOverlayOpen()) return;
+
+  backendPollingInFlight=true;
+  try{
+    const previousSnapshot=makeBackendSnapshot();
+    const [guardiasRows,bibliotecaRows,historialRows,tareasRows,overridesRows]=await Promise.all([
+      storage.fetchGuardias(),
+      storage.fetchBiblioteca(),
+      storage.fetchHistorial(),
+      storage.fetchTareasProfesorado(),
+      storage.fetchSessionOverrides()
+    ]);
+
+    if(Array.isArray(guardiasRows)){
+      data=normalizeStoredRows(guardiasRows.map(row=>({...row,faena:!!row.faena})));
+      nid=computeNextId(data);
+      persist(data);
+    }
+
+    if(Array.isArray(bibliotecaRows)){
+      const nextBiblioteca={};
+      for(let dia=0;dia<5;dia++) nextBiblioteca[dia]={};
+      bibliotecaRows.forEach(row=>{
+        if(!nextBiblioteca[row.dia]) nextBiblioteca[row.dia]={};
+        nextBiblioteca[row.dia][row.hora]=row.profesor;
+      });
+      bibliotecaGuardias=ensureBibliotecaAssignments(nextBiblioteca);
+      persistBibliotecaAssignments(bibliotecaGuardias);
+    }
+
+    if(Array.isArray(historialRows)){
+      historialCambios=historialRows;
+      persistHistorial(historialCambios);
+    }
+
+    if(Array.isArray(tareasRows)){
+      tareasProfesorado=Object.fromEntries(
+        tareasRows.map(row=>[
+          row.id||makeTareaKey(row.profesor,row.dia,row.hora),
+          {
+            profesor:row.profesor,
+            dia:row.dia,
+            hora:row.hora,
+            dejada:!!row.dejada,
+            tarea:row.tarea||''
+          }
+        ])
+      );
+      persistTareas(tareasProfesorado);
+    }
+
+    if(Array.isArray(overridesRows)){
+      sessionOverrides=Object.fromEntries(
+        overridesRows.map(row=>[
+          row.id||makeSessionKey(row.profesor,row.dia,row.hora),
+          {
+            materia:row.materia||'',
+            grupo:row.grupo||'',
+            detalle:row.detalle||'',
+            aula:row.aula||''
+          }
+        ])
+      );
+      persistSessionOverrides(sessionOverrides);
+    }
+
+    if(previousSnapshot!==makeBackendSnapshot()){
+      renderGuardiaBoard();
+      renderTable();
+      renderHistoryList();
+    }
+  }catch(error){
+    console.warn('Backend polling failed',error);
+  }finally{
+    backendPollingInFlight=false;
+  }
+}
 function isReportAvailable(){
   const now=formatNowParts();
   return now.hours>14 || (now.hours===14 && now.minutes>=10);
@@ -529,15 +783,25 @@ function buildDailyReportHtml(){
   </html>`;
 }
 function printDailyReportPdf(){
-  // if(!isAdmin||!isReportAvailable()) return;
   if(!isAdmin) return;
-  const ventana=window.open('','_blank','noopener,noreferrer,width=980,height=720');
-  if(!ventana) return;
-  ventana.document.open();
-  ventana.document.write(buildDailyReportHtml());
-  ventana.document.close();
-  ventana.focus();
-  ventana.print();
+  if(!storage.hasBackend()){
+    const ventana=window.open('','_blank','noopener,noreferrer,width=980,height=720');
+    if(!ventana) return;
+    ventana.document.open();
+    ventana.document.write(buildDailyReportHtml());
+    ventana.document.close();
+    ventana.focus();
+    ventana.print();
+    return;
+  }
+  const reportUrl=`${storage.backendBaseUrl}/report/daily.pdf?day=${day}`;
+  const link=document.createElement('a');
+  link.href=reportUrl;
+  link.target='_blank';
+  link.rel='noopener noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 function editBibliotecaAssignment(){
   if(!isAdmin) return;
@@ -614,6 +878,7 @@ async function clearHistory(){
   persistHistorial(historialCambios);
   renderHistoryList();
   showToast('Historial borrado.','success');
+  syncBackendState();
 }
 async function undoLastHistoryChange(){
   if(!isAdmin) return;
@@ -665,6 +930,7 @@ function saveBibliotecaAssignment(){
   renderTable();
   document.getElementById('saveTs').textContent=`Biblioteca actualizada - ${new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`;
   showToast('Biblioteca actualizada correctamente.','success');
+  syncBackendState();
 }
 function renderTable(){
   const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
@@ -729,19 +995,98 @@ function renderTeacherAccessPreview(){
   }
   preview.textContent=`Entrar\u00e1s como ${nombre}. Usuario: ${makeTeacherUsername(nombre)}.`;
 }
+function closeTeacherAccessSuggestions(){
+  const suggestions=document.getElementById('teacherAccessSuggestions');
+  if(!suggestions) return;
+  suggestions.hidden=true;
+}
+function renderTeacherAccessSuggestions(forceOpen=false){
+  const teacherLoginInput=document.getElementById('teacherLoginName');
+  const suggestions=document.getElementById('teacherAccessSuggestions');
+  if(!teacherLoginInput||!suggestions) return;
+  const hasFocus=document.activeElement===teacherLoginInput;
+  teacherAccessMatches=getTeacherAccessMatches(teacherLoginInput.value);
+  const selected=getProfesorNombreSeleccionado(teacherLoginInput.value);
+  if(selected){
+    teacherAccessActiveIndex=teacherAccessMatches.findIndex(nombre=>nombre===selected);
+  }else if(teacherAccessActiveIndex>=teacherAccessMatches.length){
+    teacherAccessActiveIndex=teacherAccessMatches.length?0:-1;
+  }
+  if(!teacherAccessMatches.length){
+    suggestions.innerHTML='<div class="teacher-access-suggestion-empty">No hay coincidencias.</div>';
+    suggestions.hidden=!(forceOpen||hasFocus);
+    return;
+  }
+  suggestions.innerHTML=teacherAccessMatches.map((nombre,index)=>`<button class="teacher-access-suggestion${index===teacherAccessActiveIndex?' active':''}" type="button" data-teacher-name="${escapeHtml(nombre)}">${escapeHtml(nombre)}<span class="teacher-access-suggestion-user">${escapeHtml(makeTeacherUsername(nombre))}</span></button>`).join('');
+  suggestions.hidden=!(forceOpen||hasFocus);
+}
+function selectTeacherAccessSuggestion(nombre){
+  const teacherLoginInput=document.getElementById('teacherLoginName');
+  if(!teacherLoginInput) return;
+  teacherLoginInput.value=nombre;
+  teacherAccessActiveIndex=teacherAccessMatches.findIndex(item=>item===nombre);
+  renderTeacherAccessPreview();
+  closeTeacherAccessSuggestions();
+  teacherLoginInput.blur();
+}
+function handleTeacherAccessInput(){
+  teacherAccessActiveIndex=-1;
+  renderTeacherAccessPreview();
+  renderTeacherAccessSuggestions(true);
+}
+function handleTeacherAccessKeydown(event){
+  const teacherLoginInput=document.getElementById('teacherLoginName');
+  if(!teacherLoginInput) return;
+  if(event.key==='ArrowDown'){
+    event.preventDefault();
+    teacherAccessMatches=getTeacherAccessMatches(teacherLoginInput.value);
+    if(!teacherAccessMatches.length) return;
+    teacherAccessActiveIndex=(teacherAccessActiveIndex+1+teacherAccessMatches.length)%teacherAccessMatches.length;
+    renderTeacherAccessSuggestions(true);
+    return;
+  }
+  if(event.key==='ArrowUp'){
+    event.preventDefault();
+    teacherAccessMatches=getTeacherAccessMatches(teacherLoginInput.value);
+    if(!teacherAccessMatches.length) return;
+    teacherAccessActiveIndex=(teacherAccessActiveIndex-1+teacherAccessMatches.length)%teacherAccessMatches.length;
+    renderTeacherAccessSuggestions(true);
+    return;
+  }
+  if(event.key==='Enter'){
+    if(teacherAccessActiveIndex>=0&&teacherAccessMatches[teacherAccessActiveIndex]){
+      event.preventDefault();
+      selectTeacherAccessSuggestion(teacherAccessMatches[teacherAccessActiveIndex]);
+      return;
+    }
+    const nombre=getProfesorNombreSeleccionado(teacherLoginInput.value);
+    if(nombre){
+      event.preventDefault();
+      loginTeacher();
+    }
+    return;
+  }
+  if(event.key==='Escape'){
+    closeTeacherAccessSuggestions();
+  }
+}
 function openTeacherAccess(resetSelection){
-  const teacherLoginList=document.getElementById('teacherLoginList');
   const teacherLoginInput=document.getElementById('teacherLoginName');
   const teacherAccessOverlay=document.getElementById('teacherAccessOverlay');
-  if(!teacherLoginList||!teacherLoginInput||!teacherAccessOverlay){openTeacherPanelFallback();return;}
-  teacherLoginList.innerHTML=ALL_PROFESORES.map(nombre=>`<option value="${nombre}"></option>`).join('');
+  if(!teacherLoginInput||!teacherAccessOverlay){openTeacherPanelFallback();return;}
   teacherLoginInput.value=resetSelection?'':(teacherName||'');
+  teacherAccessActiveIndex=-1;
   renderTeacherAccessPreview();
   teacherAccessOverlay.classList.add('open');
   teacherLoginInput.focus();
   teacherLoginInput.select();
+  renderTeacherAccessSuggestions(true);
 }
-function closeTeacherAccess(){const teacherAccessOverlay=document.getElementById('teacherAccessOverlay');if(teacherAccessOverlay) teacherAccessOverlay.classList.remove('open');}
+function closeTeacherAccess(){
+  const teacherAccessOverlay=document.getElementById('teacherAccessOverlay');
+  if(teacherAccessOverlay) teacherAccessOverlay.classList.remove('open');
+  closeTeacherAccessSuggestions();
+}
 function bgTeacherAccessClose(e){if(e.target.id==='teacherAccessOverlay')closeTeacherAccess();}
 function changeTeacherUser(){
   closeTeacherPanel();
@@ -751,7 +1096,7 @@ function loginTeacher(){
   const teacherLoginInput=document.getElementById('teacherLoginName');
   if(!teacherLoginInput) return;
   const nombre=getProfesorNombreSeleccionado(teacherLoginInput.value);
-  if(!nombre){showToast('Selecciona tu nombre del listado.','error');teacherLoginInput.focus();return;}
+  if(!nombre){showToast('Selecciona tu nombre de la lista.','error');teacherLoginInput.focus();renderTeacherAccessSuggestions(true);return;}
   teacherName=nombre;
   teacherDay=day;
   persistTeacherUser(nombre);
@@ -798,6 +1143,7 @@ function saveTeacherTask(dia,hora,exitAfter){
   persistSessionOverrides(sessionOverrides);
   tareasProfesorado[makeTareaKey(teacherName,dia,hora)]={profesor:teacherName,dia,hora,dejada,tarea};
   persistTareas(tareasProfesorado);
+  syncBackendState();
   if(exitAfter){renderTable();exitTeacherMode();return;}
   renderTeacherPanel();
   renderTable();
@@ -1025,6 +1371,7 @@ function save(){
   if(day!==dia) setDay(dia); else renderTable();
   document.getElementById('saveTs').textContent='Guardado - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
   showToast(todoDia?`Ausencia de d\u00eda completo registrada en ${horasObjetivo.length} horas.`:'Ausencia guardada correctamente.','success');
+  syncBackendState();
 }
 async function del(){
   if(!await askConfirm('Eliminar registro','\u00bfQuieres eliminar este registro de ausencia?','Eliminar')) return;
@@ -1036,6 +1383,7 @@ async function del(){
   closeModal();
   renderTable();
   showToast('Registro eliminado.','success');
+  syncBackendState();
 }
 document.getElementById('fDia').addEventListener('change',()=>{populateProfesoresGuardia();setFieldError('fDia','');});
 document.getElementById('fHora').addEventListener('change',()=>{populateProfesoresGuardia();setFieldError('fHora','');});
@@ -1049,8 +1397,21 @@ document.getElementById('fGuardia').addEventListener('change',()=>setFieldError(
 document.getElementById('fAula').addEventListener('input',()=>setFieldError('fAula',''));
 const teacherLoginInput=document.getElementById('teacherLoginName');
 if(teacherLoginInput){
-  teacherLoginInput.addEventListener('input',renderTeacherAccessPreview);
-  teacherLoginInput.addEventListener('change',renderTeacherAccessPreview);
+  teacherLoginInput.addEventListener('input',handleTeacherAccessInput);
+  teacherLoginInput.addEventListener('change',handleTeacherAccessInput);
+  teacherLoginInput.addEventListener('focus',()=>renderTeacherAccessSuggestions(true));
+  teacherLoginInput.addEventListener('click',()=>renderTeacherAccessSuggestions(true));
+  teacherLoginInput.addEventListener('keydown',handleTeacherAccessKeydown);
+  teacherLoginInput.addEventListener('blur',()=>window.setTimeout(closeTeacherAccessSuggestions,120));
+}
+const teacherAccessSuggestions=document.getElementById('teacherAccessSuggestions');
+if(teacherAccessSuggestions){
+  teacherAccessSuggestions.addEventListener('pointerdown',event=>{
+    const button=event.target.closest('[data-teacher-name]');
+    if(!button) return;
+    event.preventDefault();
+    selectTeacherAccessSuggestion(button.dataset.teacherName||'');
+  });
 }
 const bibliotecaHoraInput=document.getElementById('bHora');
 if(bibliotecaHoraInput){
@@ -1069,3 +1430,8 @@ safeInitStep(renderGuardiaBoard,'renderGuardiaBoard');
 safeInitStep(renderTable,'renderTable');
 safeInitStep(syncTeacherIdentity,'syncTeacherIdentity');
 safeInitStep(updateAdminControls,'updateAdminControls');
+safeInitStep(()=>{hydrateFromBackend();},'hydrateFromBackend');
+window.setInterval(()=>{pollBackendState();},BACKEND_POLL_INTERVAL_MS);
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden) pollBackendState();
+});
