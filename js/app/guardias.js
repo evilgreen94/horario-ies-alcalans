@@ -1,6 +1,6 @@
 const HORA_MAP={1:{label:'1a',rango:'08:15-09:10'},2:{label:'2a',rango:'09:10-10:05'},3:{label:'3a',rango:'10:05-11:00'},4:{label:'4a',rango:'11:00-11:25'},5:{label:'5a',rango:'11:25-12:20'},6:{label:'6a',rango:'12:20-13:15'},7:{label:'7a',rango:'13:15-14:10'},8:{label:'8a',rango:'14:10-14:25'},9:{label:'9a',rango:'14:25-15:20'}};
 const HORAS_PATIO=new Set([4,8,9]);
-const DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes'];
+const DIAS=['Lunes','Martes','Mi\u00e9rcoles','Jueves','Viernes'];
 const KEY='IES_Alcalans_Guardias';
 const KEY_ORDEN='IES_Alcalans_Guardias_OrdenHora';
 const KEY_TAREAS='IES_Alcalans_Tareas_Profesorado';
@@ -10,10 +10,6 @@ const KEY_BIBLIOTECA='IES_Alcalans_Biblioteca_Guardias';
 const KEY_HISTORIAL='IES_Alcalans_Historial_Cambios';
 const RAW_PROFESORADO=(window.PROFESORADO_SOURCE&&Array.isArray(window.PROFESORADO_SOURCE.teachers))?window.PROFESORADO_SOURCE.teachers:[];
 const GRUPOS_PROFESORADO={};
-function decodeMojibake(value){
-  if(value==null) return '';
-  try{return decodeURIComponent(escape(String(value)));}catch(e){return String(value);}
-}
 function escapeRegExp(value){return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
 function escapeHtml(value){
   return String(value)
@@ -23,14 +19,14 @@ function escapeHtml(value){
     .replace(/"/g,'&quot;')
     .replace(/'/g,'&#39;');
 }
-function cleanText(value){return decodeMojibake(value).replace(/\s+/g,' ').trim();}
+function cleanText(value){return String(value ?? '').replace(/\s+/g,' ').trim();}
 function formatNowParts(){
   const now=new Date();
   return {hours:now.getHours(),minutes:now.getMinutes(),date:now};
 }
 function stripDiacritics(value){return cleanText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
-function toTitleCase(value){return cleanText(value).toLowerCase().replace(/(^|[\s(\/-])([a-záéíóúàèìòùüñç])/g,(m,p1,p2)=>p1+p2.toUpperCase());}
-const DIA_INDEX={'lunes':0,'martes':1,'miercoles':2,'miércoles':2,'jueves':3,'viernes':4};
+function toTitleCase(value){return cleanText(value).toLowerCase().replace(/(^|[\s(\/-])([a-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00e0\u00e8\u00ec\u00f2\u00f9\u00fc\u00f1\u00e7])/g,(m,p1,p2)=>p1+p2.toUpperCase());}
+const DIA_INDEX={'lunes':0,'martes':1,'miercoles':2,'mi\u00e9rcoles':2,'jueves':3,'viernes':4};
 const HORA_INDEX=Object.fromEntries(Object.entries(HORA_MAP).map(([hora,info])=>[info.rango,+hora]));
 function normalizaDia(value){return DIA_INDEX[cleanText(value).toLowerCase()] ?? null;}
 function normalizaHora(franja){return HORA_INDEX[cleanText(franja)] ?? null;}
@@ -138,7 +134,7 @@ function formatHoraLabel(hora){
   return info?`${info.label} hora (${info.rango})`:`Hora ${hora}`;
 }
 function formatDiaHora(dia,hora){
-  return `${DIAS[dia]||'Dia'} · ${formatHoraLabel(hora)}`;
+  return `${DIAS[dia]||'Dia'} \u00b7 ${formatHoraLabel(hora)}`;
 }
 function formatHistoryAbsence(row){
   if(!row) return '';
@@ -146,7 +142,7 @@ function formatHistoryAbsence(row){
   const aula=resolveAulaRegistro(row)||row.aula||'';
   if(aula) partes.push(aula);
   if(row.guardia) partes.push(`Guardia: ${row.guardia}`);
-  return partes.join(' · ');
+  return partes.join(' \u00b7 ');
 }
 function buildUndoState(targetDay){
   return {
@@ -411,7 +407,7 @@ async function askConfirm(title,message,confirmText){
   return result.confirmed;
 }
 async function askPassword(title,message){
-  const result=await openDialog({title,message,confirmText:'Entrar',showCancel:true,input:true,inputType:'password',placeholder:'Introduce la contraseña'});
+  const result=await openDialog({title,message,confirmText:'Entrar',showCancel:true,input:true,inputType:'password',placeholder:'Introduce la contrase\u00f1a'});
   return result.confirmed?result.value:'';
 }
 setInterval(()=>{
@@ -432,8 +428,8 @@ function renderGuardiaBoard(){
     const biblioteca=getBibliotecaAsignada(day,hora);
     const banos=getGuardiaApoyo(day,hora,0,[biblioteca])?.nombre||'';
     const asignados=new Set(data.filter(g=>g.dia===day&&g.hora===hora&&g.guardia&&g.guardia.trim()).map(g=>g.guardia.trim()));
-    const nombres=profes.map(nombre=>`<span class="guardia-mini${asignados.has(nombre)?' guardia-mini-assigned':''}${nombre===biblioteca?' guardia-mini-biblio':''}">${nombre}${nombre===biblioteca?' · Biblioteca':''}</span>`).join('')||'<span class="sin-asignar">Sin profesorado asignado</span>';
-    const nombresDecorados=banos?nombres.replace(new RegExp(`<span class="([^"]*)">${escapeRegExp(banos)}</span>`),`<span class="$1 guardia-mini-banos">${banos} · Baños</span>`):nombres;
+    const nombres=profes.map(nombre=>`<span class="guardia-mini${asignados.has(nombre)?' guardia-mini-assigned':''}${nombre===biblioteca?' guardia-mini-biblio':''}">${nombre}${nombre===biblioteca?' \u00b7 Biblioteca':''}</span>`).join('')||'<span class="sin-asignar">Sin profesorado asignado</span>';
+    const nombresDecorados=banos?nombres.replace(new RegExp(`<span class="([^"]*)">${escapeRegExp(banos)}</span>`),`<span class="$1 guardia-mini-banos">${banos} \u00b7 Ba\u00f1os</span>`):nombres;
     cards.push(`<article class="guardia-card${firstMobileCard?' is-open':''}">
       <button class="guardia-card-toggle" type="button" onclick="toggleGuardiaCard(this)">
         <span class="guardia-card-head">
@@ -460,10 +456,10 @@ function buildDailyReportText(){
   const fecha=formatNowParts().date.toLocaleDateString('es-ES');
   const cabecera=[
     `Informe de guardias - ${DIAS[day]}`,
-    `Fecha de generación: ${fecha}`,
+    `Fecha de generaci\u00f3n: ${fecha}`,
     ''
   ];
-  if(!rows.length) return cabecera.concat(['No hay ausencias registradas para este día.']).join('\n');
+  if(!rows.length) return cabecera.concat(['No hay ausencias registradas para este d\u00eda.']).join('\n');
   const cuerpo=rows.map(g=>{
     const h=HORA_MAP[g.hora]||{rango:''};
     const cub=g.guardia&&g.guardia.trim();
@@ -477,9 +473,9 @@ function buildDailyReportText(){
       `Ausente: ${g.ausente}`,
       `Guardia: ${sugerido}`,
       `Biblioteca: ${biblioteca}`,
-      `Baños: ${banos}`,
+      `Ba\u00f1os: ${banos}`,
       `Aula: ${aula}`,
-      `Faena: ${faenaInfo.faena?'Sí':'No'}`,
+      `Faena: ${faenaInfo.faena?'S\u00ed':'No'}`,
       `${faenaInfo.obs?`Tarea: ${faenaInfo.obs}`:'Tarea: -'}`
     ].join('\n');
   }).join('\n\n');
@@ -502,12 +498,12 @@ function buildDailyReportHtml(){
         <div><strong>Ausente:</strong> ${escapeHtml(g.ausente)}</div>
         <div><strong>Guardia:</strong> ${escapeHtml(sugerido)}</div>
         <div><strong>Biblioteca:</strong> ${escapeHtml(biblioteca)}</div>
-        <div><strong>Baños:</strong> ${escapeHtml(banos)}</div>
+        <div><strong>Ba\u00f1os:</strong> ${escapeHtml(banos)}</div>
         <div><strong>Aula:</strong> ${escapeHtml(aula)}</div>
-        <div><strong>Faena:</strong> ${faenaInfo.faena?'Sí':'No'}</div>
+        <div><strong>Faena:</strong> ${faenaInfo.faena?'S\u00ed':'No'}</div>
         <div><strong>Tarea:</strong> ${escapeHtml(faenaInfo.obs||'-')}</div>
       </article>`;
-  }).join(''):`<p class="empty">No hay ausencias registradas para este día.</p>`;
+  }).join(''):`<p class="empty">No hay ausencias registradas para este d\u00eda.</p>`;
   return `<!DOCTYPE html>
   <html lang="es">
   <head>
@@ -527,7 +523,7 @@ function buildDailyReportHtml(){
   </head>
   <body>
     <h1>Informe de guardias - ${escapeHtml(DIAS[day])}</h1>
-    <div class="meta">Fecha de generación: ${escapeHtml(fecha)}</div>
+    <div class="meta">Fecha de generaci\u00f3n: ${escapeHtml(fecha)}</div>
     <section class="grid">${cards}</section>
   </body>
   </html>`;
@@ -626,7 +622,7 @@ async function undoLastHistoryChange(){
     showToast('No hay cambios para deshacer.','info');
     return;
   }
-  if(!await askConfirm('Deshacer ultimo cambio',`Se revertira: ${entry.title}.`,'Deshacer')) return;
+  if(!await askConfirm('Deshacer \u00faltimo cambio',`Se revertir\u00e1: ${entry.title}.`,'Deshacer')) return;
   const currentState=buildUndoState(typeof entry.undoState?.day==='number'?entry.undoState.day:day);
   if(!restoreUndoState(entry.undoState)){
     showToast('No se pudo deshacer el cambio.','error');
@@ -635,10 +631,10 @@ async function undoLastHistoryChange(){
   entry.undoState=null;
   entry.reverted=true;
   persistHistorial(historialCambios);
-  addHistoryEntry('Cambio deshecho',`Se revirtio: ${entry.title}`,'undo',{undoState:currentState});
+  addHistoryEntry('Cambio deshecho',`Se revirti\u00f3: ${entry.title}`,'undo',{undoState:currentState});
   renderHistoryList();
   document.getElementById('saveTs').textContent='Deshecho - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-  showToast('Ultimo cambio deshecho.','success');
+  showToast('\u00daltimo cambio deshecho.','success');
 }
 function updateBibliotecaProfesorOptions(){
   const bHora=document.getElementById('bHora');
@@ -660,10 +656,10 @@ function saveBibliotecaAssignment(){
   const anterior=getBibliotecaAsignada(day,hora);
   const undoState=buildUndoState(day);
   const disponibles=getProfesHora(day,hora);
-  if(!nombre||!disponibles.includes(nombre)){showToast('Selecciona un profesor válido para esa hora.','error');return;}
+  if(!nombre||!disponibles.includes(nombre)){showToast('Selecciona un profesor v\u00e1lido para esa hora.','error');return;}
   bibliotecaGuardias[day][hora]=nombre;
   persistBibliotecaAssignments(bibliotecaGuardias);
-  addHistoryEntry('Biblioteca actualizada',`${formatDiaHora(day,hora)} · ${anterior||'Sin asignar'} -> ${nombre}`,'biblioteca',{undoState});
+  addHistoryEntry('Biblioteca actualizada',`${formatDiaHora(day,hora)} \u00b7 ${anterior||'Sin asignar'} -> ${nombre}`,'biblioteca',{undoState});
   closeBibliotecaModal();
   renderGuardiaBoard();
   renderTable();
@@ -673,7 +669,7 @@ function saveBibliotecaAssignment(){
 function renderTable(){
   const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
   const tb=document.getElementById('tbody');
-  if(!rows.length){tb.innerHTML='<tr class="empty-row"><td colspan="7">No hay ausencias registradas para este dia.</td></tr>';}
+  if(!rows.length){tb.innerHTML='<tr class="empty-row"><td colspan="7">No hay ausencias registradas para este d\u00eda.</td></tr>';}
   else{
     tb.innerHTML=rows.map(g=>{
       const h=HORA_MAP[g.hora]||{label:g.hora+'a',rango:''};
@@ -705,9 +701,9 @@ function renderTable(){
 async function toggleAdmin(){
   const btnAdmin=document.getElementById('btnAdmin');
   if(!isAdmin){
-    const pw=await askPassword('Acceso Jefatura','Introduce la contraseña de Jefatura de Estudios.');
+    const pw=await askPassword('Acceso Jefatura','Introduce la contrase\u00f1a de Jefatura de Estudios.');
     if(pw!=='jefe2025'){
-      if(pw) showToast('Contraseña incorrecta.','error');
+      if(pw) showToast('Contrase\u00f1a incorrecta.','error');
       return;
     }
   }
@@ -731,7 +727,7 @@ function renderTeacherAccessPreview(){
     preview.textContent='Selecciona tu nombre para entrar en tu panel.';
     return;
   }
-  preview.textContent=`Entrarás como ${nombre}. Usuario: ${makeTeacherUsername(nombre)}.`;
+  preview.textContent=`Entrar\u00e1s como ${nombre}. Usuario: ${makeTeacherUsername(nombre)}.`;
 }
 function openTeacherAccess(resetSelection){
   const teacherLoginList=document.getElementById('teacherLoginList');
@@ -818,7 +814,7 @@ function renderTeacherPanel(){
   const sesiones=getHorarioProfesorDia(teacherName,teacherDay);
   const horas=Object.keys(sesiones).map(Number).sort((a,b)=>a-b);
   if(!horas.length){
-    document.getElementById('teacherSessions').innerHTML='<div class="teacher-session"><div class="teacher-session-empty">No tienes sesiones registradas para este dia.</div></div>';
+    document.getElementById('teacherSessions').innerHTML='<div class="teacher-session"><div class="teacher-session-empty">No tienes sesiones registradas para este d\u00eda.</div></div>';
     return;
   }
   document.getElementById('teacherSessions').innerHTML=horas.map(hora=>{
@@ -834,7 +830,7 @@ function renderTeacherPanel(){
           <div class="teacher-session-title">${HORA_MAP[hora].label} hora - ${sesion.materia||sesion.tipo}</div>
           <div class="teacher-session-meta">${grupo||sesion.detalle}</div>
         </div>
-        <div class="teacher-session-meta">${HORA_MAP[hora].rango} · ${aula}</div>
+        <div class="teacher-session-meta">${HORA_MAP[hora].rango} \u00b7 ${aula}</div>
       </div>
       <div class="teacher-session-edit">
         <div class="teacher-session-grid">
@@ -931,7 +927,7 @@ function validateAbsenceForm(){
     return {valid:false,focus:ausenteInput};
   }
   if(!todoDia && guardiaTexto && !guardia){
-    setFieldError('fGuardia','Selecciona un profesor de guardia válido para esa hora.');
+    setFieldError('fGuardia','Selecciona un profesor de guardia v\u00e1lido para esa hora.');
     return {valid:false,focus:guardiaInput};
   }
   if(guardia && guardia===ausente){
@@ -941,7 +937,7 @@ function validateAbsenceForm(){
   if(todoDia){
     const horasLectivas=getHorasLectivasProfesorDia(ausente,dia);
     if(!horasLectivas.length){
-      setFieldError('fAusente','Ese profesor no tiene horas lectivas registradas ese día.');
+      setFieldError('fAusente','Ese profesor no tiene horas lectivas registradas ese d\u00eda.');
       return {valid:false,focus:ausenteInput};
     }
     return {valid:true,ausente,guardia:'',todoDia:true,horasLectivas};
@@ -1016,7 +1012,7 @@ function save(){
       }
     });
     if(todoDia){
-      addHistoryEntry('Ausencia de dia completo',`${DIAS[dia]} · ${ausente} · ${horasObjetivo.map(formatHoraLabel).join(', ')}`,'create',{undoState});
+      addHistoryEntry('Ausencia de d\u00eda completo',`${DIAS[dia]} \u00b7 ${ausente} \u00b7 ${horasObjetivo.map(formatHoraLabel).join(', ')}`,'create',{undoState});
     }else{
       const savedRow=data.find(g=>g.dia===dia&&g.hora===hora&&g.ausente===ausente);
       addHistoryEntry('Nueva ausencia',formatHistoryAbsence(savedRow),'create',{undoState});
@@ -1028,10 +1024,10 @@ function save(){
   closeModal();
   if(day!==dia) setDay(dia); else renderTable();
   document.getElementById('saveTs').textContent='Guardado - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-  showToast(todoDia?`Ausencia de día completo registrada en ${horasObjetivo.length} horas.`:'Ausencia guardada correctamente.','success');
+  showToast(todoDia?`Ausencia de d\u00eda completo registrada en ${horasObjetivo.length} horas.`:'Ausencia guardada correctamente.','success');
 }
 async function del(){
-  if(!await askConfirm('Eliminar registro','¿Quieres eliminar este registro de ausencia?','Eliminar')) return;
+  if(!await askConfirm('Eliminar registro','\u00bfQuieres eliminar este registro de ausencia?','Eliminar')) return;
   const previousRow=data.find(g=>g.id===editId);
   const undoState=buildUndoState(previousRow?.dia ?? day);
   data=data.filter(g=>g.id!==editId);

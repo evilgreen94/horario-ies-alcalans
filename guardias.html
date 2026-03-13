@@ -38,13 +38,13 @@
     <div class="guardia-board-head">
       <div class="guardia-board-title">Guardias previstas por hora</div>
       <div class="guardia-board-note"></div>
-      <button class="btn-mini" id="btnSorteo" type="button" onclick="sortearGuardiasDia()" style="display:none">Sortear orden del día</button>
+      <button class="btn-mini" id="btnSorteo" type="button" onclick="sortearGuardiasDia()" style="display:none">Sortear orden del d&iacute;a</button>
     </div>
     <div class="guardia-grid" id="guardiaGrid"></div>
   </section>
   <div class="admin-bar" id="adminBar">
     <span class="admin-tag">Modo Jefe de Estudios</span>
-    <button class="btn-add" onclick="openModal()">+ Añadir ausencia</button>
+    <button class="btn-add" onclick="openModal()">+ A&ntilde;adir ausencia</button>
     <button class="btn-add" onclick="editBibliotecaAssignment()">Asignar biblioteca</button>
     <button class="btn-add btn-add-secondary" type="button" onclick="openHistoryModal()">Historial</button>
     <button class="btn-add" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe PDF</button>
@@ -83,8 +83,8 @@
     </div>
     <div class="fg-row">
       <div class="fg">
-        <label>Día</label>
-        <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Miércoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
+        <label>D&iacute;a</label>
+        <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Mi&eacute;rcoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
         <div class="field-error" id="fDiaError"></div>
       </div>
       <div class="fg">
@@ -111,8 +111,8 @@
       </div>
       <div class="fg"><label>Aula / Lugar</label><input type="text" id="fAula" placeholder="Ej: 2oA - Aula 12"><div class="field-error" id="fAulaError"></div></div>
     </div>
-    <div class="fg"><label>Descripción de la faena (opcional)</label><textarea id="fObs" placeholder="Describe la tarea que han de hacer los alumnos..."></textarea></div>
-    <label class="check-block"><input type="checkbox" id="fTodoDia"><span>Ausencia todo el día según su horario</span></label>
+    <div class="fg"><label>Descripci&oacute;n de la faena (opcional)</label><textarea id="fObs" placeholder="Describe la tarea que han de hacer los alumnos..."></textarea></div>
+    <label class="check-block"><input type="checkbox" id="fTodoDia"><span>Ausencia todo el d&iacute;a seg&uacute;n su horario</span></label>
     <label class="check-block"><input type="checkbox" id="fFaena"><span>Ha dejado faena / actividad para los alumnos</span></label>
     <div class="modal-actions">
       <button class="btn-cancel" type="button" onclick="closeModal()">Cancelar</button>
@@ -134,7 +134,7 @@
         <div class="teacher-user" id="teacherUser"></div>
       </div>
       <div>
-        <div class="teacher-meta" id="teacherSummary">Sesiones del día</div>
+        <div class="teacher-meta" id="teacherSummary">Sesiones del d&iacute;a</div>
         <div class="teacher-panel-actions">
           <button class="btn-teacher-panel" type="button" onclick="closeTeacherPanel()">Cerrar panel</button>
           <button class="btn-teacher-panel btn-teacher-panel-danger" type="button" onclick="exitTeacherMode()">Salir del modo</button>
@@ -199,7 +199,7 @@
     <div class="history-head">
       <div class="history-copy">Registro reciente de cambios realizados desde Jefatura.</div>
       <div class="history-head-actions">
-        <button class="btn-dialog btn-dialog-secondary" id="btnUndoHistory" type="button" onclick="undoLastHistoryChange()">Deshacer ultimo</button>
+        <button class="btn-dialog btn-dialog-secondary" id="btnUndoHistory" type="button" onclick="undoLastHistoryChange()">Deshacer &uacute;ltimo</button>
         <button class="btn-dialog btn-dialog-secondary" type="button" onclick="clearHistory()">Borrar historial</button>
       </div>
     </div>
@@ -225,10 +225,27 @@
     <img
       class="site-footer-logo site-footer-logo-conselleria"
       src="imagenes/gv_conselleria_educacion_cmyk_cast-1024x505-2.png"
-      alt="Logo de la Conselleria de Educación"
+      alt="Logo de la Conselleria de Educaci&oacute;n"
     >
   </a>
-  <div class="site-footer-credit">Ash nazg durbatuluk, ash nazg gimbatul, ash nazg thrakatuluk agh burzum-ishi krimpatul. rm sai 2026</div>
+  <div
+    class="site-footer-credit"
+    aria-label="Ash nazg durbatuluk, ash nazg gimbatul, ash nazg thrakatuluk agh burzum-ishi krimpatul. rm sai 2026"
+  >
+    <svg class="site-footer-ring" viewBox="0 0 220 220" aria-hidden="true">
+      <defs>
+        <path
+          id="siteFooterRingPath"
+          d="M 110,110 m -76,0 a 76,76 0 1,1 152,0 a 76,76 0 1,1 -152,0"
+        />
+      </defs>
+      <text class="site-footer-ring-text">
+        <textPath href="#siteFooterRingPath">
+          Ash nazg durbatuluk, ash nazg gimbatul, ash nazg thrakatuluk agh burzum-ishi krimpatul. rm sai 2026
+        </textPath>
+      </text>
+    </svg>
+  </div>
 </footer>
 <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 <div class="overlay" id="dialogOverlay" onclick="bgDialogClose(event)">
