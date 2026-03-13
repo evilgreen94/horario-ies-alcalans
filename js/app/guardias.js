@@ -642,6 +642,13 @@ function showToast(message,type){
     toast.remove();
   },3200);
 }
+function setSuperAdminHint(message,type){
+  const hint=document.getElementById('superAdminHint');
+  if(!hint) return;
+  hint.textContent=message||'';
+  hint.classList.remove('is-success','is-error','is-info');
+  if(type) hint.classList.add(`is-${type}`);
+}
 function openDialog(config){
   const dialogOverlay=document.getElementById('dialogOverlay');
   const dialogTitle=document.getElementById('dialogTitle');
@@ -961,9 +968,12 @@ async function restoreSnapshotFromFile(file){
     await hydrateFromBackend();
     renderTeacherPanel();
     renderTable();
+    const restoreTime=new Date(result?.restoredAt||Date.now()).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    setSuperAdminHint(`JSON restaurado a las ${restoreTime} · ${file.name} · Guardias: ${result?.counts?.guardias ?? 0}`,'success');
     showToast(`Copia restaurada. Guardias: ${result?.counts?.guardias ?? 0}.`,'success');
   }catch(error){
     console.warn('Snapshot restore failed',error);
+    setSuperAdminHint(`Error al restaurar ${file?.name||'el backup JSON'}. Revisa el formato o la sesion.`,'error');
     showToast('No se pudo restaurar la copia.','error');
   }
 }

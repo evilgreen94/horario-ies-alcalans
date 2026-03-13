@@ -140,6 +140,9 @@ main { width: min(1380px, calc(100vw - 32px)); margin: 0 auto; padding: 1.75rem 
 .btn-add-secondary { background: #eef4ff; color: var(--blue); border: 1px solid rgba(61,116,197,0.24); }
 .btn-add-ghost { background: transparent; color: #8c6707; border: 1px solid rgba(217,161,29,0.35); }
 .save-ts { font-size: .72rem; color: var(--muted); margin-left: auto; }
+.save-ts.is-success { color: #14663f; font-weight: 700; }
+.save-ts.is-error { color: #8f2724; font-weight: 700; }
+.save-ts.is-info { color: #2356a8; font-weight: 700; }
 .teacher-bar { display: none; align-items: center; gap: .75rem; flex-wrap: wrap; background: rgba(61,116,197,0.05); border: 1px solid rgba(61,116,197,0.18); border-radius: var(--radius); padding: .75rem 1.1rem; margin-bottom: 1.25rem; }
 .teacher-bar.show { display: flex; }
 .teacher-tag { font-size: .72rem; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 1px; }

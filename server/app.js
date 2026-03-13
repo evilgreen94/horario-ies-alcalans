@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 
 const { DB_PATH, initializeDatabase } = require('./db');
+const { rejectWritesDuringRestore } = require('./maintenance');
 const { getSessionSecret } = require('./session');
 const guardiasRouter = require('./routes/guardias');
 const bibliotecaRouter = require('./routes/biblioteca');
@@ -34,7 +35,8 @@ getSessionSecret();
 configureTrustProxy(TRUST_PROXY);
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+app.use('/api', rejectWritesDuringRestore);
 app.use(express.static(path.join(__dirname, '..')));
 
 app.get('/api/health', (_req, res) => {

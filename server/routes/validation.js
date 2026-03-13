@@ -123,6 +123,12 @@ function sanitizeSessionOverride(row) {
 
 module.exports = {
   ensureArray,
+  ensureOptionalId,
+  ensureRequiredString,
+  ensureTimestamp,
+  normalizeBoolean,
+  normalizeInteger,
+  normalizeString,
   sanitizeAusencia,
   sanitizeBiblioteca,
   sanitizeHistorial,

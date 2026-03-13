@@ -1,26 +1,89 @@
 const express = require('express');
 const path = require('path');
 const { DB_PATH, getDatabase } = require('../db');
+const { finishRestore, startRestore } = require('../maintenance');
 const { requireRole } = require('../session');
+const {
+  ensureArray,
+  ensureOptionalId,
+  ensureRequiredString,
+  ensureTimestamp,
+  normalizeBoolean,
+  normalizeInteger,
+  normalizeString,
+  sanitizeBiblioteca,
+  sanitizeSessionOverride,
+  sanitizeTareaProfesorado
+} = require('./validation');
 
 const router = express.Router();
 
-function ensureArray(value, label) {
-  if (!Array.isArray(value)) {
-    const error = new Error(`${label} debe ser una lista.`);
-    error.status = 400;
-    throw error;
-  }
-  return value;
+function badRequest(message, details) {
+  const error = new Error(message);
+  error.status = 400;
+  if (details) error.details = details;
+  throw error;
 }
 
 function ensureObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    const error = new Error(`${label} inválido.`);
-    error.status = 400;
-    throw error;
+    badRequest(`${label} invalido.`);
   }
   return value;
+}
+
+function ensureBackupSection(payload, key, label) {
+  if (!Object.prototype.hasOwnProperty.call(payload, key)) {
+    badRequest(`El backup no incluye la seccion obligatoria "${key}".`);
+  }
+  return ensureArray(payload[key], label);
+}
+
+function sanitizeRestoreAusencia(row) {
+  const input = ensureObject(row, 'Ausencia');
+  return {
+    id: ensureOptionalId(input.id, 'id'),
+    dia: normalizeInteger(input.dia, 'dia', 0, 4),
+    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    ausente: ensureRequiredString(input.ausente, 'ausente'),
+    guardia: normalizeString(input.guardia),
+    aula: normalizeString(input.aula),
+    faena: normalizeBoolean(input.faena),
+    obs: normalizeString(input.obs),
+    created_at: input.created_at ? ensureTimestamp(input.created_at, 'created_at') : new Date().toISOString(),
+    updated_at: input.updated_at ? ensureTimestamp(input.updated_at, 'updated_at') : new Date().toISOString()
+  };
+}
+
+function sanitizeRestoreHistorial(row) {
+  const input = ensureObject(row, 'Entrada de historial');
+  const undoState = input.undoState ?? null;
+  if (undoState !== null && typeof undoState !== 'object') {
+    badRequest('undoState debe ser un objeto o null.');
+  }
+  return {
+    id: ensureRequiredString(input.id, 'id'),
+    title: ensureRequiredString(input.title, 'title'),
+    detail: normalizeString(input.detail),
+    type: normalizeString(input.type, 'other') || 'other',
+    actor: normalizeString(input.actor, 'Jefatura') || 'Jefatura',
+    ts: ensureTimestamp(input.ts, 'ts'),
+    undoState
+  };
+}
+
+function sanitizeBackupPayload(payload) {
+  const input = ensureObject(payload, 'Backup');
+  if (input.exportedAt) {
+    ensureTimestamp(input.exportedAt, 'exportedAt');
+  }
+  return {
+    guardias: ensureBackupSection(input, 'guardias', 'guardias').map(sanitizeRestoreAusencia),
+    biblioteca: ensureBackupSection(input, 'biblioteca', 'biblioteca').map(sanitizeBiblioteca),
+    historial: ensureBackupSection(input, 'historial', 'historial').map(sanitizeRestoreHistorial),
+    tareasProfesorado: ensureBackupSection(input, 'tareasProfesorado', 'tareasProfesorado').map(sanitizeTareaProfesorado),
+    sessionOverrides: ensureBackupSection(input, 'sessionOverrides', 'sessionOverrides').map(sanitizeSessionOverride)
+  };
 }
 
 function formatStamp() {
@@ -48,16 +111,24 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
 
     const payload = {
       exportedAt: new Date().toISOString(),
-      dbPath: DB_PATH,
       guardias: guardias.map(row => ({ ...row, faena: !!row.faena })),
       biblioteca,
       historial: historial.map(row => ({
-        ...row,
+        id: row.id,
+        title: row.title,
+        detail: row.detail,
+        type: row.type,
+        actor: row.actor,
+        ts: row.ts,
         undoState: row.undo_state ? JSON.parse(row.undo_state) : null
       })),
       tareasProfesorado: tareasProfesorado.map(row => ({
-        ...row,
-        dejada: !!row.dejada
+        id: row.id,
+        profesor: row.profesor,
+        dia: row.dia,
+        hora: row.hora,
+        dejada: !!row.dejada,
+        tarea: row.tarea || ''
       })),
       sessionOverrides
     };
@@ -80,19 +151,19 @@ router.get('/database.sqlite', requireRole('superadmin'), (_req, res, next) => {
 
 router.get('/info', requireRole('superadmin'), (_req, res) => {
   res.json({
-    dbPath: DB_PATH,
     dbFileName: path.basename(DB_PATH)
   });
 });
 
 router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
+  let restoreStarted = false;
+
   try {
-    const payload = ensureObject(req.body, 'Backup');
-    const guardias = ensureArray(payload.guardias || [], 'guardias');
-    const biblioteca = ensureArray(payload.biblioteca || [], 'biblioteca');
-    const historial = ensureArray(payload.historial || [], 'historial');
-    const tareasProfesorado = ensureArray(payload.tareasProfesorado || [], 'tareasProfesorado');
-    const sessionOverrides = ensureArray(payload.sessionOverrides || [], 'sessionOverrides');
+    startRestore();
+    restoreStarted = true;
+
+    const payload = sanitizeBackupPayload(req.body);
+    const { guardias, biblioteca, historial, tareasProfesorado, sessionOverrides } = payload;
 
     const db = await getDatabase();
     await db.exec('BEGIN TRANSACTION');
@@ -108,16 +179,16 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
           `INSERT INTO ausencias (id, dia, hora, ausente, guardia, aula, faena, obs, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            row.id ?? null,
+            row.id,
             row.dia,
             row.hora,
-            row.ausente || '',
-            row.guardia || '',
-            row.aula || '',
+            row.ausente,
+            row.guardia,
+            row.aula,
             row.faena ? 1 : 0,
-            row.obs || '',
-            row.created_at || new Date().toISOString(),
-            row.updated_at || new Date().toISOString()
+            row.obs,
+            row.created_at,
+            row.updated_at
           ]
         );
       }
@@ -126,7 +197,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         await db.run(
           `INSERT INTO biblioteca_guardias (dia, hora, profesor, updated_at)
            VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
-          [row.dia, row.hora, row.profesor || '']
+          [row.dia, row.hora, row.profesor]
         );
       }
 
@@ -136,11 +207,11 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             row.id,
-            row.title || 'Cambio',
-            row.detail || '',
-            row.type || 'other',
-            row.actor || 'Jefatura',
-            row.ts || new Date().toISOString(),
+            row.title,
+            row.detail,
+            row.type,
+            row.actor,
+            row.ts,
             row.undoState ? JSON.stringify(row.undoState) : null
           ]
         );
@@ -150,7 +221,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         await db.run(
           `INSERT INTO tareas_profesorado (id, profesor, dia, hora, dejada, tarea, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-          [row.id, row.profesor || '', row.dia, row.hora, row.dejada ? 1 : 0, row.tarea || '']
+          [row.id, row.profesor, row.dia, row.hora, row.dejada ? 1 : 0, row.tarea]
         );
       }
 
@@ -158,7 +229,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         await db.run(
           `INSERT INTO session_overrides (id, profesor, dia, hora, materia, grupo, detalle, aula, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-          [row.id, row.profesor || '', row.dia, row.hora, row.materia || '', row.grupo || '', row.detalle || '', row.aula || '']
+          [row.id, row.profesor, row.dia, row.hora, row.materia, row.grupo, row.detalle, row.aula]
         );
       }
 
@@ -181,6 +252,10 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  } finally {
+    if (restoreStarted) {
+      finishRestore();
+    }
   }
 });
 
