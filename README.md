@@ -79,7 +79,7 @@ http://localhost:3000/api/health
 Debe devolver algo como:
 
 ```json
-{"ok":true,"dbPath":"C:\\Users\\Familia\\Documents\\GitHub\\horario-ies-alcalans\\BD\\guardias.sqlite"}
+{"ok":true}
 ```
 
 ## Base de datos

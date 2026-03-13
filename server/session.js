@@ -23,6 +23,14 @@ function signPayload(payload) {
   return crypto.createHmac('sha256', getSessionSecret()).update(payload).digest('base64url');
 }
 
+function hasValidSignature(payload, signature) {
+  const expectedSignature = signPayload(payload);
+  const left = Buffer.from(expectedSignature);
+  const right = Buffer.from(String(signature || ''));
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
 function isSecureRequest(req) {
   if (!req) return false;
   if (req.secure) return true;
@@ -67,7 +75,7 @@ function readSessionFromRequest(req) {
 
   const [payload, signature] = raw.split('.');
   if (!payload || !signature) return null;
-  if (signPayload(payload) !== signature) return null;
+  if (!hasValidSignature(payload, signature)) return null;
 
   try {
     const parsed = JSON.parse(fromBase64Url(payload));

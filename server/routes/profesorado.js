@@ -5,10 +5,11 @@ const {
   sanitizeSessionOverride,
   sanitizeTareaProfesorado
 } = require('./validation');
+const { requireRole } = require('../session');
 
 const router = express.Router();
 
-router.get('/tareas', async (_req, res, next) => {
+router.get('/tareas', requireRole('admin'), async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const rows = await db.all('SELECT * FROM tareas_profesorado ORDER BY profesor, dia, hora');
@@ -27,7 +28,7 @@ router.get('/tareas', async (_req, res, next) => {
   }
 });
 
-router.put('/tareas/replace', async (req, res, next) => {
+router.put('/tareas/replace', requireRole('admin'), async (req, res, next) => {
   try {
     const rows = ensureArray(req.body, 'Las tareas de profesorado').map(sanitizeTareaProfesorado);
     const db = await getDatabase();
@@ -47,7 +48,7 @@ router.put('/tareas/replace', async (req, res, next) => {
   }
 });
 
-router.get('/session-overrides', async (_req, res, next) => {
+router.get('/session-overrides', requireRole('admin'), async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const rows = await db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora');
@@ -68,7 +69,7 @@ router.get('/session-overrides', async (_req, res, next) => {
   }
 });
 
-router.put('/session-overrides/replace', async (req, res, next) => {
+router.put('/session-overrides/replace', requireRole('admin'), async (req, res, next) => {
   try {
     const rows = ensureArray(req.body, 'Los overrides de sesi\u00f3n').map(sanitizeSessionOverride);
     const db = await getDatabase();

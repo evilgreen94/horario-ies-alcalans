@@ -5,6 +5,12 @@ const { requireRole } = require('../session');
 
 const router = express.Router();
 
+function notFound(message) {
+  const error = new Error(message);
+  error.status = 404;
+  return error;
+}
+
 router.get('/', async (_req, res, next) => {
   try {
     const db = await getDatabase();
@@ -66,12 +72,15 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
     const { id } = req.params;
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
     const db = await getDatabase();
-    await db.run(
+    const result = await db.run(
       `UPDATE ausencias
        SET dia = ?, hora = ?, ausente = ?, guardia = ?, aula = ?, faena = ?, obs = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
       [dia, hora, ausente, guardia, aula, faena ? 1 : 0, obs, id]
     );
+    if (!result.changes) {
+      throw notFound('No existe una ausencia con ese id.');
+    }
     const row = await db.get('SELECT * FROM ausencias WHERE id = ?', [id]);
     res.json(row);
   } catch (error) {
@@ -82,7 +91,10 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
 router.delete('/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const db = await getDatabase();
-    await db.run('DELETE FROM ausencias WHERE id = ?', [req.params.id]);
+    const result = await db.run('DELETE FROM ausencias WHERE id = ?', [req.params.id]);
+    if (!result.changes) {
+      throw notFound('No existe una ausencia con ese id.');
+    }
     res.status(204).end();
   } catch (error) {
     next(error);

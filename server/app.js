@@ -40,7 +40,7 @@ app.use('/api', rejectWritesDuringRestore);
 app.use(express.static(path.join(__dirname, '..')));
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, dbPath: DB_PATH });
+  res.json({ ok: true });
 });
 
 app.use('/api/guardias', guardiasRouter);

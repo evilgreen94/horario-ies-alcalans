@@ -423,13 +423,18 @@ async function hydrateFromBackend(){
   if(!storage.hasBackend()||backendHydrated) return;
   backendHydrated=true;
   try{
-    const [guardiasRows,bibliotecaRows,historialRows,tareasRows,overridesRows]=await Promise.all([
+    const [guardiasResult,bibliotecaResult,historialResult,tareasResult,overridesResult]=await Promise.allSettled([
       storage.fetchGuardias(),
       storage.fetchBiblioteca(),
       storage.fetchHistorial(),
       storage.fetchTareasProfesorado(),
       storage.fetchSessionOverrides()
     ]);
+    const guardiasRows=guardiasResult.status==='fulfilled'?guardiasResult.value:null;
+    const bibliotecaRows=bibliotecaResult.status==='fulfilled'?bibliotecaResult.value:null;
+    const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
+    const tareasRows=tareasResult.status==='fulfilled'?tareasResult.value:null;
+    const overridesRows=overridesResult.status==='fulfilled'?overridesResult.value:null;
 
     const backendHasData=
       (Array.isArray(guardiasRows)&&guardiasRows.length)||
@@ -530,13 +535,18 @@ async function pollBackendState(){
   backendPollingInFlight=true;
   try{
     const previousSnapshot=makeBackendSnapshot();
-    const [guardiasRows,bibliotecaRows,historialRows,tareasRows,overridesRows]=await Promise.all([
+    const [guardiasResult,bibliotecaResult,historialResult,tareasResult,overridesResult]=await Promise.allSettled([
       storage.fetchGuardias(),
       storage.fetchBiblioteca(),
       storage.fetchHistorial(),
       storage.fetchTareasProfesorado(),
       storage.fetchSessionOverrides()
     ]);
+    const guardiasRows=guardiasResult.status==='fulfilled'?guardiasResult.value:null;
+    const bibliotecaRows=bibliotecaResult.status==='fulfilled'?bibliotecaResult.value:null;
+    const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
+    const tareasRows=tareasResult.status==='fulfilled'?tareasResult.value:null;
+    const overridesRows=overridesResult.status==='fulfilled'?overridesResult.value:null;
 
     if(Array.isArray(guardiasRows)){
       data=normalizeStoredRows(guardiasRows.map(row=>({...row,faena:!!row.faena})));
@@ -735,6 +745,8 @@ async function loginRole(role,password){
     isAdmin=!!result?.isAdmin;
     isSuperAdmin=!!result?.isSuperAdmin;
     refreshAccessUi();
+    backendHydrated=false;
+    await hydrateFromBackend();
     return true;
   }catch(error){
     if(String(error?.message||'').includes('401')) return false;

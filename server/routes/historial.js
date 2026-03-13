@@ -5,7 +5,7 @@ const { requireRole } = require('../session');
 
 const router = express.Router();
 
-router.get('/', async (_req, res, next) => {
+router.get('/', requireRole('admin'), async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const rows = await db.all('SELECT * FROM historial ORDER BY ts DESC');
