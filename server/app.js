@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 
 const { DB_PATH, initializeDatabase } = require('./db');
+const { getSessionSecret } = require('./session');
 const guardiasRouter = require('./routes/guardias');
 const bibliotecaRouter = require('./routes/biblioteca');
 const historialRouter = require('./routes/historial');
@@ -13,6 +14,24 @@ const authRouter = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const TRUST_PROXY = (process.env.GUARDIAS_TRUST_PROXY || '').trim();
+
+function configureTrustProxy(value) {
+  if (!value) return;
+  if (value === 'true') {
+    app.set('trust proxy', true);
+    return;
+  }
+  if (value === 'false') {
+    app.set('trust proxy', false);
+    return;
+  }
+  const numeric = Number(value);
+  app.set('trust proxy', Number.isInteger(numeric) ? numeric : value);
+}
+
+getSessionSecret();
+configureTrustProxy(TRUST_PROXY);
 
 app.use(cors());
 app.use(express.json());

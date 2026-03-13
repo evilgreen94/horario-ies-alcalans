@@ -9,6 +9,10 @@ const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 const LEGACY_DATA_DIR = path.join(__dirname, 'data');
 const LEGACY_DB_PATH = path.join(LEGACY_DATA_DIR, 'guardias.sqlite');
 const PROJECT_DB_PATH = path.join(__dirname, '..', 'BD', 'guardias.sqlite');
+const REQUIRED_PASSWORD_ENV_BY_ROLE = {
+  [ADMIN_ROLE]: 'GUARDIAS_ADMIN_PASSWORD',
+  [SUPERADMIN_ROLE]: 'GUARDIAS_SUPERADMIN_PASSWORD'
+};
 
 function resolveDefaultDataDir() {
   if (process.platform === 'win32') {
@@ -69,14 +73,16 @@ async function initializeDatabase() {
 }
 
 async function seedDefaultCredentials(db) {
-  const defaults = [
-    [ADMIN_ROLE, process.env.GUARDIAS_ADMIN_PASSWORD || 'jefe2025'],
-    [SUPERADMIN_ROLE, process.env.GUARDIAS_SUPERADMIN_PASSWORD || 'superadmin2026']
-  ];
+  const roles = [ADMIN_ROLE, SUPERADMIN_ROLE];
 
-  for (const [role, password] of defaults) {
+  for (const role of roles) {
     const existing = await db.get('SELECT role FROM auth_credentials WHERE role = ?', [role]);
     if (existing) continue;
+    const envName = REQUIRED_PASSWORD_ENV_BY_ROLE[role];
+    const password = String(process.env[envName] || '').trim();
+    if (password.length < 8) {
+      throw new Error(`Missing or weak ${envName}. Set an initial password of at least 8 characters for role "${role}".`);
+    }
     const { salt, hash } = hashPassword(password);
     await db.run(
       `INSERT INTO auth_credentials (role, password_hash, salt, updated_at)

@@ -2,7 +2,14 @@ const crypto = require('crypto');
 
 const COOKIE_NAME = 'guardias_session';
 const SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
-const SESSION_SECRET = process.env.GUARDIAS_SESSION_SECRET || 'guardias-dev-secret-change-me';
+const SESSION_SECRET = (process.env.GUARDIAS_SESSION_SECRET || '').trim();
+
+function getSessionSecret() {
+  if (!SESSION_SECRET) {
+    throw new Error('Missing GUARDIAS_SESSION_SECRET. Configure a strong session secret before starting the server.');
+  }
+  return SESSION_SECRET;
+}
 
 function toBase64Url(value) {
   return Buffer.from(value).toString('base64url');
@@ -13,20 +20,29 @@ function fromBase64Url(value) {
 }
 
 function signPayload(payload) {
-  return crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+  return crypto.createHmac('sha256', getSessionSecret()).update(payload).digest('base64url');
 }
 
-function serializeSessionCookie(role) {
+function isSecureRequest(req) {
+  if (!req) return false;
+  if (req.secure) return true;
+  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+  return forwardedProto === 'https';
+}
+
+function serializeSessionCookie(role, req) {
   const payload = toBase64Url(JSON.stringify({
     role,
     exp: Date.now() + SESSION_MAX_AGE_MS
   }));
   const signature = signPayload(payload);
-  return `${COOKIE_NAME}=${payload}.${signature}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}`;
+  const secureFlag = isSecureRequest(req) ? '; Secure' : '';
+  return `${COOKIE_NAME}=${payload}.${signature}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}${secureFlag}`;
 }
 
-function clearSessionCookieHeader() {
-  return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+function clearSessionCookieHeader(req) {
+  const secureFlag = isSecureRequest(req) ? '; Secure' : '';
+  return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secureFlag}`;
 }
 
 function parseCookies(headerValue) {
@@ -86,6 +102,7 @@ function requireRole(role) {
 module.exports = {
   clearSessionCookieHeader,
   COOKIE_NAME,
+  getSessionSecret,
   readSessionFromRequest,
   requireRole,
   serializeSessionCookie
