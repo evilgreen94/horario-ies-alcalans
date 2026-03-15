@@ -1445,14 +1445,31 @@ function saveTeacherTask(dia,hora,exitAfter){
   if(!sesionBase) return;
   const dejada=document.getElementById(`taskCheck-${dia}-${hora}`).checked;
   const tarea=document.getElementById(`taskText-${dia}-${hora}`).value.trim();
-  sessionOverrides[makeSessionKey(teacherName,dia,hora)]={
+  const overrideKey=makeSessionKey(teacherName,dia,hora);
+  const nextOverride={
     materia:document.getElementById(`sessionMateria-${dia}-${hora}`).value.trim()||sesionBase.materia||'',
     grupo:document.getElementById(`sessionGrupo-${dia}-${hora}`).value.trim(),
     detalle:document.getElementById(`sessionDetalle-${dia}-${hora}`).value.trim()||sesionBase.detalle||'',
     aula:document.getElementById(`sessionAula-${dia}-${hora}`).value.trim()
   };
+  const normalizedBase={
+    materia:sesionBase.materia||'',
+    grupo:sesionBase.grupo||'',
+    detalle:sesionBase.detalle||'',
+    aula:sesionBase.aula||''
+  };
+  if(JSON.stringify(nextOverride)===JSON.stringify(normalizedBase)){
+    delete sessionOverrides[overrideKey];
+  }else{
+    sessionOverrides[overrideKey]=nextOverride;
+  }
   persistSessionOverrides(sessionOverrides);
-  tareasProfesorado[makeTareaKey(teacherName,dia,hora)]={profesor:teacherName,dia,hora,dejada,tarea};
+  const tareaKey=makeTareaKey(teacherName,dia,hora);
+  if(!dejada && !tarea){
+    delete tareasProfesorado[tareaKey];
+  }else{
+    tareasProfesorado[tareaKey]={profesor:teacherName,dia,hora,dejada,tarea};
+  }
   persistTareas(tareasProfesorado);
   syncTeacherState();
   if(exitAfter){renderTable();exitTeacherMode();return;}
@@ -1530,7 +1547,7 @@ function syncTodoDiaMode(){
   guardiaInput.placeholder='La guardia se asigna automaticamente';
   setFieldError('fGuardia','');
 }
-function openModal(id){editId=id||null;const g=id?data.find(x=>x.id===id):null;const aula=g?resolveAulaRegistro(g):'';clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?g.ausente:'';document.getElementById('fGuardia').value=g?g.guardia:'';document.getElementById('fAula').value=aula;document.getElementById('fTodoDia').checked=false;document.getElementById('fFaena').checked=g?g.faena:false;document.getElementById('fObs').value=g?g.obs:'';populateProfesoresGuardia();syncAulaFromProfesor(!g||!aula);syncTodoDiaMode();document.getElementById('overlay').classList.add('open');}
+function openModal(id){editId=id||null;const g=id?data.find(x=>x.id===id):null;const aula=g?resolveAulaRegistro(g):'';clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?g.ausente:'';document.getElementById('fGuardia').value=g?g.guardia:'';document.getElementById('fAula').value=aula;document.getElementById('fTodoDia').checked=false;document.getElementById('fFaena').checked=g?g.faena:false;document.getElementById('fObs').value=g?g.obs:'';populateProfesoresGuardia();syncAulaFromProfesor(!g||!aula);syncTodoDiaMode();syncGuardiaPreview();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
 function bgClose(e){if(e.target.id==='overlay')closeModal();}
 function populateProfesoresAusencias(){
@@ -1610,6 +1627,23 @@ function populateProfesoresGuardia(){
   profesoresGuardia.innerHTML=guardias.map(nombre=>`<option value="${nombre}"></option>`).join('');
   if(guardiaInput.value && !getGuardiaNombreSeleccionado(guardiaInput.value,dia,hora)) guardiaInput.value='';
 }
+function syncGuardiaPreview(){
+  const fDia=document.getElementById('fDia');
+  const fHora=document.getElementById('fHora');
+  const guardiaInput=document.getElementById('fGuardia');
+  const todoDiaInput=document.getElementById('fTodoDia');
+  if(!fDia||!fHora||!guardiaInput||!todoDiaInput) return;
+  if(todoDiaInput.checked){
+    guardiaInput.value='';
+    guardiaInput.placeholder='Se asignará automáticamente en cada hora';
+    return;
+  }
+  const dia=Number(fDia.value);
+  const hora=Number(fHora.value);
+  const sugerida=getGuardiaSugerida(dia,hora,1)||'';
+  guardiaInput.value=sugerida;
+  guardiaInput.placeholder=sugerida?'Asignación automática prevista':'Sin guardia disponible';
+}
 function save(){
   const dia=+document.getElementById('fDia').value;
   const hora=+document.getElementById('fHora').value;
@@ -1688,13 +1722,13 @@ async function del(){
   showToast('Registro eliminado.','success');
   syncAdminState();
 }
-document.getElementById('fDia').addEventListener('change',()=>{populateProfesoresGuardia();setFieldError('fDia','');});
-document.getElementById('fHora').addEventListener('change',()=>{populateProfesoresGuardia();setFieldError('fHora','');});
+document.getElementById('fDia').addEventListener('change',()=>{populateProfesoresGuardia();syncGuardiaPreview();setFieldError('fDia','');});
+document.getElementById('fHora').addEventListener('change',()=>{populateProfesoresGuardia();syncGuardiaPreview();setFieldError('fHora','');});
 document.getElementById('fDia').addEventListener('change',()=>syncAulaFromProfesor(true));
 document.getElementById('fHora').addEventListener('change',()=>syncAulaFromProfesor(true));
-document.getElementById('fTodoDia').addEventListener('change',syncTodoDiaMode);
-document.getElementById('fAusente').addEventListener('change',()=>{syncAulaFromProfesor(true);setFieldError('fAusente','');});
-document.getElementById('fAusente').addEventListener('input',()=>{syncAulaFromProfesor(false);setFieldError('fAusente','');});
+document.getElementById('fTodoDia').addEventListener('change',()=>{syncTodoDiaMode();syncGuardiaPreview();});
+document.getElementById('fAusente').addEventListener('change',()=>{syncAulaFromProfesor(true);syncGuardiaPreview();setFieldError('fAusente','');});
+document.getElementById('fAusente').addEventListener('input',()=>{syncAulaFromProfesor(false);syncGuardiaPreview();setFieldError('fAusente','');});
 document.getElementById('fGuardia').addEventListener('input',()=>setFieldError('fGuardia',''));
 document.getElementById('fGuardia').addEventListener('change',()=>setFieldError('fGuardia',''));
 document.getElementById('fAula').addEventListener('input',()=>setFieldError('fAula',''));
@@ -1731,6 +1765,7 @@ function safeInitStep(fn,name){
 }
 safeInitStep(populateProfesoresAusencias,'populateProfesoresAusencias');
 safeInitStep(populateProfesoresGuardia,'populateProfesoresGuardia');
+safeInitStep(syncGuardiaPreview,'syncGuardiaPreview');
 safeInitStep(()=>{reassignAllGuardias();persist(data);},'reassignAllGuardias');
 safeInitStep(renderPills,'renderPills');
 safeInitStep(renderGuardiaBoard,'renderGuardiaBoard');
@@ -1750,6 +1785,4 @@ window.addEventListener('guardias-auth-invalid',()=>{
   renderTable();
   showToast('La sesi\u00f3n ha caducado.','error');
 });
-
-
 
