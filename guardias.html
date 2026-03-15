@@ -44,14 +44,20 @@
     <div class="guardia-grid" id="guardiaGrid"></div>
   </section>
   <div class="admin-bar" id="adminBar">
-    <span class="admin-tag">Modo Jefe de Estudios</span>
-    <button class="btn-add" onclick="openModal()">+ A&ntilde;adir ausencia</button>
-    <button class="btn-add btn-add-secondary" type="button" onclick="openHistoryModal()">Historial</button>
-    <button class="btn-add" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe PDF</button>
-    <button class="btn-add btn-add-secondary" id="btnInformeSemanal" onclick="printWeeklyReportPdf()" style="display:none">Informe semanal</button>
-    <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('admin')">Cambiar contrase&ntilde;a</button>
-    <button class="btn-add btn-add-ghost" type="button" onclick="toggleAdmin()">Salir de Jefatura</button>
-    <span class="save-ts" id="saveTs">Toca una fila para editar</span>
+    <div class="admin-bar-head">
+      <span class="admin-tag">Modo Jefe de Estudios</span>
+    </div>
+    <div class="admin-actions admin-actions-primary">
+      <button class="btn-add btn-add-primary" onclick="openModal()">+ A&ntilde;adir ausencia</button>
+      <button class="btn-add btn-add-secondary" type="button" onclick="openHistoryModal()">Historial</button>
+      <div class="admin-status save-ts" id="saveTs">Edita desde la tabla o registra una nueva ausencia.</div>
+    </div>
+    <div class="admin-actions admin-actions-secondary">
+      <button class="btn-add btn-add-secondary" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe diario</button>
+      <button class="btn-add btn-add-secondary" id="btnInformeSemanal" onclick="printWeeklyReportPdf()" style="display:none">Informe semanal</button>
+      <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('admin')">Cambiar contrase&ntilde;a</button>
+      <button class="btn-add btn-add-ghost" type="button" onclick="toggleAdmin()">Salir de Jefatura</button>
+    </div>
   </div>
   <div class="admin-bar superadmin-bar" id="superAdminBar">
     <span class="admin-tag superadmin-tag">Modo Superadmin</span>
@@ -88,44 +94,81 @@
   </div>
 </main>
 <div class="overlay" id="overlay" onclick="bgClose(event)">
-  <div class="modal">
+  <div class="modal absence-modal">
     <div class="modal-hd">
       <span id="mTitle">Nueva ausencia</span>
       <button class="modal-x" onclick="closeModal()">x</button>
     </div>
-    <div class="fg-row">
-      <div class="fg">
-        <label>D&iacute;a</label>
-        <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Mi&eacute;rcoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
-        <div class="field-error" id="fDiaError"></div>
+
+    <div class="modal-section">
+      <div class="modal-section-head">
+        <div class="modal-section-title">Tramo horario</div>
+        <div class="modal-section-copy">Indica cu&aacute;ndo se produce la ausencia.</div>
       </div>
-      <div class="fg">
-        <label>Hora</label>
-        <select id="fHora"><option value="1">1a hora (08:15-09:10)</option><option value="2">2a hora (09:10-10:05)</option><option value="3">3a hora (10:05-11:00)</option><option value="4">4a hora (11:00-11:25)</option><option value="5">5a hora (11:25-12:20)</option><option value="6">6a hora (12:20-13:15)</option><option value="7">7a hora (13:15-14:10)</option><option value="8">8a hora (14:10-14:25)</option><option value="9">9a hora (14:25-15:20)</option></select>
-        <div class="field-error" id="fHoraError"></div>
+      <div class="fg-row">
+        <div class="fg">
+          <label>D&iacute;a</label>
+          <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Mi&eacute;rcoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
+          <div class="field-error" id="fDiaError"></div>
+        </div>
+        <div class="fg">
+          <label>Hora</label>
+          <select id="fHora"><option value="1">1a hora (08:15-09:10)</option><option value="2">2a hora (09:10-10:05)</option><option value="3">3a hora (10:05-11:00)</option><option value="4">4a hora (11:00-11:25)</option><option value="5">5a hora (11:25-12:20)</option><option value="6">6a hora (12:20-13:15)</option><option value="7">7a hora (13:15-14:10)</option><option value="8">8a hora (14:10-14:25)</option><option value="9">9a hora (14:25-15:20)</option></select>
+          <div class="field-error" id="fHoraError"></div>
+        </div>
       </div>
     </div>
-    <div class="fg">
-      <label>Profesor ausente</label>
-      <div class="input-with-action">
-        <input type="text" id="fAusente" list="profesoresAusencias" placeholder="Selecciona o busca un profesor" autocomplete="off">
-        <button class="btn-inline-clear" type="button" onclick="clearAusenteSelection()">Cambiar</button>
+
+    <div class="modal-section">
+      <div class="modal-section-head">
+        <div class="modal-section-title">Profesor ausente</div>
+        <div class="modal-section-copy">Busca el profesor y confirma el aula o lugar.</div>
       </div>
-      <datalist id="profesoresAusencias"></datalist>
-      <div class="field-error" id="fAusenteError"></div>
-    </div>
-    <div class="fg-row">
       <div class="fg">
-        <label>Profesor de guardia</label>
+        <label>Profesor ausente</label>
+        <div class="input-with-action">
+          <input type="text" id="fAusente" list="profesoresAusencias" placeholder="Selecciona o busca un profesor" autocomplete="off">
+          <button class="btn-inline-clear" type="button" onclick="clearAusenteSelection()">Cambiar</button>
+        </div>
+        <datalist id="profesoresAusencias"></datalist>
+        <div class="field-error" id="fAusenteError"></div>
+      </div>
+      <div class="fg">
+        <label>Aula / Lugar</label>
+        <input type="text" id="fAula" placeholder="Ej: 2oA - Aula 12">
+        <div class="field-error" id="fAulaError"></div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-head">
+        <div class="modal-section-title">Cobertura</div>
+        <div class="modal-section-copy">La guardia se calcula autom&aacute;ticamente con el reparto del tramo.</div>
+      </div>
+      <div class="fg fg-auto">
+        <label>Profesor de guardia previsto</label>
         <input type="text" id="fGuardia" list="profesoresGuardia" placeholder="Selecciona un profesor de guardia" autocomplete="off">
         <datalist id="profesoresGuardia"></datalist>
+        <div class="fg-note">Vista previa informativa. La asignaci&oacute;n final se actualiza sola al guardar.</div>
         <div class="field-error" id="fGuardiaError"></div>
       </div>
-      <div class="fg"><label>Aula / Lugar</label><input type="text" id="fAula" placeholder="Ej: 2oA - Aula 12"><div class="field-error" id="fAulaError"></div></div>
+      <div class="check-grid">
+        <label class="check-block"><input type="checkbox" id="fTodoDia"><span>Ausencia todo el d&iacute;a seg&uacute;n su horario</span></label>
+        <label class="check-block"><input type="checkbox" id="fFaena"><span>Ha dejado faena / actividad para los alumnos</span></label>
+      </div>
     </div>
-    <div class="fg"><label>Descripci&oacute;n de la faena (opcional)</label><textarea id="fObs" placeholder="Describe la tarea que han de hacer los alumnos..."></textarea></div>
-    <label class="check-block"><input type="checkbox" id="fTodoDia"><span>Ausencia todo el d&iacute;a seg&uacute;n su horario</span></label>
-    <label class="check-block"><input type="checkbox" id="fFaena"><span>Ha dejado faena / actividad para los alumnos</span></label>
+
+    <div class="modal-section">
+      <div class="modal-section-head">
+        <div class="modal-section-title">Tarea para el grupo</div>
+        <div class="modal-section-copy">Opcional. Solo rell&eacute;nalo si hay instrucciones que deban seguir durante la guardia.</div>
+      </div>
+      <div class="fg">
+        <label>Descripci&oacute;n de la faena</label>
+        <textarea id="fObs" placeholder="Describe la tarea que han de hacer los alumnos..."></textarea>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-cancel" type="button" onclick="closeModal()">Cancelar</button>
       <button class="btn-save" type="button" onclick="save()">Guardar</button>
