@@ -144,6 +144,41 @@ Estas variables solo se usan si la base de datos todavia no tiene creadas las cr
 
 No cambian la contraseña de una base ya inicializada.
 
+## Variables reales para el servidor del centro
+
+La plantilla del repo queda en:
+
+```text
+.env.example
+```
+
+Base recomendada para el servidor del centro:
+
+```text
+PORT=3000
+GUARDIAS_SESSION_SECRET=<secret-largo-estable-y-privado>
+GUARDIAS_TRUST_PROXY=1
+GUARDIAS_DB_PATH=/srv/horario-ies-alcalans/guardias.sqlite
+GUARDIAS_CORS_ORIGINS=
+```
+
+Criterio para cada variable:
+
+- `PORT=3000`
+- `GUARDIAS_SESSION_SECRET`: obligatoria, fuerte, estable y privada
+- `GUARDIAS_TRUST_PROXY=1`: necesaria si hay proxy inverso o HTTPS terminado delante de Node
+- `GUARDIAS_DB_PATH`: mejor fuera del repo, en ruta fija del servidor
+- `GUARDIAS_CORS_ORIGINS=`: mejor vacio si frontend y backend salen del mismo dominio
+
+Variables solo de inicializacion:
+
+```text
+GUARDIAS_ADMIN_PASSWORD=<solo-si-la-bd-es-nueva>
+GUARDIAS_SUPERADMIN_PASSWORD=<solo-si-la-bd-es-nueva>
+```
+
+No conviene dejarlas puestas permanentemente en el servicio una vez creada la base.
+
 ## Credenciales
 
 ### Roles

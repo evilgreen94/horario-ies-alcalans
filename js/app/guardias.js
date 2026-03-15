@@ -53,12 +53,20 @@ function buildProfesoradoData(){
   RAW_PROFESORADO.forEach((teacher,index)=>{
     const nombre=formatTeacherName(teacher.nombre)||`Profesor ${index+1}`;
     const horario={};
+    const gruposProfesor=new Set();
     (teacher.horario||[]).forEach(item=>{
       const dia=resolveDiaIndex(item.dia);
       const hora=normalizaHora(item.franja);
       if(dia==null||hora==null) return;
       if(!horario[dia]) horario[dia]={};
-      horario[dia][hora]=parseSesion(item);
+      const sesion=parseSesion(item);
+      horario[dia][hora]=sesion;
+      if(sesion.grupo){
+        gruposProfesor.add(sesion.grupo);
+        if(!GRUPOS_PROFESORADO[sesion.grupo]){
+          GRUPOS_PROFESORADO[sesion.grupo]={nombre:sesion.grupo};
+        }
+      }
     });
     const guardiasUnicas=new Set();
     [...(teacher.guardias||[]),...(teacher.horario||[]).filter(item=>isGuardiaTexto(item.texto))].forEach(item=>{
@@ -71,7 +79,7 @@ function buildProfesoradoData(){
       guardiasUnicas.add(key);
       guardiasPorHora[dia][hora].push(nombre);
     });
-    profesoresBase[nombre]={nombre,nombreCompleto:nombre,departamento:'Profesorado',grupos:[],horario};
+    profesoresBase[nombre]={nombre,nombreCompleto:nombre,departamento:'Profesorado',grupos:[...gruposProfesor],horario};
   });
   Object.keys(guardiasPorHora).forEach(dia=>{
     Object.keys(guardiasPorHora[dia]).forEach(hora=>{
@@ -185,16 +193,31 @@ function formatHistoryTimestamp(value){
 function getLastUndoableHistoryEntry(){
   return historialCambios.find(entry=>entry?.undoState&&entry.type!=='undo')||null;
 }
+function getSpecialAssignmentClockKey(){
+  const now=new Date();
+  return `${now.toISOString().slice(0,10)}|${String(now.getHours()).padStart(2,'0')}`;
+}
+let specialAssignmentClockKey='';
 function shuffle(arr){const copy=[...arr];for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}return copy;}
+function pickRandom(items,excluded){
+  const blocked=new Set([].concat(excluded||[]).filter(Boolean));
+  const pool=(items||[]).filter(item=>!blocked.has(item));
+  const source=pool.length?pool:(items||[]);
+  if(!source.length) return '';
+  return source[Math.floor(Math.random()*source.length)]||'';
+}
 function makeOrdenHora(dia,hora){return shuffle(HORARIO_GUARDIAS[dia]?.[hora]||[]).map((nombre,index)=>({nombre,numero:index+1}));}
 function buildInitialOrden(){const orden={};for(let dia=0;dia<5;dia++){orden[dia]={};for(let hora=1;hora<=9;hora++){orden[dia][hora]=makeOrdenHora(dia,hora);}}persistOrden(orden);return orden;}
 function buildDefaultBibliotecaAssignments(){
   const biblioteca={};
   for(let dia=0;dia<5;dia++){
     biblioteca[dia]={};
+    let ultimoAsignado='';
     for(let hora=1;hora<=9;hora++){
       if(HORAS_PATIO.has(hora)) continue;
-      biblioteca[dia][hora]=getProfesHora(dia,hora)[0]||'';
+      const asignado=pickRandom(getProfesHora(dia,hora),ultimoAsignado);
+      biblioteca[dia][hora]=asignado;
+      ultimoAsignado=asignado||ultimoAsignado;
     }
   }
   persistBibliotecaAssignments(biblioteca);
@@ -205,14 +228,16 @@ function ensureBibliotecaAssignments(base){
   let changed=false;
   for(let dia=0;dia<5;dia++){
     if(!biblioteca[dia]){biblioteca[dia]={};changed=true;}
+    let ultimoAsignado='';
     for(let hora=1;hora<=9;hora++){
       if(HORAS_PATIO.has(hora)) continue;
       const disponibles=getProfesHora(dia,hora);
       const actual=biblioteca[dia][hora];
       if(!actual||!disponibles.includes(actual)){
-        biblioteca[dia][hora]=disponibles[0]||'';
+        biblioteca[dia][hora]=pickRandom(disponibles,ultimoAsignado);
         changed=true;
       }
+      ultimoAsignado=biblioteca[dia][hora]||ultimoAsignado;
     }
   }
   if(changed) persistBibliotecaAssignments(biblioteca);
@@ -241,16 +266,112 @@ function ensureOrden(base){
 }
 function loadOrden(){try{const d=storage.readJson(KEY_ORDEN,null);return d?ensureOrden(d):buildInitialOrden();}catch(e){return buildInitialOrden();}}
 function getOrdenHora(dia,hora){return (ordenGuardias[dia]?.[hora]||[]).slice().sort((a,b)=>a.numero-b.numero);}
-function getBibliotecaAsignada(dia,hora){return bibliotecaGuardias[dia]?.[hora]||'';}
+function hashSeed(value){
+  let hash=2166136261;
+  const text=String(value||'');
+  for(let i=0;i<text.length;i++){
+    hash^=text.charCodeAt(i);
+    hash=Math.imul(hash,16777619);
+  }
+  return hash>>>0;
+}
+function seededShuffle(list,seed){
+  const copy=[...(list||[])];
+  let state=hashSeed(seed)||1;
+  for(let i=copy.length-1;i>0;i--){
+    state=(Math.imul(state,1664525)+1013904223)>>>0;
+    const j=state%(i+1);
+    [copy[i],copy[j]]=[copy[j],copy[i]];
+  }
+  return copy;
+}
+function getSpecialAssignments(dia,hora){
+  const orderedNames=seededShuffle(getOrdenHora(dia,hora).map(item=>item.nombre),`${new Date().toISOString().slice(0,10)}|${dia}|${hora}`);
+  const biblioteca=orderedNames[0]||'';
+  const banos=orderedNames.find(nombre=>nombre!==biblioteca)||'';
+  const specialCount=(biblioteca?1:0)+(banos?1:0);
+  const uncoveredIfReserved=data.filter(row=>row.dia===dia&&row.hora===hora).length>Math.max(orderedNames.length-specialCount,0);
+  return {
+    biblioteca: uncoveredIfReserved?'':biblioteca,
+    banos: uncoveredIfReserved?'':banos
+  };
+}
+function getBibliotecaAsignada(dia,hora){return getSpecialAssignments(dia,hora).biblioteca||'';}
+function getBanosAsignado(dia,hora){return getSpecialAssignments(dia,hora).banos||'';}
 function getOrdenHoraDisponible(dia,hora,excluidos){
   const excluidosSet=new Set((excluidos||[]).filter(Boolean));
   return getOrdenHora(dia,hora).filter(item=>!excluidosSet.has(item.nombre));
 }
+function reassignGuardiasForSlot(dia,hora){
+  const rows=data.filter(row=>row.dia===dia&&row.hora===hora).sort((a,b)=>(a.id||0)-(b.id||0));
+  if(!rows.length) return;
+  const ausentes=new Set(rows.map(row=>row.ausente).filter(Boolean));
+  const biblioteca=getBibliotecaAsignada(dia,hora);
+  const banos=getBanosAsignado(dia,hora);
+  const orderedNames=getOrdenHora(dia,hora).map(item=>item.nombre).filter(nombre=>!ausentes.has(nombre));
+  const principales=orderedNames.filter(nombre=>nombre!==biblioteca&&nombre!==banos);
+  const assigned=new Set();
+  rows.forEach(row=>{
+    const siguientePrincipal=principales.find(nombre=>!assigned.has(nombre));
+    if(siguientePrincipal){
+      row.guardia=siguientePrincipal;
+      assigned.add(siguientePrincipal);
+      return;
+    }
+    if(banos&&orderedNames.includes(banos)&&!assigned.has(banos)){
+      row.guardia=banos;
+      assigned.add(banos);
+      return;
+    }
+    if(biblioteca&&orderedNames.includes(biblioteca)&&!assigned.has(biblioteca)){
+      row.guardia=biblioteca;
+      assigned.add(biblioteca);
+      return;
+    }
+    row.guardia='';
+  });
+}
+function reassignGuardiasForDayHours(dia,horas){
+  [...new Set((horas||[]).map(Number).filter(Number.isInteger))].forEach(hora=>reassignGuardiasForSlot(dia,hora));
+}
+function reassignAllGuardias(){
+  for(let dia=0;dia<5;dia++){
+    for(let hora=1;hora<=9;hora++){
+      if(HORAS_PATIO.has(hora)) continue;
+      reassignGuardiasForSlot(dia,hora);
+    }
+  }
+}
 function getGuardiaSugerida(dia,hora,turno){
-  return getOrdenHoraDisponible(dia,hora,[getBibliotecaAsignada(dia,hora)])[turno-1]?.nombre||'';
+  return getOrdenHoraDisponible(dia,hora,[getBibliotecaAsignada(dia,hora),getBanosAsignado(dia,hora)])[turno-1]?.nombre||'';
 }
 function getGuardiaApoyo(dia,hora,ocupadas,excluidos){
   return getOrdenHoraDisponible(dia,hora,excluidos)[ocupadas]||null;
+}
+function sortearBibliotecaDia(){
+  if(!isAdmin) return;
+  const undoState=buildUndoState(day);
+  if(!bibliotecaGuardias[day]) bibliotecaGuardias[day]={};
+  let ultimoAsignado='';
+  const resumen=[];
+  for(let hora=1;hora<=9;hora++){
+    if(HORAS_PATIO.has(hora)) continue;
+    const disponibles=getProfesHora(day,hora);
+    const anterior=getBibliotecaAsignada(day,hora)||'Sin asignar';
+    const siguiente=pickRandom(disponibles,ultimoAsignado)||'';
+    bibliotecaGuardias[day][hora]=siguiente;
+    ultimoAsignado=siguiente||ultimoAsignado;
+    resumen.push(`${formatHoraLabel(hora)}: ${anterior} -> ${siguiente||'Sin asignar'}`);
+  }
+  reassignGuardiasForDayHours(day,[1,2,3,4,5,6,7,8,9]);
+  persistBibliotecaAssignments(bibliotecaGuardias);
+  persist(data);
+  addHistoryEntry('Biblioteca sorteada',`${DIAS[day]} · ${resumen.join(' | ')}`,'biblioteca',{undoState});
+  renderGuardiaBoard();
+  renderTable();
+  document.getElementById('saveTs').textContent=`Biblioteca sorteada - ${new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`;
+  showToast('Biblioteca sorteada aleatoriamente para el día.','success');
+  syncAdminState();
 }
 function getProfesHora(dia,hora){return HORARIO_GUARDIAS[dia]?.[hora]||[];}
 function getProfesor(nombre){return PROFESORES_BASE[nombre]||null;}
@@ -421,6 +542,7 @@ async function syncTeacherState(){
 }
 async function hydrateFromBackend(){
   if(!storage.hasBackend()||backendHydrated) return;
+  if(!isAdmin&&!isSuperAdmin) return;
   backendHydrated=true;
   try{
     const [guardiasResult,bibliotecaResult,historialResult,tareasResult,overridesResult]=await Promise.allSettled([
@@ -496,6 +618,8 @@ async function hydrateFromBackend(){
       persistSessionOverrides(sessionOverrides);
     }
 
+    reassignAllGuardias();
+    persist(data);
     renderGuardiaBoard();
     renderTable();
     renderHistoryList();
@@ -508,7 +632,7 @@ async function hydrateFromBackend(){
   }
 }
 function isAnyOverlayOpen(){
-  return ['overlay','teacherOverlay','teacherAccessOverlay','bibliotecaOverlay','historyOverlay','dialogOverlay']
+  return ['overlay','teacherOverlay','teacherAccessOverlay','historyOverlay','dialogOverlay']
     .some(id=>document.getElementById(id)?.classList.contains('open'));
 }
 function makeBackendSnapshot(){
@@ -530,6 +654,7 @@ function makeBackendSnapshot(){
 }
 async function pollBackendState(){
   if(!storage.hasBackend()||backendPollingInFlight||backendSyncInFlight) return;
+  if(!isAdmin&&!isSuperAdmin) return;
   if(document.hidden||isAnyOverlayOpen()) return;
 
   backendPollingInFlight=true;
@@ -601,6 +726,8 @@ async function pollBackendState(){
       persistSessionOverrides(sessionOverrides);
     }
 
+    reassignAllGuardias();
+    persist(data);
     if(previousSnapshot!==makeBackendSnapshot()){
       renderGuardiaBoard();
       renderTable();
@@ -765,7 +892,12 @@ async function logoutCurrentRole(){
   }
   isAdmin=false;
   isSuperAdmin=false;
+  backendHydrated=false;
   refreshAccessUi();
+}
+async function initializeApp(){
+  await loadAuthSession();
+  await hydrateFromBackend();
 }
 async function changeRolePasswordFlow(role){
   const roleLabel=role==='superadmin'?'Superadmin':'Jefatura';
@@ -799,11 +931,8 @@ async function changeRolePasswordFlow(role){
     showToast('No se pudo actualizar la contrase\u00f1a.','error');
   }
 }
-setInterval(()=>{
-  document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-  updateAdminControls();
-},1000);
-document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+setInterval(()=>{updateClockUi();},1000);
+updateClockUi();
 function initials(n){return(n||'').split(/[\s,]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';}
 function renderPills(){document.getElementById('dNombre').textContent=DIAS[day];document.getElementById('dayPills').innerHTML=DIAS.map((d,i)=>`<button class="day-pill${i===day?' active':''}" onclick="setDay(${i})">${d}</button>`).join('');}
 function renderGuardiaBoard(){
@@ -815,10 +944,18 @@ function renderGuardiaBoard(){
     const ordenHora=getOrdenHora(day,hora);
     const profes=ordenHora.map(item=>item.nombre);
     const biblioteca=getBibliotecaAsignada(day,hora);
-    const banos=getGuardiaApoyo(day,hora,0,[biblioteca])?.nombre||'';
+    const banos=getBanosAsignado(day,hora)||'';
     const asignados=new Set(data.filter(g=>g.dia===day&&g.hora===hora&&g.guardia&&g.guardia.trim()).map(g=>g.guardia.trim()));
-    const nombres=profes.map(nombre=>`<span class="guardia-mini${asignados.has(nombre)?' guardia-mini-assigned':''}${nombre===biblioteca?' guardia-mini-biblio':''}">${nombre}${nombre===biblioteca?' \u00b7 Biblioteca':''}</span>`).join('')||'<span class="sin-asignar">Sin profesorado asignado</span>';
-    const nombresDecorados=banos?nombres.replace(new RegExp(`<span class="([^"]*)">${escapeRegExp(banos)}</span>`),`<span class="$1 guardia-mini-banos">${banos} \u00b7 Ba\u00f1os</span>`):nombres;
+    const nombres=profes.map(nombre=>{
+      const classes=[
+        'guardia-mini',
+        asignados.has(nombre)?'guardia-mini-assigned':'',
+        nombre===biblioteca?'guardia-mini-biblio':'',
+        nombre===banos?'guardia-mini-banos':''
+      ].filter(Boolean).join(' ');
+      const suffix=nombre===biblioteca?' \u00b7 Biblioteca':(nombre===banos?' \u00b7 Ba\u00f1os':'');
+      return `<span class="${classes}">${escapeHtml(nombre)}${suffix}</span>`;
+    }).join('')||'<span class="sin-asignar">Sin profesorado asignado</span>';
     cards.push(`<article class="guardia-card${firstMobileCard?' is-open':''}">
       <button class="guardia-card-toggle" type="button" onclick="toggleGuardiaCard(this)">
         <span class="guardia-card-head">
@@ -827,7 +964,7 @@ function renderGuardiaBoard(){
         </span>
       </button>
       <div class="guardia-card-body">
-        <div class="guardia-list">${nombresDecorados}</div>
+        <div class="guardia-list">${nombres}</div>
       </div>
     </article>`);
     firstMobileCard=false;
@@ -854,7 +991,7 @@ function buildDailyReportText(){
     const cub=g.guardia&&g.guardia.trim();
     const sugerido=cub||getGuardiaSugerida(day,g.hora,1)||'Sin asignar';
     const biblioteca=getBibliotecaAsignada(day,g.hora)||'Sin asignar';
-    const banos=getGuardiaApoyo(day,g.hora,0,[biblioteca,sugerido])?.nombre||'Sin asignar';
+    const banos=getBanosAsignado(day,g.hora)||'Sin asignar';
     const faenaInfo=resolveFaena(g);
     const aula=resolveAulaRegistro(g)||'-';
     return [
@@ -878,7 +1015,7 @@ function buildDailyReportHtml(){
     const cub=g.guardia&&g.guardia.trim();
     const sugerido=cub||getGuardiaSugerida(day,g.hora,1)||'Sin asignar';
     const biblioteca=getBibliotecaAsignada(day,g.hora)||'Sin asignar';
-    const banos=getGuardiaApoyo(day,g.hora,0,[biblioteca,sugerido])?.nombre||'Sin asignar';
+    const banos=getBanosAsignado(day,g.hora)||'Sin asignar';
     const faenaInfo=resolveFaena(g);
     const aula=resolveAulaRegistro(g)||'-';
     return `
@@ -989,21 +1126,6 @@ async function restoreSnapshotFromFile(file){
     showToast('No se pudo restaurar la copia.','error');
   }
 }
-function editBibliotecaAssignment(){
-  if(!isAdmin) return;
-  const bibliotecaOverlay=document.getElementById('bibliotecaOverlay');
-  const bHora=document.getElementById('bHora');
-  if(!bibliotecaOverlay||!bHora) return;
-  const primeraHoraDisponible=[1,2,3,5,6,7].find(hora=>getBibliotecaAsignada(day,hora))||1;
-  bHora.value=String(primeraHoraDisponible);
-  updateBibliotecaProfesorOptions();
-  bibliotecaOverlay.classList.add('open');
-}
-function closeBibliotecaModal(){
-  const bibliotecaOverlay=document.getElementById('bibliotecaOverlay');
-  if(bibliotecaOverlay) bibliotecaOverlay.classList.remove('open');
-}
-function bgBibliotecaClose(e){if(e.target.id==='bibliotecaOverlay')closeBibliotecaModal();}
 function renderHistoryList(){
   const historyList=document.getElementById('historyList');
   const undoButton=document.getElementById('btnUndoHistory');
@@ -1038,6 +1160,7 @@ function setHistoryFilter(filter){
 function restoreUndoState(state){
   if(!state) return false;
   data=normalizeStoredRows(cloneJson(state.data||[]));
+  reassignAllGuardias();
   persist(data);
   bibliotecaGuardias=ensureBibliotecaAssignments(cloneJson(state.biblioteca||{}));
   persistBibliotecaAssignments(bibliotecaGuardias);
@@ -1047,6 +1170,17 @@ function restoreUndoState(state){
   renderGuardiaBoard();
   renderTable();
   return true;
+}
+function updateClockUi(){
+  document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  updateAdminControls();
+  const nextClockKey=getSpecialAssignmentClockKey();
+  if(nextClockKey===specialAssignmentClockKey) return;
+  specialAssignmentClockKey=nextClockKey;
+  reassignAllGuardias();
+  persist(data);
+  renderGuardiaBoard();
+  renderTable();
 }
 function openHistoryModal(){
   if(!isAdmin) return;
@@ -1087,37 +1221,6 @@ async function undoLastHistoryChange(){
   document.getElementById('saveTs').textContent='Deshecho - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
   showToast('\u00daltimo cambio deshecho.','success');
 }
-function updateBibliotecaProfesorOptions(){
-  const bHora=document.getElementById('bHora');
-  const bProfesor=document.getElementById('bProfesor');
-  if(!bHora||!bProfesor) return;
-  const hora=+bHora.value;
-  const disponibles=getProfesHora(day,hora);
-  const actual=getBibliotecaAsignada(day,hora);
-  bProfesor.innerHTML=disponibles.map(nombre=>`<option value="${nombre}">${nombre}</option>`).join('');
-  bProfesor.value=disponibles.includes(actual)?actual:(disponibles[0]||'');
-}
-function saveBibliotecaAssignment(){
-  if(!isAdmin) return;
-  const bHora=document.getElementById('bHora');
-  const bProfesor=document.getElementById('bProfesor');
-  if(!bHora||!bProfesor) return;
-  const hora=+bHora.value;
-  const nombre=bProfesor.value;
-  const anterior=getBibliotecaAsignada(day,hora);
-  const undoState=buildUndoState(day);
-  const disponibles=getProfesHora(day,hora);
-  if(!nombre||!disponibles.includes(nombre)){showToast('Selecciona un profesor v\u00e1lido para esa hora.','error');return;}
-  bibliotecaGuardias[day][hora]=nombre;
-  persistBibliotecaAssignments(bibliotecaGuardias);
-  addHistoryEntry('Biblioteca actualizada',`${formatDiaHora(day,hora)} \u00b7 ${anterior||'Sin asignar'} -> ${nombre}`,'biblioteca',{undoState});
-  closeBibliotecaModal();
-  renderGuardiaBoard();
-  renderTable();
-  document.getElementById('saveTs').textContent=`Biblioteca actualizada - ${new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`;
-  showToast('Biblioteca actualizada correctamente.','success');
-  syncAdminState();
-}
 function renderTable(){
   const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
   const tb=document.getElementById('tbody');
@@ -1128,7 +1231,7 @@ function renderTable(){
       const cub=g.guardia&&g.guardia.trim();
       const sugerido=cub||getGuardiaSugerida(day,g.hora,1);
       const biblioteca=getBibliotecaAsignada(day,g.hora);
-      const banos=getGuardiaApoyo(day,g.hora,0,[biblioteca,sugerido]);
+      const banos=getBanosAsignado(day,g.hora)||'';
       const faenaInfo=resolveFaena(g);
       const aula=resolveAulaRegistro(g);
       return `<tr>
@@ -1414,15 +1517,9 @@ function syncTodoDiaMode(){
   const todoDiaInput=document.getElementById('fTodoDia');
   const guardiaInput=document.getElementById('fGuardia');
   if(!todoDiaInput||!guardiaInput) return;
-  if(todoDiaInput.checked){
-    guardiaInput.value='';
-    guardiaInput.disabled=true;
-    guardiaInput.placeholder='La guardia se gestiona por cada hora';
-    setFieldError('fGuardia','');
-  }else{
-    guardiaInput.disabled=false;
-    guardiaInput.placeholder='Selecciona un profesor de guardia';
-  }
+  guardiaInput.disabled=true;
+  guardiaInput.placeholder='La guardia se asigna automaticamente';
+  setFieldError('fGuardia','');
 }
 function openModal(id){editId=id||null;const g=id?data.find(x=>x.id===id):null;const aula=g?resolveAulaRegistro(g):'';clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?g.ausente:'';document.getElementById('fGuardia').value=g?g.guardia:'';document.getElementById('fAula').value=aula;document.getElementById('fTodoDia').checked=false;document.getElementById('fFaena').checked=g?g.faena:false;document.getElementById('fObs').value=g?g.obs:'';populateProfesoresGuardia();syncAulaFromProfesor(!g||!aula);syncTodoDiaMode();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
@@ -1457,11 +1554,8 @@ function validateAbsenceForm(){
   const hora=+document.getElementById('fHora').value;
   const todoDia=document.getElementById('fTodoDia').checked;
   const ausenteInput=document.getElementById('fAusente');
-  const guardiaInput=document.getElementById('fGuardia');
   const aulaInput=document.getElementById('fAula');
   const ausente=getProfesorNombreSeleccionado(ausenteInput.value);
-  const guardiaTexto=guardiaInput.value.trim();
-  const guardia=todoDia?'':getGuardiaNombreSeleccionado(guardiaTexto,dia,hora);
   clearAbsenceFormErrors();
   if(!ausente){
     setFieldError('fAusente','Selecciona un profesor ausente del listado.');
@@ -1470,14 +1564,6 @@ function validateAbsenceForm(){
   if(!todoDia && findDuplicateAbsence(dia,hora,ausente)){
     setFieldError('fAusente','Ya existe una ausencia registrada para ese profesor en esa hora.');
     return {valid:false,focus:ausenteInput};
-  }
-  if(!todoDia && guardiaTexto && !guardia){
-    setFieldError('fGuardia','Selecciona un profesor de guardia v\u00e1lido para esa hora.');
-    return {valid:false,focus:guardiaInput};
-  }
-  if(guardia && guardia===ausente){
-    setFieldError('fGuardia','El profesor ausente no puede cubrir su propia guardia.');
-    return {valid:false,focus:guardiaInput};
   }
   if(todoDia){
     const horasLectivas=getHorasLectivasProfesorDia(ausente,dia);
@@ -1491,7 +1577,7 @@ function validateAbsenceForm(){
     setFieldError('fAula','Indica el aula o lugar de la ausencia.');
     return {valid:false,focus:aulaInput};
   }
-  return {valid:true,ausente,guardia,todoDia:false,horasLectivas:[hora]};
+  return {valid:true,ausente,guardia:'',todoDia:false,horasLectivas:[hora]};
 }
 function clearAusenteSelection(){
   const ausenteInput=document.getElementById('fAusente');
@@ -1535,12 +1621,16 @@ function save(){
   const undoState=buildUndoState(dia);
 
   document.getElementById('fAusente').value=ausente;
-  document.getElementById('fGuardia').value=guardia;
+  document.getElementById('fGuardia').value='';
 
   if(editId&&!todoDia){
     const aulaReal=getAulaProfesor(ausente,dia,hora)||aulaManual;
     const i=data.findIndex(g=>g.id===editId);
-    data[i]={dia,hora,ausente,guardia,aula:aulaReal,faena,obs,id:editId};
+    data[i]={dia,hora,ausente,guardia:'',aula:aulaReal,faena,obs,id:editId};
+    if(previousRow && (previousRow.dia!==dia || previousRow.hora!==hora)){
+      reassignGuardiasForDayHours(previousRow.dia,[previousRow.hora]);
+    }
+    reassignGuardiasForDayHours(dia,[hora]);
     addHistoryEntry('Ausencia editada',`${formatHistoryAbsence(previousRow)} -> ${formatHistoryAbsence(data[i])}`,'edit',{undoState});
   }else{
     if(editId){
@@ -1556,6 +1646,10 @@ function save(){
         data.push({...entry,id:nid++});
       }
     });
+    if(editId && previousRow && (previousRow.dia!==dia || !horasObjetivo.includes(previousRow.hora))){
+      reassignGuardiasForDayHours(previousRow.dia,[previousRow.hora]);
+    }
+    reassignGuardiasForDayHours(dia,horasObjetivo);
     if(todoDia){
       addHistoryEntry('Ausencia de d\u00eda completo',`${DIAS[dia]} \u00b7 ${ausente} \u00b7 ${horasObjetivo.map(formatHoraLabel).join(', ')}`,'create',{undoState});
     }else{
@@ -1577,6 +1671,7 @@ async function del(){
   const previousRow=data.find(g=>g.id===editId);
   const undoState=buildUndoState(previousRow?.dia ?? day);
   data=data.filter(g=>g.id!==editId);
+  if(previousRow) reassignGuardiasForDayHours(previousRow.dia,[previousRow.hora]);
   persist(data);
   if(previousRow) addHistoryEntry('Ausencia eliminada',formatHistoryAbsence(previousRow),'delete',{undoState});
   closeModal();
@@ -1619,10 +1714,6 @@ if(restoreSnapshotInput){
     if(file) restoreSnapshotFromFile(file);
   });
 }
-const bibliotecaHoraInput=document.getElementById('bHora');
-if(bibliotecaHoraInput){
-  bibliotecaHoraInput.addEventListener('change',updateBibliotecaProfesorOptions);
-}
 function safeInitStep(fn,name){
   try{fn();}
   catch(error){
@@ -1631,13 +1722,13 @@ function safeInitStep(fn,name){
 }
 safeInitStep(populateProfesoresAusencias,'populateProfesoresAusencias');
 safeInitStep(populateProfesoresGuardia,'populateProfesoresGuardia');
+safeInitStep(()=>{reassignAllGuardias();persist(data);},'reassignAllGuardias');
 safeInitStep(renderPills,'renderPills');
 safeInitStep(renderGuardiaBoard,'renderGuardiaBoard');
 safeInitStep(renderTable,'renderTable');
 safeInitStep(syncTeacherIdentity,'syncTeacherIdentity');
 safeInitStep(refreshAccessUi,'refreshAccessUi');
-safeInitStep(()=>{loadAuthSession();},'loadAuthSession');
-safeInitStep(()=>{hydrateFromBackend();},'hydrateFromBackend');
+safeInitStep(()=>{initializeApp().catch(error=>console.error('Init step failed: initializeApp',error));},'initializeApp');
 window.setInterval(()=>{pollBackendState();},BACKEND_POLL_INTERVAL_MS);
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden) pollBackendState();
