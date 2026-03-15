@@ -13,6 +13,9 @@ const REQUIRED_PASSWORD_ENV_BY_ROLE = {
   [ADMIN_ROLE]: 'GUARDIAS_ADMIN_PASSWORD',
   [SUPERADMIN_ROLE]: 'GUARDIAS_SUPERADMIN_PASSWORD'
 };
+const WEEK_STATE_KEY = 'school_week_key';
+
+let lastWeekCheckKey = '';
 
 function resolveDefaultDataDir() {
   if (process.platform === 'win32') {
@@ -69,7 +72,66 @@ async function initializeDatabase() {
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
   await db.exec(schema);
   await seedDefaultCredentials(db);
+  await ensureWeeklyResetIfNeeded(db);
   return db;
+}
+
+function getMadridNow() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' }));
+}
+
+function getCurrentSchoolWeekKey() {
+  const now = getMadridNow();
+  const day = now.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() + mondayOffset);
+  return monday.toISOString().slice(0, 10);
+}
+
+async function ensureWeeklyResetIfNeeded(dbInstance) {
+  const db = dbInstance || await getDatabase();
+  const currentWeekKey = getCurrentSchoolWeekKey();
+  if (lastWeekCheckKey === currentWeekKey) return false;
+
+  const storedState = await db.get('SELECT value FROM app_state WHERE key = ?', [WEEK_STATE_KEY]);
+  if (!storedState) {
+    await db.run(
+      `INSERT INTO app_state (key, value, updated_at)
+       VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
+      [WEEK_STATE_KEY, currentWeekKey]
+    );
+    lastWeekCheckKey = currentWeekKey;
+    return false;
+  }
+
+  if (storedState.value === currentWeekKey) {
+    lastWeekCheckKey = currentWeekKey;
+    return false;
+  }
+
+  await db.exec('BEGIN TRANSACTION');
+  try {
+    await db.exec('DELETE FROM ausencias');
+    await db.exec('DELETE FROM biblioteca_guardias');
+    await db.exec('DELETE FROM historial');
+    await db.exec('DELETE FROM tareas_profesorado');
+    await db.run(
+      `UPDATE app_state
+       SET value = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE key = ?`,
+      [currentWeekKey, WEEK_STATE_KEY]
+    );
+    await db.exec('COMMIT');
+  } catch (error) {
+    await db.exec('ROLLBACK');
+    throw error;
+  }
+
+  lastWeekCheckKey = currentWeekKey;
+  return true;
 }
 
 async function seedDefaultCredentials(db) {
@@ -94,6 +156,8 @@ async function seedDefaultCredentials(db) {
 
 module.exports = {
   DB_PATH,
+  ensureWeeklyResetIfNeeded,
   getDatabase,
+  getCurrentSchoolWeekKey,
   initializeDatabase
 };

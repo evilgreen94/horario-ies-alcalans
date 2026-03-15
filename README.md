@@ -1,42 +1,85 @@
 # Horario IES Alcalans
 
-Aplicacion de guardias para uso interno del centro.
+Aplicacion web interna para gestionar ausencias del profesorado, reparto de guardias, biblioteca, baños, historial y copias de seguridad.
 
-La rama de backend sirve una aplicacion web en `Node.js + Express` y guarda los datos en una base SQLite.
+Este `README` esta pensado para que otra persona pueda continuar el proyecto sin depender del contexto de desarrollo original.
+
+## Objetivo del proyecto
+
+- Registrar ausencias del profesorado por dia y hora
+- Asignar automaticamente profesorado de guardia
+- Reservar automaticamente biblioteca y baños por tramo horario
+- Permitir a Jefatura registrar si hay tarea/faena dejada
+- Generar informe PDF diario
+- Permitir backup y restore desde `superadmin`
 
 ## Estado actual
 
-- Rama de trabajo backend: `backend`
-- Backend: `server/app.js`
-- Frontend principal: `guardias.html`
-- Base de datos compartida del proyecto: `BD/guardias.sqlite`
+- Rama principal de trabajo: `backend`
+- Backend: `Node.js + Express`
+- Frontend: HTML/CSS/JS sin framework
+- Base de datos: SQLite
 - Puerto por defecto: `3000`
+- Entorno actual de trabajo: local / red interna, no internet publica
+
+## Arquitectura
+
+### Backend
+
+- Entrada principal: [server/app.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\server\app.js)
+- Base de datos y arranque de esquema: [server/db.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\server\db.js)
+- Sesiones: [server/session.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\server\session.js)
+- Hash de credenciales: [server/auth.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\server\auth.js)
+- Rutas API: `server/routes/`
+
+### Frontend
+
+- Pantalla principal: [guardias.html](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\guardias.html)
+- Logica principal: [js/app/guardias.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\js\app\guardias.js)
+- Cliente de API / cache local: [js/app/storage.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\js\app\storage.js)
+- Horarios fuente del profesorado: [js/data/profesorado_horarios_guardias.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\js\data\profesorado_horarios_guardias.js)
+
+### Datos
+
+- Esquema SQL: [schema.sql](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\server\schema.sql)
+- Base usada por defecto en esta rama: [guardias.sqlite](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\BD\guardias.sqlite)
 
 ## Estructura relevante
 
 ```text
 horario-ies-alcalans/
-├── BD/
-│   └── guardias.sqlite
-├── guardias.html
-├── js/
-├── css/
-└── server/
-    ├── app.js
-    ├── auth.js
-    ├── db.js
-    ├── session.js
-    ├── schema.sql
-    └── routes/
+|-- BD/
+|   `-- guardias.sqlite
+|-- guardias.html
+|-- css/
+|-- js/
+|   |-- app/
+|   |   |-- guardias.js
+|   |   `-- storage.js
+|   `-- data/
+|       `-- profesorado_horarios_guardias.js
+|-- server/
+|   |-- app.js
+|   |-- auth.js
+|   |-- db.js
+|   |-- maintenance.js
+|   |-- schema.sql
+|   |-- session.js
+|   |-- routes/
+|   `-- scripts/
+|       `-- smoke-test.js
+|-- .env.example
+|-- start-local.cmd
+`-- start-local.ps1
 ```
 
 ## Requisitos
 
-- `Node.js` instalado
-- `npm` disponible
-- En PowerShell de Windows conviene usar `npm.cmd` en vez de `npm`
+- `Node.js`
+- `npm`
+- En PowerShell de Windows conviene usar `npm.cmd`
 
-Version comprobada en este entorno:
+Versiones comprobadas en el entorno de desarrollo:
 
 - `node`: `v24.14.0`
 - `npm.cmd`: `11.9.0`
@@ -54,47 +97,107 @@ npm.cmd install
 
 ## Arranque local
 
-El backend ahora exige un secreto de sesion.
+### Metodo recomendado en Windows
 
-En la terminal integrada de VS Code, desde la raiz del proyecto:
+1. Editar [.env.local.cmd](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\.env.local.cmd)
+2. Sustituir el placeholder por un secreto real
+3. Ejecutar:
 
 ```powershell
-cd "C:\Users\Familia\Documents\GitHub\horario-ies-alcalans"
+.\start-local.cmd
+```
+
+### Alternativa PowerShell
+
+1. Editar [.env.local.ps1](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\.env.local.ps1)
+2. Ejecutar:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\start-local.ps1
+```
+
+### Arranque manual
+
+```powershell
 $env:GUARDIAS_SESSION_SECRET="pon-aqui-un-secreto-largo-y-random"
 npm.cmd start
 ```
 
-Abrir en navegador:
+Aplicacion:
 
 ```text
 http://localhost:3000
 ```
 
-Comprobacion rapida:
+Healthcheck:
 
 ```text
 http://localhost:3000/api/health
 ```
 
-Debe devolver algo como:
+Respuesta esperada:
 
 ```json
 {"ok":true}
 ```
 
+## Variables de entorno
+
+Plantilla del repositorio:
+
+- [.env.example](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\.env.example)
+
+### Obligatorias
+
+```text
+GUARDIAS_SESSION_SECRET=<secret-largo-estable-y-privado>
+```
+
+Sin esta variable el servidor no arranca.
+
+### Recomendadas para despliegue
+
+```text
+PORT=3000
+GUARDIAS_TRUST_PROXY=1
+GUARDIAS_DB_PATH=/srv/horario-ies-alcalans/guardias.sqlite
+GUARDIAS_CORS_ORIGINS=
+```
+
+Uso:
+
+- `PORT`: puerto interno de Node
+- `GUARDIAS_TRUST_PROXY`: necesaria si la app va detras de proxy inverso / HTTPS terminado fuera de Node
+- `GUARDIAS_DB_PATH`: ruta fija de la BD
+- `GUARDIAS_CORS_ORIGINS`: lista de origenes permitidos separados por comas; dejar vacio si frontend y backend salen del mismo dominio
+
+### Solo para inicializacion de una base nueva
+
+```text
+GUARDIAS_ADMIN_PASSWORD=<clave-inicial-admin>
+GUARDIAS_SUPERADMIN_PASSWORD=<clave-inicial-superadmin>
+```
+
+Estas variables:
+
+- solo se usan si faltan las credenciales en la tabla `auth_credentials`
+- no cambian contraseñas ya existentes
+- no conviene dejarlas puestas permanentemente en el servicio
+
 ## Base de datos
 
-La aplicacion resuelve la BD con esta prioridad:
+Resolucion de la ruta de la BD:
 
-1. Variable de entorno `GUARDIAS_DB_PATH`
-2. Archivo `BD/guardias.sqlite` dentro del proyecto
-3. Carpeta local del sistema (`AppData/Local/...`) como ultimo recurso
+1. `GUARDIAS_DB_PATH`
+2. `BD/guardias.sqlite`
+3. carpeta local del sistema
 
-En esta rama se esta usando `BD/guardias.sqlite` para facilitar mover la BD entre ordenadores.
+En esta rama se usa `BD/guardias.sqlite` para facilitar trabajo entre equipos.
 
 ## Flujo entre ordenadores
 
-Como ahora mismo no hay servidor central, la forma de trabajar es copiar el archivo SQLite entre equipos.
+Como no hay todavia servidor central, la sincronizacion real de datos se hace copiando el archivo SQLite.
 
 Archivo a conservar:
 
@@ -104,127 +207,192 @@ BD\guardias.sqlite
 
 Flujo recomendado:
 
-1. En el equipo donde has trabajado, copia `BD\guardias.sqlite`
-2. Pasa ese archivo al otro equipo
-3. Sustituyelo dentro de la carpeta `BD`
-4. Arranca el proyecto con el mismo flujo local
+1. Trabajar en un equipo
+2. Copiar `BD\guardias.sqlite`
+3. Llevarla al otro equipo
+4. Sustituir la BD local
+5. Arrancar normalmente
 
-GitHub no sincroniza automaticamente la base de datos salvo que el archivo este dentro del repo, no este ignorado y se haga `commit` y `push`.
+GitHub no sincroniza automaticamente el contenido de SQLite.
 
-## Variables de entorno
+## Seguridad aplicada
 
-### Obligatorias para arrancar
+Ya implementado:
 
-```powershell
-$env:GUARDIAS_SESSION_SECRET="un-secreto-largo-y-random"
-```
+- secreto de sesion obligatorio
+- cookies de sesion firmadas
+- `Secure` en cookie cuando la peticion llega por HTTPS
+- limitacion basica de intentos de login
+- cierre de endpoints sensibles sin autenticacion
+- `guardias`, `biblioteca`, `historial` y datos de profesorado protegidos
+- export/restore restringido a `superadmin`
+- CORS cross-origin deshabilitado por defecto
+- comparacion segura de firma de sesion
 
-Se usa para firmar las cookies de sesion. Si falta, el servidor no arranca.
+## Roles y acceso
 
-### Opcionales
-
-```powershell
-$env:GUARDIAS_DB_PATH="C:\ruta\custom\guardias.sqlite"
-$env:GUARDIAS_TRUST_PROXY="1"
-$env:GUARDIAS_CORS_ORIGINS="https://guardias.centro.es,https://intranet.centro.es"
-```
-
-- `GUARDIAS_DB_PATH`: fuerza una ruta de base de datos concreta
-- `GUARDIAS_TRUST_PROXY`: util cuando la app este detras de proxy inverso o HTTPS terminado fuera de Node
-- `GUARDIAS_CORS_ORIGINS`: lista separada por comas de origenes permitidos para acceso cross-origin; si no se define, no se habilita CORS cross-origin
-
-### Solo para inicializar una base nueva
-
-```powershell
-$env:GUARDIAS_ADMIN_PASSWORD="una-clave-inicial-segura"
-$env:GUARDIAS_SUPERADMIN_PASSWORD="otra-clave-inicial-segura"
-```
-
-Estas variables solo se usan si la base de datos todavia no tiene creadas las credenciales de `admin` y `superadmin`.
-
-No cambian la contraseña de una base ya inicializada.
-
-## Variables reales para el servidor del centro
-
-La plantilla del repo queda en:
-
-```text
-.env.example
-```
-
-Base recomendada para el servidor del centro:
-
-```text
-PORT=3000
-GUARDIAS_SESSION_SECRET=<secret-largo-estable-y-privado>
-GUARDIAS_TRUST_PROXY=1
-GUARDIAS_DB_PATH=/srv/horario-ies-alcalans/guardias.sqlite
-GUARDIAS_CORS_ORIGINS=
-```
-
-Criterio para cada variable:
-
-- `PORT=3000`
-- `GUARDIAS_SESSION_SECRET`: obligatoria, fuerte, estable y privada
-- `GUARDIAS_TRUST_PROXY=1`: necesaria si hay proxy inverso o HTTPS terminado delante de Node
-- `GUARDIAS_DB_PATH`: mejor fuera del repo, en ruta fija del servidor
-- `GUARDIAS_CORS_ORIGINS=`: mejor vacio si frontend y backend salen del mismo dominio
-
-Variables solo de inicializacion:
-
-```text
-GUARDIAS_ADMIN_PASSWORD=<solo-si-la-bd-es-nueva>
-GUARDIAS_SUPERADMIN_PASSWORD=<solo-si-la-bd-es-nueva>
-```
-
-No conviene dejarlas puestas permanentemente en el servicio una vez creada la base.
-
-## Credenciales
-
-### Roles
+Roles soportados:
 
 - `admin`
 - `superadmin`
 
-### Estado real de las contraseñas
-
-Las contraseñas activas estan guardadas en la propia base SQLite, en la tabla `auth_credentials`.
-
-Eso significa:
-
-- Si la BD ya existe, manda lo que haya guardado en esa tabla
-- Las variables `GUARDIAS_ADMIN_PASSWORD` y `GUARDIAS_SUPERADMIN_PASSWORD` solo crean las credenciales iniciales si faltan
-
-### Acceso superadmin
-
-URL para habilitar el panel de superadmin:
+Panel `superadmin`:
 
 ```text
 http://localhost:3000/?panel=superadmin
 ```
 
-## Seguridad aplicada en esta rama
+Estado real de las contraseñas:
 
-Se han endurecido varios puntos del backend:
+- viven en la tabla `auth_credentials`
+- si la BD ya existe, mandan esas credenciales
+- no hay contraseñas por defecto conocidas en arranque
 
-- ya no existe una secret de sesion por defecto conocida
-- el servidor falla al arrancar si no se define `GUARDIAS_SESSION_SECRET`
-- ya no se crean usuarios nuevos con claves por defecto conocidas
-- el login tiene limitacion basica de intentos: 10 fallos por IP y rol en 15 minutos
-- la cookie de sesion marca `Secure` cuando la peticion entra por HTTPS
-- `guardias`, `historial` y datos de profesorado ya no quedan expuestos sin autenticacion administrativa
-- CORS cross-origin queda deshabilitado por defecto salvo origenes permitidos explicitamente
+## Comportamiento funcional actual
 
-## Despliegue futuro en servidor del centro
+### Guardias
 
-Si se despliega para acceso desde movil o fuera del equipo local, lo minimo recomendable es:
+- las ausencias se registran por dia y hora
+- la guardia se asigna automaticamente
+- si se crea, edita o borra una ausencia, el reparto se recalcula
 
-1. HTTPS
-2. reverse proxy o servidor frontal
-3. `GUARDIAS_TRUST_PROXY=1`
-4. `GUARDIAS_SESSION_SECRET` fuerte y estable
-5. copias de seguridad periodicas de `guardias.sqlite`
-6. control de quien conoce las claves de `admin` y `superadmin`
+### Biblioteca y baños
+
+- se calculan automaticamente por hora
+- no dependen ya de boton manual
+- si hacen falta para cubrir ausencias, se liberan como reserva
+
+### Profesorado
+
+- existe panel de profesorado en local / entorno interno
+- actualmente no esta pensado para exposicion abierta a internet
+- fase 1 asumida: Jefatura o un compañero registran la tarea/faena
+
+### Backup y restore
+
+Disponible en `superadmin`:
+
+- `Backup JSON`
+- `Restaurar JSON`
+- `Base SQLite`
+
+Uso recomendado en fase 1:
+
+1. `Backup JSON` como copia logica frecuente
+2. `Base SQLite` como respaldo tecnico completo
+3. probar `restore` periodicamente
+
+## API y permisos
+
+Resumen operativo:
+
+- `admin`: gestion diaria
+- `superadmin`: backup / restore / acceso tecnico
+
+Matriz simplificada:
+
+- anonimo:
+  - no puede leer `guardias`, `biblioteca`, `historial`, `profesorado`, `report`, `export`
+  - no puede escribir ningun endpoint sensible
+- `admin`:
+  - puede trabajar con guardias, biblioteca, historial, profesorado y report
+  - no puede exportar ni restaurar backups de `superadmin`
+- `superadmin`:
+  - puede usar `snapshot.json`, `database.sqlite` y `restore`
+
+## Tests y comprobaciones
+
+### Smoke test
+
+Script:
+
+- [smoke-test.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\server\scripts\smoke-test.js)
+
+Comando:
+
+```powershell
+npm.cmd run smoke
+```
+
+Cubre:
+
+- `health`
+- rutas protegidas sin login
+- escrituras anonimas bloqueadas
+
+Version completa con credenciales reales:
+
+```powershell
+$env:GUARDIAS_SMOKE_ADMIN_PASSWORD="clave-admin-real"
+$env:GUARDIAS_SMOKE_SUPERADMIN_PASSWORD="clave-superadmin-real"
+npm.cmd run smoke
+```
+
+Entonces prueba tambien:
+
+- login `admin`
+- login `superadmin`
+- permisos diferenciales entre `admin` y `superadmin`
+- export JSON
+- descarga SQLite
+- restore JSON
+
+## Despliegue previsto
+
+Escenario previsto para fase 1:
+
+- servidor Linux interno del centro
+- acceso en red interna
+- no exponer internet publica por ahora
+- `Node + reverse proxy + SQLite`
+
+Pendiente de decision externa:
+
+- disponibilidad de equipo
+- aprobacion de direccion
+- hostname / IP fija
+- proxy inverso final
+- HTTPS final
+
+## Roadmap funcional acordado
+
+### Fase 1
+
+- uso interno del centro
+- Jefatura gestiona ausencias
+- Jefatura o un compañero indican tarea/faena
+- sin acceso remoto del profesorado desde casa
+- prioridad en estabilidad, seguridad y operativa
+
+### Fase 2 posible
+
+- identificacion local del profesorado al llegar al centro
+- automatizacion mayor de presencia / ausencia
+- posible ajuste del reparto automatico de guardias
+
+### Fase 3 posible
+
+- acceso remoto del profesorado con autenticacion individual real
+- esto requeriria rediseño serio de seguridad y sesiones
+
+## Operativa recomendada
+
+### Antes de tocar despliegue
+
+- mantener backup JSON y copia SQLite
+- ejecutar smoke test tras cambios sensibles
+- no exponer el modo profesorado actual a internet
+
+### Si otra persona hereda el proyecto
+
+Orden recomendado de lectura:
+
+1. [README.md](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\README.md)
+2. [app.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\server\app.js)
+3. [db.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\server\db.js)
+4. [session.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\server\session.js)
+5. [guardias.js](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\js\app\guardias.js)
+6. [schema.sql](C:\Users\Familia\Documents\GitHub\horario-ies-alcalans\server\schema.sql)
 
 ## Comandos utiles
 
@@ -237,16 +405,13 @@ npm.cmd install
 Arrancar:
 
 ```powershell
-$env:GUARDIAS_SESSION_SECRET="pon-aqui-un-secreto-largo-y-random"
-npm.cmd start
+.\start-local.cmd
 ```
 
-Arrancar en otro puerto:
+Smoke test:
 
 ```powershell
-$env:GUARDIAS_SESSION_SECRET="pon-aqui-un-secreto-largo-y-random"
-$env:PORT="3001"
-npm.cmd start
+npm.cmd run smoke
 ```
 
 Inicializar una BD nueva con claves iniciales:
@@ -257,23 +422,3 @@ $env:GUARDIAS_ADMIN_PASSWORD="clave-admin-inicial"
 $env:GUARDIAS_SUPERADMIN_PASSWORD="clave-superadmin-inicial"
 npm.cmd start
 ```
-
-## Notas de PowerShell
-
-Si `npm` falla por politica de ejecucion, usa:
-
-```powershell
-npm.cmd start
-```
-
-En vez de:
-
-```powershell
-npm start
-```
-
-## Estado pendiente razonable
-
-- revisar y asegurar exportacion y restauracion de backups
-- valorar un flujo mejor de copias de la BD entre equipos
-- documentar despliegue del centro cuando se decida el servidor final

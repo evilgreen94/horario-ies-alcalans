@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-const { initializeDatabase } = require('./db');
+const { ensureWeeklyResetIfNeeded, initializeDatabase } = require('./db');
 const { rejectWritesDuringRestore } = require('./maintenance');
 const { getSessionSecret } = require('./session');
 const guardiasRouter = require('./routes/guardias');
@@ -63,6 +63,14 @@ configureTrustProxy(TRUST_PROXY);
 app.use(cors(createCorsOptions()));
 app.use(express.json({ limit: '5mb' }));
 app.use('/api', rejectWritesDuringRestore);
+app.use('/api', async (_req, _res, next) => {
+  try {
+    await ensureWeeklyResetIfNeeded();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 app.use(express.static(path.join(__dirname, '..')));
 
 app.get('/api/health', (_req, res) => {
