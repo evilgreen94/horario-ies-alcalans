@@ -183,13 +183,16 @@
       <button class="modal-x" onclick="closeTeacherPanel()">x</button>
     </div>
     <div class="teacher-head">
-      <div>
+      <div class="teacher-head-main">
         <div class="teacher-session-title" id="teacherName">Profesorado</div>
         <div class="teacher-meta" id="teacherMeta">Horario del profesorado</div>
         <div class="teacher-user" id="teacherUser"></div>
       </div>
-      <div>
-        <div class="teacher-meta" id="teacherSummary">Sesiones del d&iacute;a</div>
+      <div class="teacher-head-side">
+        <div class="teacher-summary-card">
+          <div class="teacher-summary-label">Resumen del d&iacute;a</div>
+          <div class="teacher-meta" id="teacherSummary">Sesiones del d&iacute;a</div>
+        </div>
         <div class="teacher-panel-actions">
           <button class="btn-teacher-panel" type="button" onclick="closeTeacherPanel()">Cerrar panel</button>
           <button class="btn-teacher-panel btn-teacher-panel-danger" type="button" onclick="exitTeacherMode()">Salir del modo</button>
@@ -207,7 +210,7 @@
       <button class="modal-x" onclick="closeTeacherAccess()">x</button>
     </div>
     <div class="teacher-access-shell">
-      <div class="teacher-access-intro">Escribe tu nombre o búscalo en la lista. La entrada está pensada para que cada profesor se localice rápido a sí mismo.</div>
+      <div class="teacher-access-intro">Busca tu nombre para abrir tu panel del día. Desde ahí podrás revisar sesiones, indicar tarea y ajustar materia, grupo o aula si hace falta.</div>
       <div class="teacher-access-search-panel">
         <div class="fg">
           <label>Profesor</label>

@@ -592,10 +592,52 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   color: var(--muted);
   font-size: .86rem;
 }
-.teacher-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.teacher-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(61,116,197,0.12);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(246,249,255,.96), rgba(255,255,255,.98));
+}
+.teacher-head-main {
+  min-width: 0;
+}
+.teacher-head-side {
+  display: grid;
+  gap: .8rem;
+  align-content: start;
+}
+.teacher-summary-card {
+  padding: .9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.92);
+}
+.teacher-summary-label {
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: .35rem;
+}
 .teacher-meta { color: var(--muted); font-size: .82rem; }
-.teacher-user { margin-top: .4rem; font-size: .74rem; color: var(--blue); font-weight: 700; }
-.teacher-panel-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .8rem; flex-wrap: wrap; }
+.teacher-user {
+  margin-top: .55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .38rem .6rem;
+  border-radius: 999px;
+  background: rgba(61,116,197,0.1);
+  color: var(--blue);
+  font-size: .74rem;
+  font-weight: 700;
+}
+.teacher-panel-actions { display: flex; justify-content: flex-end; gap: .6rem; flex-wrap: wrap; }
 .btn-teacher-panel { background: transparent; color: var(--blue); border: 1px solid rgba(61,116,197,0.28); border-radius: 8px; padding: 8px 12px; font-weight: 800; cursor: pointer; }
 .btn-teacher-panel-danger { color: var(--red); border-color: rgba(217,83,79,0.28); }
 .teacher-access-head {
@@ -709,21 +751,74 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .teacher-access-search-panel { padding: .85rem; }
 }
 .teacher-day-pills { display: flex; gap: .45rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.teacher-day-pills button { font-family: var(--font-b); font-size: .74rem; font-weight: 700; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; }
+.teacher-day-pills button { font-family: var(--font-b); font-size: .74rem; font-weight: 700; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; }
 .teacher-day-pills button.active { background: var(--blue); color: #fff; border-color: var(--blue); }
-.teacher-sessions { display: grid; gap: .85rem; }
-.teacher-session { border: 1px solid var(--border); background: var(--surface2); border-radius: 12px; padding: .95rem; }
-.teacher-session-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .7rem; }
-.teacher-session-title { font-weight: 800; }
+.teacher-sessions { display: grid; gap: 1rem; }
+.teacher-session {
+  border: 1px solid rgba(61,116,197,0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(246,249,255,.92));
+  border-radius: 18px;
+  padding: 1rem;
+  box-shadow: 0 12px 28px rgba(31,41,55,0.05);
+}
+.teacher-session-head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; }
+.teacher-session-title { font-weight: 800; font-size: 1rem; line-height: 1.2; }
 .teacher-session-meta { font-size: .8rem; color: var(--muted); }
-.teacher-session-edit { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--border); }
+.teacher-session-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .38rem .62rem;
+  border-radius: 999px;
+  background: rgba(61,116,197,0.1);
+  color: var(--blue);
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.teacher-session-summary {
+  display: grid;
+  gap: .35rem;
+}
+.teacher-session-side {
+  display: grid;
+  gap: .45rem;
+  justify-items: end;
+}
+.teacher-session-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  justify-content: flex-end;
+}
+.teacher-session-edit {
+  margin-top: .95rem;
+  padding-top: .95rem;
+  border-top: 1px solid rgba(219,227,238,0.9);
+}
 .teacher-session-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .teacher-edit-toggle { background: transparent; color: var(--blue); border: 1px solid rgba(31,122,224,.22); border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; }
 .teacher-session-empty { color: var(--muted); font-size: .9rem; padding: .5rem 0; }
-.teacher-check { display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; }
+.teacher-check {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin: .85rem 0 .75rem;
+  padding: .8rem .9rem;
+  border: 1px solid rgba(61,116,197,0.12);
+  border-radius: 12px;
+  background: rgba(61,116,197,0.04);
+}
 .teacher-check input { accent-color: var(--blue); }
-.teacher-save { background: var(--blue); color: #fff; border: none; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; }
-.teacher-save-exit { background: transparent; color: var(--blue); border: 1px solid rgba(31,122,224,.35); border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; margin-left: .45rem; }
+.teacher-actions {
+  display: flex;
+  gap: .6rem;
+  flex-wrap: wrap;
+  margin-top: .85rem;
+}
+.teacher-save { background: var(--blue); color: #fff; border: none; border-radius: 10px; padding: 10px 14px; font-weight: 800; cursor: pointer; }
+.teacher-save-exit { background: transparent; color: var(--blue); border: 1px solid rgba(31,122,224,.35); border-radius: 10px; padding: 10px 14px; font-weight: 800; cursor: pointer; }
 @media(max-width:800px) { .stats{grid-template-columns:repeat(2,1fr)} th:nth-child(6),td:nth-child(6){display:none} }
 @media(max-width:1100px) {
   header { min-height: auto; flex-wrap: wrap; justify-content: center; gap: .75rem; padding: 12px 1rem; }

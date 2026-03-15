@@ -1482,11 +1482,12 @@ function renderTeacherPanel(){
   syncTeacherIdentity();
   document.getElementById('teacherName').textContent=profesor.nombre;
   document.getElementById('teacherMeta').textContent=`${profesor.nombreCompleto} - ${profesor.departamento}`;
-  document.getElementById('teacherSummary').textContent=`${DIAS[teacherDay]} - sesiones programadas`;
-  document.getElementById('teacherBarName').textContent=`${profesor.nombre} - ${profesor.departamento}`;
-  document.getElementById('teacherDayPills').innerHTML=DIAS.map((nombreDia,index)=>`<button class="${index===teacherDay?'active':''}" onclick="setTeacherDay(${index})">${nombreDia}</button>`).join('');
   const sesiones=getHorarioProfesorDia(teacherName,teacherDay);
   const horas=Object.keys(sesiones).map(Number).sort((a,b)=>a-b);
+  const totalConTarea=horas.filter(hora=>getTareaProfesor(teacherName,teacherDay,hora)?.dejada).length;
+  document.getElementById('teacherSummary').textContent=`${DIAS[teacherDay]} · ${horas.length} sesiones · ${totalConTarea} con tarea`;
+  document.getElementById('teacherBarName').textContent=`${profesor.nombre} - ${profesor.departamento}`;
+  document.getElementById('teacherDayPills').innerHTML=DIAS.map((nombreDia,index)=>`<button class="${index===teacherDay?'active':''}" onclick="setTeacherDay(${index})">${nombreDia}</button>`).join('');
   if(!horas.length){
     document.getElementById('teacherSessions').innerHTML='<div class="teacher-session"><div class="teacher-session-empty">No tienes sesiones registradas para este d\u00eda.</div></div>';
     return;
@@ -1498,13 +1499,21 @@ function renderTeacherPanel(){
     const tarea=getTareaProfesor(teacherName,teacherDay,hora);
     const checked=tarea?!!tarea.dejada:false;
     const texto=tarea?.tarea||'';
+    const detalleVisible=grupo||sesion.detalle||'Sin detalle adicional';
     return `<div class="teacher-session">
       <div class="teacher-session-head">
-        <div>
-          <div class="teacher-session-title">${HORA_MAP[hora].label} hora - ${sesion.materia||sesion.tipo}</div>
-          <div class="teacher-session-meta">${grupo||sesion.detalle}</div>
+        <div class="teacher-session-summary">
+          <div class="teacher-session-slot">${HORA_MAP[hora].label} hora</div>
+          <div class="teacher-session-title">${sesion.materia||sesion.tipo}</div>
+          <div class="teacher-session-meta">${detalleVisible}</div>
         </div>
-        <div class="teacher-session-meta">${HORA_MAP[hora].rango} \u00b7 ${aula}</div>
+        <div class="teacher-session-side">
+          <div class="teacher-session-meta">${HORA_MAP[hora].rango}</div>
+          <div class="teacher-session-badges">
+            <span class="badge ${checked?'b-ok':'b-nok'}">${checked?'Con tarea':'Sin tarea'}</span>
+            <span class="badge b-biblio">${aula}</span>
+          </div>
+        </div>
       </div>
       <div class="teacher-session-edit">
         <div class="teacher-session-grid">
@@ -1534,8 +1543,10 @@ function renderTeacherPanel(){
         <label>Tarea</label>
         <textarea id="taskText-${teacherDay}-${hora}" placeholder="Indica que debe hacer el grupo">${texto}</textarea>
       </div>
-      <button class="teacher-save" type="button" onclick="saveTeacherTask(${teacherDay},${hora},false)">Guardar tarea</button>
-      <button class="teacher-save-exit" type="button" onclick="saveTeacherTask(${teacherDay},${hora},true)">Guardar y salir</button>
+      <div class="teacher-actions">
+        <button class="teacher-save" type="button" onclick="saveTeacherTask(${teacherDay},${hora},false)">Guardar tarea</button>
+        <button class="teacher-save-exit" type="button" onclick="saveTeacherTask(${teacherDay},${hora},true)">Guardar y salir</button>
+      </div>
     </div>`;
   }).join('');
 }
