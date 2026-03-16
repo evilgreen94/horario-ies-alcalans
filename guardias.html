@@ -53,6 +53,7 @@
       <div class="admin-status save-ts" id="saveTs">Edita desde la tabla o registra una nueva ausencia.</div>
     </div>
     <div class="admin-actions admin-actions-secondary">
+      <button class="btn-add btn-add-secondary" type="button" onclick="openSubstitutionModal()">Sustituciones</button>
       <button class="btn-add btn-add-secondary" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe diario</button>
       <button class="btn-add btn-add-secondary" id="btnInformeSemanal" onclick="printWeeklyReportPdf()" style="display:none">Informe semanal</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('admin')">Cambiar contrase&ntilde;a</button>
@@ -127,10 +128,11 @@
       <div class="fg">
         <label>Profesor ausente</label>
         <div class="input-with-action">
-          <input type="text" id="fAusente" list="profesoresAusencias" placeholder="Selecciona o busca un profesor" autocomplete="off">
+          <input type="text" id="fAusente" placeholder="Selecciona o busca un profesor" autocomplete="off" aria-autocomplete="list" aria-controls="ausenteSuggestions">
           <button class="btn-inline-clear" type="button" onclick="clearAusenteSelection()">Cambiar</button>
         </div>
-        <datalist id="profesoresAusencias"></datalist>
+        <div class="absence-suggestions" id="ausenteSuggestions" hidden></div>
+        <div class="absence-preview" id="ausentePreview">Empieza a escribir para localizar al profesor.</div>
         <div class="field-error" id="fAusenteError"></div>
       </div>
       <div class="fg">
@@ -152,6 +154,7 @@
         <div class="fg-note">Vista previa informativa. La asignaci&oacute;n final se actualiza sola al guardar.</div>
         <div class="field-error" id="fGuardiaError"></div>
       </div>
+      <div class="absence-decision-bar" id="absenceDecisionBar">Selecciona profesor y hora para ver aula, cobertura prevista y tarea disponible.</div>
       <div class="check-grid">
         <label class="check-block"><input type="checkbox" id="fTodoDia"><span>Ausencia todo el d&iacute;a seg&uacute;n su horario</span></label>
         <label class="check-block"><input type="checkbox" id="fFaena"><span>Ha dejado faena / actividad para los alumnos</span></label>
@@ -193,6 +196,7 @@
           <div class="teacher-summary-label">Resumen del d&iacute;a</div>
           <div class="teacher-meta" id="teacherSummary">Sesiones del d&iacute;a</div>
         </div>
+        <div class="teacher-duty-alert" id="teacherDutyAlert" hidden></div>
         <div class="teacher-panel-actions">
           <button class="btn-teacher-panel" type="button" onclick="closeTeacherPanel()">Cerrar panel</button>
           <button class="btn-teacher-panel btn-teacher-panel-danger" type="button" onclick="exitTeacherMode()">Salir del modo</button>
@@ -234,6 +238,7 @@
             <div class="teacher-access-suggestions" id="teacherAccessSuggestions" hidden></div>
           </div>
         </div>
+        <div class="teacher-access-recent" id="teacherAccessRecent" hidden></div>
         <div class="teacher-access-preview" id="teacherAccessPreview">Selecciona tu nombre para entrar en tu panel.</div>
       </div>
     </div>
@@ -263,6 +268,20 @@
       <button class="history-filter" data-filter="delete" type="button" onclick="setHistoryFilter('delete')">Borrados</button>
     </div>
     <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+<div class="overlay" id="substitutionOverlay" onclick="bgSubstitutionClose(event)">
+  <div class="modal substitution-modal">
+    <div class="modal-hd">
+      <span>Sustituciones de profesorado</span>
+      <button class="modal-x" type="button" onclick="closeSubstitutionModal()">x</button>
+    </div>
+    <div class="history-copy">Asigna un sustituto temporal sin tocar horario, guardias ni aulas del profesor titular.</div>
+    <div class="fg" style="margin-top:1rem">
+      <label>Buscar profesor titular</label>
+      <input type="text" id="substitutionSearch" placeholder="Filtra por titular o sustituto">
+    </div>
+    <div class="substitution-list" id="substitutionList"></div>
   </div>
 </div>
 <footer class="site-footer">

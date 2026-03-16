@@ -124,6 +124,15 @@
         body: JSON.stringify(rows)
       });
     },
+    fetchTeacherSubstitutions(){
+      return request('/profesorado/substitutions');
+    },
+    replaceTeacherSubstitutions(rows){
+      return request('/profesorado/substitutions/replace', {
+        method: 'PUT',
+        body: JSON.stringify(rows)
+      });
+    },
     fetchAuthSession(){
       return request('/auth/session');
     },

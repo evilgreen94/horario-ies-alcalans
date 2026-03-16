@@ -121,6 +121,14 @@ function sanitizeSessionOverride(row) {
   };
 }
 
+function sanitizeTeacherSubstitution(row) {
+  const input = ensureObject(row, 'Sustitucion de profesorado');
+  return {
+    profesor: ensureRequiredString(input.profesor, 'profesor'),
+    sustituto: ensureRequiredString(input.sustituto, 'sustituto')
+  };
+}
+
 module.exports = {
   ensureArray,
   ensureOptionalId,
@@ -132,6 +140,7 @@ module.exports = {
   sanitizeAusencia,
   sanitizeBiblioteca,
   sanitizeHistorial,
+  sanitizeTeacherSubstitution,
   sanitizeTareaProfesorado,
   sanitizeSessionOverride
 };

@@ -619,7 +619,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Martes",
@@ -655,7 +655,7 @@
         "tipo": "clase",
         "asignatura": "Itinerario personal",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Jueves",
@@ -691,7 +691,7 @@
         "tipo": "clase",
         "asignatura": "Itinerario personal",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Viernes",
@@ -4108,7 +4108,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Martes",
@@ -4162,7 +4162,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Jueves",
@@ -4171,7 +4171,7 @@
         "tipo": "clase",
         "asignatura": "Ámbito Científico",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Jueves",
@@ -4180,7 +4180,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Jueves",
@@ -4207,7 +4207,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Viernes",
@@ -6869,7 +6869,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Lunes",
@@ -6896,7 +6896,7 @@
         "tipo": "clase",
         "asignatura": "Montaje y mantenimie",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Martes",
@@ -6914,7 +6914,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Martes",
@@ -6977,7 +6977,7 @@
         "tipo": "clase",
         "asignatura": "Montaje y mantenimie",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Viernes",
@@ -7011,9 +7011,9 @@
         "inicio": "13:15",
         "fin": "14:10",
         "tipo": "clase",
-        "asignatura": "E24 1GM",
+        "asignatura": "E24",
         "grupo": "",
-        "aula": "E24 1GM"
+        "aula": "E24"
       }
     ],
     "JOAQUIN LORENTE PEREZ": [
@@ -7186,7 +7186,7 @@
         "inicio": "09:10",
         "fin": "10:05",
         "tipo": "clase",
-        "asignatura": "Sistemas operativos",
+        "asignatura": "SOM",
         "grupo": "2 CFM INF",
         "aula": "A08 2nGM"
       },
@@ -7249,7 +7249,7 @@
         "inicio": "12:20",
         "fin": "13:15",
         "tipo": "clase",
-        "asignatura": "Sistemas operativos",
+        "asignatura": "SOM",
         "grupo": "2 CFM INF",
         "aula": "A08 2nGM"
       },
@@ -7258,7 +7258,7 @@
         "inicio": "09:10",
         "fin": "10:05",
         "tipo": "clase",
-        "asignatura": "Sistemas operativos",
+        "asignatura": "SOM",
         "grupo": "2 CFM INF",
         "aula": "A08 2nGM"
       },
@@ -7294,7 +7294,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Sistemas operativos",
+        "asignatura": "SOM",
         "grupo": "2 CFM INF",
         "aula": "A08 2nGM"
       },
@@ -8136,7 +8136,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Lunes",
@@ -8170,9 +8170,9 @@
         "inicio": "13:15",
         "fin": "14:10",
         "tipo": "clase",
-        "asignatura": "E24 1GM",
+        "asignatura": "E24",
         "grupo": "",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Miércoles",
@@ -8190,7 +8190,7 @@
         "tipo": "clase",
         "asignatura": "Redes locales",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Jueves",
@@ -8206,9 +8206,9 @@
         "inicio": "13:15",
         "fin": "14:10",
         "tipo": "clase",
-        "asignatura": "E24 1GM",
+        "asignatura": "E24",
         "grupo": "",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Viernes",
@@ -8217,7 +8217,7 @@
         "tipo": "clase",
         "asignatura": "Redes locales",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Viernes",
@@ -8226,7 +8226,7 @@
         "tipo": "clase",
         "asignatura": "Redes locales",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       }
     ],
     "LAURA HERNÁNDIZ": [
@@ -9594,7 +9594,7 @@
         "tipo": "clase",
         "asignatura": "Ámbito Lingüístico y",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Lunes",
@@ -9630,7 +9630,7 @@
         "tipo": "clase",
         "asignatura": "Ámbito Lingüístico y",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Martes",
@@ -9675,7 +9675,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Miércoles",
@@ -9747,7 +9747,7 @@
         "tipo": "clase",
         "asignatura": "Ámbito Lingüístico y",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Viernes",
@@ -9767,7 +9767,7 @@
         "tipo": "clase",
         "asignatura": "Aplicaciones ofimáti",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Lunes",
@@ -9776,16 +9776,16 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Lunes",
         "inicio": "13:15",
         "fin": "14:10",
         "tipo": "clase",
-        "asignatura": "E24 1GM",
+        "asignatura": "E24",
         "grupo": "",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Martes",
@@ -9794,7 +9794,7 @@
         "tipo": "clase",
         "asignatura": "Operaciones auxiliar",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Martes",
@@ -9821,7 +9821,7 @@
         "tipo": "clase",
         "asignatura": "PROYECTO INTERMODULAR 2GM",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Miércoles",
@@ -9830,7 +9830,7 @@
         "tipo": "clase",
         "asignatura": "Operaciones auxiliar",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Miércoles",
@@ -9839,7 +9839,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Jueves",
@@ -9848,7 +9848,7 @@
         "tipo": "clase",
         "asignatura": "Aplicaciones ofimáti",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Jueves",
@@ -9857,7 +9857,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Viernes",
@@ -9884,7 +9884,7 @@
         "tipo": "clase",
         "asignatura": "Operaciones auxiliar",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Viernes",
@@ -9893,7 +9893,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Viernes",
@@ -9902,7 +9902,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       }
     ],
     "NADIA LÓPEZ MAGDALENA": [
@@ -10367,7 +10367,7 @@
         "tipo": "clase",
         "asignatura": "Lengua Extranjera II",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Miércoles",
@@ -10376,7 +10376,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Jueves",
@@ -10394,7 +10394,7 @@
         "tipo": "clase",
         "asignatura": "Lengua Extranjera II",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Jueves",
@@ -11923,7 +11923,7 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Instalación y manten",
+        "asignatura": "IMX",
         "grupo": "",
         "aula": ""
       },
@@ -11943,7 +11943,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Martes",
@@ -11961,25 +11961,25 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Sistemas operativos",
-        "grupo": "",
-        "aula": ""
+        "asignatura": "SOM",
+        "grupo": "1 GM",
+        "aula": "E24"
       },
       {
         "dia": "Miércoles",
         "inicio": "10:05",
         "fin": "11:00",
         "tipo": "clase",
-        "asignatura": "Instalación y manten",
+        "asignatura": "IMX",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Jueves",
@@ -11988,16 +11988,16 @@
         "tipo": "reunion",
         "asignatura": "Tutoría Segundo",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Jueves",
         "inicio": "10:05",
         "fin": "11:00",
         "tipo": "clase",
-        "asignatura": "Instalación y manten",
+        "asignatura": "IMX",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Jueves",
@@ -12006,7 +12006,7 @@
         "tipo": "clase",
         "asignatura": "",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Jueves",
@@ -12022,9 +12022,9 @@
         "inicio": "08:15",
         "fin": "09:10",
         "tipo": "clase",
-        "asignatura": "Instalación y manten",
+        "asignatura": "IMX",
         "grupo": "2 CFB INF",
-        "aula": "A15FPBINF"
+        "aula": "A15"
       },
       {
         "dia": "Viernes",
@@ -12040,9 +12040,9 @@
         "inicio": "11:25",
         "fin": "12:20",
         "tipo": "clase",
-        "asignatura": "Sistemas operativos",
+        "asignatura": "SOM",
         "grupo": "1 CFM INF",
-        "aula": "E24 1GM"
+        "aula": "E24"
       },
       {
         "dia": "Viernes",
