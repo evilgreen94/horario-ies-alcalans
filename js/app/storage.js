@@ -133,6 +133,26 @@
         body: JSON.stringify(rows)
       });
     },
+    fetchTeacherFutureAbsences(){
+      return request('/profesorado/future-absences');
+    },
+    createTeacherFutureAbsence(row){
+      return request('/profesorado/future-absences', {
+        method: 'POST',
+        body: JSON.stringify(row)
+      });
+    },
+    updateTeacherFutureAbsence(id, row){
+      return request(`/profesorado/future-absences/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(row)
+      });
+    },
+    deleteTeacherFutureAbsence(id){
+      return request(`/profesorado/future-absences/${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
+    },
     fetchAuthSession(){
       return request('/auth/session');
     },

@@ -80,6 +80,13 @@ function getMadridNow() {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' }));
 }
 
+function formatDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function getCurrentSchoolWeekKey() {
   const now = getMadridNow();
   const day = now.getDay();
@@ -87,7 +94,7 @@ function getCurrentSchoolWeekKey() {
   const monday = new Date(now);
   monday.setHours(0, 0, 0, 0);
   monday.setDate(monday.getDate() + mondayOffset);
-  return monday.toISOString().slice(0, 10);
+  return formatDateKey(monday);
 }
 
 async function ensureWeeklyResetIfNeeded(dbInstance) {

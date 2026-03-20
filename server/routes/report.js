@@ -122,28 +122,30 @@ function drawSummary(doc, teacherCount, slotCount) {
   doc.text(String(teacherCount), left + 14, top + 22);
   doc.text(String(slotCount), left + cardWidth + gap + 14, top + 22);
 
+  doc.x = left;
   doc.y = top + 58;
 }
 
 function drawWeeklyDayBlock(doc, dayIndex, rows) {
   ensurePageSpace(doc, 96);
+  const left = doc.page.margins.left;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  doc.x = left;
 
   doc.fillColor('#0f172a');
-  doc.font('Helvetica-Bold').fontSize(15).text(DIAS[dayIndex], { underline: false });
+  doc.font('Helvetica-Bold').fontSize(15).text(DIAS[dayIndex], left, doc.y, { width, align: 'left', underline: false });
   doc.moveDown(0.35);
 
   if (!rows.length) {
     doc.fillColor('#64748b');
-    doc.font('Helvetica').fontSize(10.5).text('No hay ausencias registradas para este día.');
+    doc.font('Helvetica').fontSize(10.5).text('No hay ausencias registradas para este día.', left, doc.y, { width, align: 'left' });
     doc.moveDown(0.8);
     return;
   }
 
   rows.forEach(row => {
     ensurePageSpace(doc, 72);
-    const left = doc.page.margins.left;
     const top = doc.y;
-    const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
     doc.roundedRect(left, top, width, 54, 10).fillAndStroke('#ffffff', '#dbe3ee');
     doc.fillColor('#111827');

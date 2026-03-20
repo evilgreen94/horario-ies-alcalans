@@ -32,8 +32,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Martes",
@@ -104,8 +104,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Jueves",
@@ -129,7 +129,7 @@ window.PROFESORADO_SOURCE={
                                              "dia":  "Viernes",
                                              "franja":  "13:15-14:10",
                                              "texto":  "",
-                                             "aula":  "A091rFPINF"
+                                             "aula":  "A09"
                                          }
                                      ],
                          "guardias":  [
@@ -310,20 +310,20 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Formación y Orientac | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Formación y Orientac | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Martes",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Formación y Orientac | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Formación y Orientac | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Martes",
@@ -340,8 +340,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Martes",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Martes",
@@ -358,14 +358,14 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Itinerario personal | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Itinerario personal | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Jueves",
@@ -376,8 +376,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Formación y Orientac | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Formación y Orientac | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Viernes",
@@ -388,8 +388,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "09:10-10:05",
-                                             "texto":  "Itinerario personal | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Itinerario personal | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Viernes",
@@ -2855,8 +2855,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Seguridad informátic | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Seguridad informátic | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Lunes",
@@ -2879,8 +2879,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Martes",
                                              "franja":  "09:10-10:05",
-                                             "texto":  "OPTATIVA 2GM | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "OPTATIVA 2GM | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Martes",
@@ -2897,14 +2897,14 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "OPTATIVA 2GM | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "OPTATIVA 2GM | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "09:10-10:05",
-                                             "texto":  "Seguridad informátic | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Seguridad informátic | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Miércoles",
@@ -2921,8 +2921,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Seguridad informátic | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Seguridad informátic | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Jueves",
@@ -2957,14 +2957,14 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "13:15-14:10",
-                                             "texto":  "A08 2nGM | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "A08 | A08",
+                                             "aula":  "A08"
                                          }
                                      ],
                          "guardias":  [
@@ -4180,8 +4180,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "09:10-10:05",
-                                             "texto":  "Lengua Extranjera | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Lengua Extranjera | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Lunes",
@@ -4751,20 +4751,20 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "Servicios en red | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Servicios en red | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Martes",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Servicios en red | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Servicios en red | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Martes",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Martes",
@@ -4775,8 +4775,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Martes",
                                              "franja":  "13:15-14:10",
-                                             "texto":  "A08 2nGM | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "A08 | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Miércoles",
@@ -4787,8 +4787,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "PROYECTO INTERMODULAR 2GM | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "PROYECTO INTERMODULAR 2GM | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Miércoles",
@@ -4799,8 +4799,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "PROYECTO INTERMODULAR 2GM | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "PROYECTO INTERMODULAR 2GM | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Jueves",
@@ -4849,8 +4849,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Lunes",
@@ -4862,31 +4862,31 @@ window.PROFESORADO_SOURCE={
                                              "dia":  "Lunes",
                                              "franja":  "13:15-14:10",
                                              "texto":  "",
-                                             "aula":  "A091rFPINF"
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Martes",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Montaje y mantenimie | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Montaje y mantenimie | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Martes",
                                              "franja":  "09:10-10:05",
-                                             "texto":  "Montaje y mantenimie | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Montaje y mantenimie | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Martes",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Martes",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Miércoles",
@@ -4897,38 +4897,38 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "13:15-14:10",
                                              "texto":  "",
-                                             "aula":  "A091rFPINF"
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Montaje y mantenimie | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Montaje y mantenimie | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "09:10-10:05",
-                                             "texto":  "Tutoría Primero | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Tutoría Primero | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Montaje y mantenimie | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Montaje y mantenimie | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Montaje y mantenimie | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Montaje y mantenimie | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Viernes",
@@ -4939,14 +4939,14 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "13:15-14:10",
-                                             "texto":  "E24 1GM | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "E24 | E24",
+                                             "aula":  "E24"
                                          }
                                      ],
                          "guardias":  [
@@ -5091,32 +5091,32 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Ofimática y archivo | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Ofimática y archivo | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "09:10-10:05",
-                                             "texto":  "Sistemas operativos | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Sistemas operativos | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Ofimática y archivo | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Ofimática y archivo | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Martes",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Ofimática y archivo | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Ofimática y archivo | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Martes",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Martes",
@@ -5128,25 +5128,25 @@ window.PROFESORADO_SOURCE={
                                              "dia":  "Martes",
                                              "franja":  "13:15-14:10",
                                              "texto":  "",
-                                             "aula":  "A091rFPINF"
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Ofimática y archivo | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Ofimática y archivo | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "Sistemas operativos | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Sistemas operativos | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "09:10-10:05",
-                                             "texto":  "Sistemas operativos | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Sistemas operativos | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Jueves",
@@ -5157,26 +5157,26 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "13:15-14:10",
                                              "texto":  "",
-                                             "aula":  "A091rFPINF"
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Sistemas operativos | 2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "Sistemas operativos | 2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "09:10-10:05",
-                                             "texto":  "Ofimática y archivo | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Ofimática y archivo | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Viernes",
@@ -5187,8 +5187,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Viernes",
@@ -5797,8 +5797,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Lunes",
@@ -5821,8 +5821,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Martes",
                                              "franja":  "13:15-14:10",
-                                             "texto":  "E24 1GM | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "E24 | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Miércoles",
@@ -5833,8 +5833,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "Redes locales | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Redes locales | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Jueves",
@@ -5845,20 +5845,20 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "13:15-14:10",
-                                             "texto":  "E24 1GM | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "E24 | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Redes locales | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Redes locales | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Redes locales | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Redes locales | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          }
                                      ],
                          "guardias":  [
@@ -5894,8 +5894,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Martes",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Ámbito Científico | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Ámbito Científico | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Martes",
@@ -5954,8 +5954,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Ámbito Científico | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Ámbito Científico | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Jueves",
@@ -5966,8 +5966,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "08:15-09:10",
-                                             "texto":  "Ámbito Científico | 1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "Ámbito Científico | 1 CFB INF | A09",
+                                             "aula":  "A09"
                                          },
                                          {
                                              "dia":  "Viernes",
@@ -5984,8 +5984,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "1 CFB INF | A091rFPINF",
-                                             "aula":  "A091rFPINF"
+                                             "texto":  "1 CFB INF | A09",
+                                             "aula":  "A09"
                                          }
                                      ],
                          "guardias":  [
@@ -6935,8 +6935,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Aplicaciones ofimáti | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Aplicaciones ofimáti | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Lunes",
@@ -6947,8 +6947,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "13:15-14:10",
-                                             "texto":  "E24 1GM | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "E24 | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Martes",
@@ -6983,14 +6983,14 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "Aplicaciones ofimáti | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Aplicaciones ofimáti | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Jueves",
@@ -7533,8 +7533,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "10:05-11:00",
-                                             "texto":  "Lengua Extranjera II | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Lengua Extranjera II | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Miércoles",
@@ -7551,8 +7551,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "09:10-10:05",
-                                             "texto":  "Lengua Extranjera II | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Lengua Extranjera II | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Jueves",
@@ -8702,8 +8702,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Viernes",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "Sistemas operativos | 1 CFM INF | E24 1GM",
-                                             "aula":  "E24 1GM"
+                                             "texto":  "Sistemas operativos | 1 CFM INF | E24",
+                                             "aula":  "E24"
                                          },
                                          {
                                              "dia":  "Viernes",
@@ -10033,8 +10033,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Lunes",
                                              "franja":  "13:15-14:10",
-                                             "texto":  "GUARDIA | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "GUARDIA | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Martes",
@@ -10051,8 +10051,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Martes",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Martes",
@@ -10081,8 +10081,8 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Miércoles",
                                              "franja":  "11:25-12:20",
-                                             "texto":  "2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Miércoles",
@@ -10093,14 +10093,14 @@ window.PROFESORADO_SOURCE={
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "12:20-13:15",
-                                             "texto":  "2 CFM INF | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "2 CFM INF | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Jueves",
                                              "franja":  "13:15-14:10",
-                                             "texto":  "A08 2nGM | A08 2nGM",
-                                             "aula":  "A08 2nGM"
+                                             "texto":  "A08 | A08",
+                                             "aula":  "A08"
                                          },
                                          {
                                              "dia":  "Viernes",

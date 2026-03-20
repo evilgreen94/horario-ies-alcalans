@@ -27,6 +27,11 @@
 <main>
   <div class="day-strip">
     <div class="day-strip-title">Guardias - <em id="dNombre">Lunes</em></div>
+    <div class="week-strip" id="weekStrip">
+      <button class="btn-mini" type="button" onclick="changeWeekOffset(-1)">Semana anterior</button>
+      <div class="week-strip-label" id="weekLabel">Semana actual</div>
+      <button class="btn-mini" type="button" onclick="changeWeekOffset(1)">Semana siguiente</button>
+    </div>
     <div id="dayPills"></div>
   </div>
   <div class="stats">
@@ -48,12 +53,13 @@
       <span class="admin-tag">Modo Jefe de Estudios</span>
     </div>
     <div class="admin-actions admin-actions-primary">
-      <button class="btn-add btn-add-primary" onclick="openModal()">+ A&ntilde;adir ausencia</button>
+      <button class="btn-add btn-add-primary" id="btnAddAusencia" onclick="openModal()">+ A&ntilde;adir ausencia</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="openHistoryModal()">Historial</button>
       <div class="admin-status save-ts" id="saveTs">Edita desde la tabla o registra una nueva ausencia.</div>
     </div>
     <div class="admin-actions admin-actions-secondary">
       <button class="btn-add btn-add-secondary" type="button" onclick="openSubstitutionModal()">Sustituciones</button>
+      <button class="btn-add btn-add-secondary" type="button" onclick="openFutureAbsenceAdminModal()">Faltas futuras</button>
       <button class="btn-add btn-add-secondary" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe diario</button>
       <button class="btn-add btn-add-secondary" id="btnInformeSemanal" onclick="printWeeklyReportPdf()" style="display:none">Informe semanal</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('admin')">Cambiar contrase&ntilde;a</button>
@@ -68,6 +74,10 @@
     <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('superadmin')">Cambiar contrase&ntilde;a</button>
     <button class="btn-add btn-add-ghost" type="button" onclick="toggleSuperAdmin()">Salir de Superadmin</button>
     <span class="save-ts" id="superAdminHint">Acceso t&eacute;cnico oculto por URL especial.</span>
+    <div class="superadmin-monitor" id="superAdminMonitor">
+      <div class="superadmin-monitor-grid" id="superAdminMonitorGrid"></div>
+      <div class="superadmin-monitor-log" id="superAdminMonitorLog"></div>
+    </div>
     <input type="file" id="restoreSnapshotInput" accept="application/json,.json" hidden>
   </div>
   <div class="teacher-bar" id="teacherBar">
@@ -198,6 +208,7 @@
         </div>
         <div class="teacher-duty-alert" id="teacherDutyAlert" hidden></div>
         <div class="teacher-panel-actions">
+          <button class="btn-teacher-panel" type="button" onclick="openTeacherFutureAbsenceModal()">Avisar falta futura</button>
           <button class="btn-teacher-panel" type="button" onclick="closeTeacherPanel()">Cerrar panel</button>
           <button class="btn-teacher-panel btn-teacher-panel-danger" type="button" onclick="exitTeacherMode()">Salir del modo</button>
         </div>
@@ -282,6 +293,62 @@
       <input type="text" id="substitutionSearch" placeholder="Filtra por titular o sustituto">
     </div>
     <div class="substitution-list" id="substitutionList"></div>
+  </div>
+</div>
+<div class="overlay" id="teacherFutureAbsenceOverlay" onclick="bgTeacherFutureAbsenceClose(event)">
+  <div class="modal">
+    <div class="modal-hd">
+      <span>Avisar ausencia futura</span>
+      <button class="modal-x" type="button" onclick="closeTeacherFutureAbsenceModal()">x</button>
+    </div>
+    <div class="history-copy">Env&iacute;a un aviso anticipado para que Jefatura tenga constancia de la falta prevista.</div>
+    <div class="fg" style="margin-top:1rem">
+      <label>Profesor</label>
+      <input type="text" id="teacherFutureAbsenceName" readonly>
+    </div>
+    <div class="fg-row">
+      <div class="fg">
+        <label>Fecha</label>
+        <input type="date" id="teacherFutureAbsenceDate" onchange="handleTeacherFutureAbsenceDateChange()">
+      </div>
+      <div class="fg">
+        <label>Observaciones</label>
+        <input type="text" id="teacherFutureAbsenceNote" placeholder="Opcional">
+      </div>
+    </div>
+    <div class="fg">
+      <label>Horas lectivas de ese día</label>
+      <div class="absence-preview" id="teacherFutureAbsenceDayMeta">Selecciona una fecha para ver tus horas de clase.</div>
+      <div class="teacher-future-hours" id="teacherFutureAbsenceHours"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" type="button" onclick="closeTeacherFutureAbsenceModal()">Cancelar</button>
+      <button class="btn-save" type="button" onclick="submitTeacherFutureAbsence()">Enviar aviso</button>
+    </div>
+    <div class="substitution-list" id="teacherFutureAbsenceOwnList" style="margin-top:1rem"></div>
+  </div>
+</div>
+<div class="overlay" id="futureAbsenceAdminOverlay" onclick="bgFutureAbsenceAdminClose(event)">
+  <div class="modal history-modal">
+    <div class="modal-hd">
+      <span>Faltas futuras comunicadas</span>
+      <button class="modal-x" type="button" onclick="closeFutureAbsenceAdminModal()">x</button>
+    </div>
+    <div class="history-copy">Avisos enviados por profesorado para fechas posteriores.</div>
+    <div class="future-absence-toolbar">
+      <div class="future-absence-summary" id="futureAbsenceAdminSummary"></div>
+      <div class="future-absence-filters">
+        <select id="futureAbsenceAdminStatusFilter">
+          <option value="all">Todos los estados</option>
+          <option value="pending">Pendientes</option>
+          <option value="approved">Validadas</option>
+          <option value="rejected">Rechazadas</option>
+          <option value="applied">Aplicadas</option>
+        </select>
+        <input id="futureAbsenceAdminTeacherFilter" type="text" placeholder="Filtrar por profesor">
+      </div>
+    </div>
+    <div class="substitution-list" id="futureAbsenceAdminList" style="margin-top:1rem"></div>
   </div>
 </div>
 <footer class="site-footer">

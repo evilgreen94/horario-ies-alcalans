@@ -129,6 +129,29 @@ function sanitizeTeacherSubstitution(row) {
   };
 }
 
+function sanitizeTeacherFutureAbsence(row) {
+  const input = ensureObject(row, 'Aviso de ausencia futura');
+  const status = normalizeString(input.status, 'pending') || 'pending';
+  if (!['pending', 'approved', 'rejected', 'applied'].includes(status)) {
+    throw badRequest('status inv\u00e1lido.');
+  }
+  const hours = Array.isArray(input.hours)
+    ? input.hours.map(value => normalizeInteger(value, 'hours', 1, 9)).filter(value => ![4, 8, 9].includes(value))
+    : [];
+  return {
+    id: ensureRequiredString(input.id, 'id'),
+    profesor: ensureRequiredString(input.profesor, 'profesor'),
+    date: ensureRequiredString(input.date, 'date'),
+    note: normalizeString(input.note),
+    hours: [...new Set(hours)].sort((a, b) => a - b),
+    status,
+    reviewedAt: input.reviewedAt ? ensureTimestamp(input.reviewedAt, 'reviewedAt') : '',
+    reviewerNote: normalizeString(input.reviewerNote),
+    appliedAt: input.appliedAt ? ensureTimestamp(input.appliedAt, 'appliedAt') : '',
+    createdAt: ensureTimestamp(input.createdAt, 'createdAt')
+  };
+}
+
 module.exports = {
   ensureArray,
   ensureOptionalId,
@@ -139,6 +162,7 @@ module.exports = {
   normalizeString,
   sanitizeAusencia,
   sanitizeBiblioteca,
+  sanitizeTeacherFutureAbsence,
   sanitizeHistorial,
   sanitizeTeacherSubstitution,
   sanitizeTareaProfesorado,

@@ -3,6 +3,7 @@ const { getDatabase } = require('../db');
 const {
   ensureArray,
   sanitizeSessionOverride,
+  sanitizeTeacherFutureAbsence,
   sanitizeTeacherSubstitution,
   sanitizeTareaProfesorado
 } = require('./validation');
@@ -10,6 +11,7 @@ const { requireRole } = require('../session');
 
 const router = express.Router();
 const SUBSTITUTIONS_STATE_KEY = 'teacher_substitutions';
+const FUTURE_ABSENCES_STATE_KEY = 'teacher_future_absences';
 
 router.get('/tareas', requireRole('admin'), async (_req, res, next) => {
   try {
@@ -111,6 +113,75 @@ router.put('/substitutions/replace', requireRole('admin'), async (req, res, next
        VALUES (?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
       [SUBSTITUTIONS_STATE_KEY, JSON.stringify(rows)]
+    );
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/future-absences', async (_req, res, next) => {
+  try {
+    const db = await getDatabase();
+    const row = await db.get('SELECT value FROM app_state WHERE key = ?', [FUTURE_ABSENCES_STATE_KEY]);
+    const parsed = row?.value ? JSON.parse(row.value) : [];
+    res.json(Array.isArray(parsed) ? parsed : []);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/future-absences', async (req, res, next) => {
+  try {
+    const entry = sanitizeTeacherFutureAbsence(req.body);
+    const db = await getDatabase();
+    const currentRow = await db.get('SELECT value FROM app_state WHERE key = ?', [FUTURE_ABSENCES_STATE_KEY]);
+    const current = currentRow?.value ? JSON.parse(currentRow.value) : [];
+    const nextRows = [...(Array.isArray(current) ? current : []).filter(row => row?.id !== entry.id), entry];
+    await db.run(
+      `INSERT INTO app_state (key, value, updated_at)
+       VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
+      [FUTURE_ABSENCES_STATE_KEY, JSON.stringify(nextRows)]
+    );
+    res.json({ ok: true, entry });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/future-absences/:id', requireRole('admin'), async (req, res, next) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const entry = sanitizeTeacherFutureAbsence({ ...req.body, id });
+    const db = await getDatabase();
+    const currentRow = await db.get('SELECT value FROM app_state WHERE key = ?', [FUTURE_ABSENCES_STATE_KEY]);
+    const current = currentRow?.value ? JSON.parse(currentRow.value) : [];
+    const nextRows = [...(Array.isArray(current) ? current : []).filter(row => row?.id !== id), entry];
+    await db.run(
+      `INSERT INTO app_state (key, value, updated_at)
+       VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
+      [FUTURE_ABSENCES_STATE_KEY, JSON.stringify(nextRows)]
+    );
+    res.json({ ok: true, entry });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/future-absences/:id', requireRole('admin'), async (req, res, next) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const db = await getDatabase();
+    const currentRow = await db.get('SELECT value FROM app_state WHERE key = ?', [FUTURE_ABSENCES_STATE_KEY]);
+    const current = currentRow?.value ? JSON.parse(currentRow.value) : [];
+    const nextRows = (Array.isArray(current) ? current : []).filter(row => String(row?.id || '') !== id);
+    await db.run(
+      `INSERT INTO app_state (key, value, updated_at)
+       VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
+      [FUTURE_ABSENCES_STATE_KEY, JSON.stringify(nextRows)]
     );
     res.json({ ok: true });
   } catch (error) {

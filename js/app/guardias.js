@@ -7,6 +7,7 @@ const KEY_TAREAS='IES_Alcalans_Tareas_Profesorado';
 const KEY_TEACHER_USER='IES_Alcalans_Profesorado_Actual';
 const KEY_TEACHER_RECENTS='IES_Alcalans_Profesorado_Recientes';
 const KEY_TEACHER_SUBSTITUTIONS='IES_Alcalans_Profesorado_Sustituciones';
+const KEY_TEACHER_FUTURE_ABSENCES='IES_Alcalans_Profesorado_Faltas_Futuras';
 const KEY_SESSION_OVERRIDES='IES_Alcalans_Sesiones_Profesorado';
 const KEY_HISTORIAL='IES_Alcalans_Historial_Cambios';
 const KEY_WEEK='IES_Alcalans_School_Week_Key';
@@ -26,6 +27,12 @@ function formatNowParts(){
   const now=new Date();
   return {hours:now.getHours(),minutes:now.getMinutes(),date:now};
 }
+function formatDateKey(date){
+  const year=date.getFullYear();
+  const month=String(date.getMonth()+1).padStart(2,'0');
+  const day=String(date.getDate()).padStart(2,'0');
+  return `${year}-${month}-${day}`;
+}
 function getCurrentSchoolWeekKey(){
   const now=formatNowParts().date;
   const day=now.getDay();
@@ -33,7 +40,28 @@ function getCurrentSchoolWeekKey(){
   const monday=new Date(now);
   monday.setHours(0,0,0,0);
   monday.setDate(monday.getDate()+mondayOffset);
-  return monday.toISOString().slice(0,10);
+  return formatDateKey(monday);
+}
+function getSchoolWeekDateFromKey(weekKey){
+  const date=new Date(`${weekKey}T00:00:00`);
+  return Number.isNaN(date.getTime())?null:date;
+}
+function getSchoolWeekKeyFromOffset(offset){
+  const monday=getSchoolWeekDateFromKey(getCurrentSchoolWeekKey());
+  if(!monday) return getCurrentSchoolWeekKey();
+  monday.setDate(monday.getDate()+(offset*7));
+  return formatDateKey(monday);
+}
+function formatWeekRangeLabel(weekKey,offset){
+  const monday=getSchoolWeekDateFromKey(weekKey);
+  if(!monday) return 'Semana lectiva';
+  const friday=new Date(monday);
+  friday.setDate(monday.getDate()+4);
+  const range=`${monday.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})} - ${friday.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})}`;
+  if(offset===0) return `Semana actual · ${range}`;
+  if(offset===1) return `Semana siguiente · ${range}`;
+  if(offset===-1) return `Semana anterior · ${range}`;
+  return `${offset>0?`+${offset}`:offset} semanas · ${range}`;
 }
 function stripDiacritics(value){return cleanText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 const DIA_INDEX={'lunes':0,'martes':1,'miercoles':2,'mi\u00e9rcoles':2,'jueves':3,'viernes':4};
@@ -49,7 +77,7 @@ function parseSesion(item){
   if(isGuardiaTexto(texto)) return {tipo:'guardia',materia:'Guardia',detalle:'Guardia',grupo:'',aula:aula||''};
   if(partes.length>=3) return {tipo:'clase',materia:partes[0],grupo:partes[1],detalle:texto,aula:aula||partes[2]||''};
   if(partes.length===2) return {tipo:'clase',materia:partes[0],grupo:'',detalle:texto,aula:aula||partes[1]||''};
-  return {tipo:'clase',materia:partes[0]||texto||'Sesion',grupo:'',detalle:texto||'Sesion',aula:aula||''};
+  return {tipo:'clase',materia:partes[0]||texto||'Sesi\u00f3n',grupo:'',detalle:texto||'Sesi\u00f3n',aula:aula||''};
 }
 function buildProfesoradoData(){
   const profesoresBase={};
@@ -113,9 +141,17 @@ let absenceMatches=[];
 let absenceActiveIndex=-1;
 let teacherSubstitutions={};
 let substitutionFilter='';
+let teacherDutyFocusTimer=null;
+let teacherFutureAbsences=[];
+let futureAbsenceAdminStatusFilter='all';
+let futureAbsenceAdminTeacherFilter='';
+let weekOffset=0;
+let teacherWeekOffset=0;
 const demo=[];
 const APP_URL_PARAMS=new URLSearchParams(window.location.search||'');
 const SUPERADMIN_ENABLED=APP_URL_PARAMS.get('panel')==='superadmin';
+let superAdminRoutePrompted=false;
+document.body.classList.toggle('superadmin-route',SUPERADMIN_ENABLED);
 const LEGACY_DEMO_NAMES=new Set(['Garcia Lopez, Ana','Perez Sanchez, Luis','Torres Vidal, Marta','Romero Diaz, Javier','Navarro Gil, Carmen','Castro Reyes, David','Blanco Munoz, Rosa','Serrano Lara, Miguel']);
 function syncTeacherIdentity(){
   const profesor=getProfesor(teacherName);
@@ -165,6 +201,8 @@ function loadTeacherSubstitutions(){
 function persistTeacherSubstitutions(map){
   storage.writeJson(KEY_TEACHER_SUBSTITUTIONS,Object.entries(map||{}).map(([profesor,sustituto])=>({profesor,sustituto})));
 }
+function loadTeacherFutureAbsences(){return storage.readJson(KEY_TEACHER_FUTURE_ABSENCES,[]);}
+function persistTeacherFutureAbsences(rows){storage.writeJson(KEY_TEACHER_FUTURE_ABSENCES,Array.isArray(rows)?rows:[]);}
 function loadSessionOverrides(){return storage.readJson(KEY_SESSION_OVERRIDES,{});}
 function persistSessionOverrides(d){storage.writeJson(KEY_SESSION_OVERRIDES,d);}
 function loadHistorial(){return storage.readJson(KEY_HISTORIAL,[]);}
@@ -274,47 +312,109 @@ function seededShuffle(list,seed){
   }
   return copy;
 }
-function getSpecialAssignments(dia,hora){
+function getSpecialAssignments(dia,hora,rowsSource=data){
   const orderedNames=seededShuffle(getOrdenHora(dia,hora).map(item=>item.nombre),`${new Date().toISOString().slice(0,10)}|${dia}|${hora}`);
   const biblioteca=orderedNames[0]||'';
   const banos=orderedNames.find(nombre=>nombre!==biblioteca)||'';
   const specialCount=(biblioteca?1:0)+(banos?1:0);
-  const uncoveredIfReserved=data.filter(row=>row.dia===dia&&row.hora===hora).length>Math.max(orderedNames.length-specialCount,0);
+  const uncoveredIfReserved=(rowsSource||[]).filter(row=>row.dia===dia&&row.hora===hora).length>Math.max(orderedNames.length-specialCount,0);
   return {
     biblioteca: uncoveredIfReserved?'':biblioteca,
     banos: uncoveredIfReserved?'':banos
   };
 }
-function getBibliotecaAsignada(dia,hora){return getSpecialAssignments(dia,hora).biblioteca||'';}
-function getBanosAsignado(dia,hora){return getSpecialAssignments(dia,hora).banos||'';}
+function getBibliotecaAsignada(dia,hora,rowsSource=data){return getSpecialAssignments(dia,hora,rowsSource).biblioteca||'';}
+function getBanosAsignado(dia,hora,rowsSource=data){return getSpecialAssignments(dia,hora,rowsSource).banos||'';}
+function buildGuardiaCoverageCounter(options={}){
+  const {excludeDia=null,excludeHora=null,dayOnly=null}=options;
+  const rowsSource=Array.isArray(options.rowsSource)?options.rowsSource:data;
+  const counter={};
+  rowsSource.forEach(row=>{
+    if(excludeDia===row.dia&&excludeHora===row.hora) return;
+    if(dayOnly!=null&&row.dia!==dayOnly) return;
+    const nombre=cleanText(row.guardia);
+    if(!nombre) return;
+    counter[nombre]=(counter[nombre]||0)+1;
+  });
+  return counter;
+}
+function getBalancedGuardiaOrder(dia,hora,options={}){
+  const {
+    excludeNames=[],
+    excludeDia=dia,
+    excludeHora=hora,
+    dayOnly=dia
+  }=options;
+  const blocked=new Set((excludeNames||[]).filter(Boolean));
+  const rowsSource=Array.isArray(options.rowsSource)?options.rowsSource:data;
+  const totalCounter=buildGuardiaCoverageCounter({excludeDia,excludeHora,rowsSource});
+  const dayCounter=buildGuardiaCoverageCounter({excludeDia,excludeHora,dayOnly,rowsSource});
+  const baseOrder=getOrdenHora(dia,hora)
+    .map((item,index)=>({...item,index}))
+    .filter(item=>!blocked.has(item.nombre));
+  return baseOrder.sort((a,b)=>
+    (totalCounter[a.nombre]||0)-(totalCounter[b.nombre]||0)||
+    (dayCounter[a.nombre]||0)-(dayCounter[b.nombre]||0)||
+    a.numero-b.numero||
+    a.index-b.index
+  );
+}
 function getOrdenHoraDisponible(dia,hora,excluidos){
   const excluidosSet=new Set((excluidos||[]).filter(Boolean));
-  return getOrdenHora(dia,hora).filter(item=>!excluidosSet.has(item.nombre));
+  return getBalancedGuardiaOrder(dia,hora,{excludeNames:[...excluidosSet]}).map(item=>({nombre:item.nombre,numero:item.numero}));
 }
-function reassignGuardiasForSlot(dia,hora){
-  const rows=data.filter(row=>row.dia===dia&&row.hora===hora).sort((a,b)=>(a.id||0)-(b.id||0));
+function assignGuardiasForRows(rowsSource){
+  const rows=(rowsSource||[]).map(row=>({...row}));
+  for(let diaIndex=0;diaIndex<5;diaIndex++){
+    for(let hora=1;hora<=9;hora++){
+      if(HORAS_PATIO.has(hora)) continue;
+      reassignGuardiasForSlot(diaIndex,hora,rows);
+    }
+  }
+  return rows;
+}
+function reassignGuardiasForSlot(dia,hora,rowsSource=data){
+  const rows=rowsSource.filter(row=>row.dia===dia&&row.hora===hora).sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
   if(!rows.length) return;
   const ausentes=new Set(rows.map(row=>row.ausente).filter(Boolean));
-  const biblioteca=getBibliotecaAsignada(dia,hora);
-  const banos=getBanosAsignado(dia,hora);
-  const orderedNames=getOrdenHora(dia,hora).map(item=>item.nombre).filter(nombre=>!ausentes.has(nombre));
+  const biblioteca=getBibliotecaAsignada(dia,hora,rowsSource);
+  const banos=getBanosAsignado(dia,hora,rowsSource);
+  const totalCounter=buildGuardiaCoverageCounter({excludeDia:dia,excludeHora:hora,rowsSource});
+  const dayCounter=buildGuardiaCoverageCounter({excludeDia:dia,excludeHora:hora,dayOnly:dia,rowsSource});
+  const orderedNames=getBalancedGuardiaOrder(dia,hora,{excludeNames:[...ausentes],rowsSource}).map(item=>item.nombre);
   const principales=orderedNames.filter(nombre=>nombre!==biblioteca&&nombre!==banos);
   const assigned=new Set();
+  function scoreNombre(nombre){
+    return [(totalCounter[nombre]||0),(dayCounter[nombre]||0)];
+  }
+  function assignNombre(nombre){
+    assigned.add(nombre);
+    totalCounter[nombre]=(totalCounter[nombre]||0)+1;
+    dayCounter[nombre]=(dayCounter[nombre]||0)+1;
+  }
   rows.forEach(row=>{
-    const siguientePrincipal=principales.find(nombre=>!assigned.has(nombre));
+    const siguientePrincipal=principales
+      .filter(nombre=>!assigned.has(nombre))
+      .sort((a,b)=>{
+        const [aTotal,aDay]=scoreNombre(a);
+        const [bTotal,bDay]=scoreNombre(b);
+        return aTotal-bTotal||aDay-bDay||principales.indexOf(a)-principales.indexOf(b);
+      })[0];
     if(siguientePrincipal){
       row.guardia=siguientePrincipal;
-      assigned.add(siguientePrincipal);
+      assignNombre(siguientePrincipal);
       return;
     }
-    if(banos&&orderedNames.includes(banos)&&!assigned.has(banos)){
-      row.guardia=banos;
-      assigned.add(banos);
-      return;
-    }
-    if(biblioteca&&orderedNames.includes(biblioteca)&&!assigned.has(biblioteca)){
-      row.guardia=biblioteca;
-      assigned.add(biblioteca);
+    const especiales=[banos,biblioteca]
+      .filter(nombre=>nombre&&orderedNames.includes(nombre)&&!assigned.has(nombre))
+      .sort((a,b)=>{
+        const [aTotal,aDay]=scoreNombre(a);
+        const [bTotal,bDay]=scoreNombre(b);
+        return aTotal-bTotal||aDay-bDay;
+      });
+    if(especiales[0]){
+      row.guardia=especiales[0];
+      assignNombre(especiales[0]);
       return;
     }
     row.guardia='';
@@ -331,8 +431,8 @@ function reassignAllGuardias(){
     }
   }
 }
-function getGuardiaSugerida(dia,hora,turno){
-  return getOrdenHoraDisponible(dia,hora,[getBibliotecaAsignada(dia,hora),getBanosAsignado(dia,hora)])[turno-1]?.nombre||'';
+function getGuardiaSugerida(dia,hora,turno,rowsSource=data){
+  return getBalancedGuardiaOrder(dia,hora,{excludeNames:[getBibliotecaAsignada(dia,hora,rowsSource),getBanosAsignado(dia,hora,rowsSource)],rowsSource})[turno-1]?.nombre||'';
 }
 function getProfesHora(dia,hora){return HORARIO_GUARDIAS[dia]?.[hora]||[];}
 function getProfesor(nombre){return PROFESORES_BASE[nombre]||null;}
@@ -527,10 +627,22 @@ let dialogResolver=null;
 let backendSyncInFlight=false;
 let backendHydrated=false;
 let backendPollingInFlight=false;
+let futureAbsenceSyncFlags=new Set();
+let superAdminEvents=[];
+let lastBackendSnapshot='';
+const superAdminStatus={
+  lastAdminSyncAt:'',
+  lastTeacherSyncAt:'',
+  lastPollAt:'',
+  lastHydrateAt:'',
+  lastError:'',
+  lastErrorAt:''
+};
 const BACKEND_POLL_INTERVAL_MS=10000;
 (function(){const wd=new Date().getDay();day=(wd>=1&&wd<=5)?wd-1:0;})();
 teacherRecents=loadTeacherRecents();
 teacherSubstitutions=loadTeacherSubstitutions();
+teacherFutureAbsences=loadTeacherFutureAbsences();
 teacherName=getProfesorNombreSeleccionado(loadTeacherUser())||'';
 teacherDay=day;
 function serializeBibliotecaAssignments(){
@@ -569,9 +681,78 @@ function serializeSessionOverrides(){
 function serializeTeacherSubstitutions(){
   return Object.entries(teacherSubstitutions).map(([profesor,sustituto])=>({profesor,sustituto}));
 }
+function formatStatusTimestamp(value){
+  if(!value) return 'Sin registro';
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime())) return 'Sin registro';
+  return date.toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function pushSuperAdminEvent(type,message){
+  superAdminEvents.unshift({
+    id:`monitor-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    type,
+    message,
+    ts:new Date().toISOString()
+  });
+  superAdminEvents=superAdminEvents.slice(0,8);
+  renderSuperAdminMonitor();
+}
+function setSuperAdminError(message){
+  superAdminStatus.lastError=message||'';
+  superAdminStatus.lastErrorAt=message?new Date().toISOString():'';
+  renderSuperAdminMonitor();
+}
+function clearSuperAdminError(){
+  superAdminStatus.lastError='';
+  superAdminStatus.lastErrorAt='';
+  renderSuperAdminMonitor();
+}
+function renderSuperAdminMonitor(){
+  const grid=document.getElementById('superAdminMonitorGrid');
+  const log=document.getElementById('superAdminMonitorLog');
+  if(!grid||!log) return;
+  const backendConnected=storage.hasBackend();
+  const syncPending=futureAbsenceSyncFlags.size;
+  const syncState=backendConnected?(backendSyncInFlight||backendPollingInFlight?'Sincronizando':(superAdminStatus.lastError?'Con incidencias':'En seguimiento')):'Sin backend';
+  const syncClass=!backendConnected?'superadmin-pill-warn':(superAdminStatus.lastError?'superadmin-pill-error':(backendSyncInFlight||backendPollingInFlight?'superadmin-pill-warn':'superadmin-pill-ok'));
+  const driftState=lastBackendSnapshot&&lastBackendSnapshot!==makeBackendSnapshot()?'Cambios locales pendientes':'Sin diferencias detectadas';
+  const driftClass=lastBackendSnapshot&&lastBackendSnapshot!==makeBackendSnapshot()?'superadmin-pill-warn':'superadmin-pill-ok';
+  const cards=[
+    {
+      k:'Backend',
+      v:backendConnected?'Disponible':'No configurado',
+      note:`Modo ${storage.storageMode||'hybrid'}`
+    },
+    {
+      k:'Sincronización',
+      v:`<span class="superadmin-pill ${syncClass}">${syncState}</span>`,
+      note:`Admin: ${formatStatusTimestamp(superAdminStatus.lastAdminSyncAt)}`
+    },
+    {
+      k:'Profesorado',
+      v:formatStatusTimestamp(superAdminStatus.lastTeacherSyncAt),
+      note:`Hydrate: ${formatStatusTimestamp(superAdminStatus.lastHydrateAt)}`
+    },
+    {
+      k:'Polling',
+      v:formatStatusTimestamp(superAdminStatus.lastPollAt),
+      note:`${syncPending} avisos futuros pendientes de backend`
+    },
+    {
+      k:'Diferencias',
+      v:`<span class="superadmin-pill ${driftClass}">${driftState}</span>`,
+      note:superAdminStatus.lastError?`Último error: ${superAdminStatus.lastError}`:'Sin errores recientes'
+    }
+  ];
+  grid.innerHTML=cards.map(card=>`<article class="superadmin-monitor-card"><div class="superadmin-monitor-k">${card.k}</div><div class="superadmin-monitor-v">${card.v}</div><div class="superadmin-monitor-note">${card.note}</div></article>`).join('');
+  log.innerHTML=superAdminEvents.length
+    ?superAdminEvents.map(item=>`<div class="superadmin-monitor-log-item"><strong>${escapeHtml(item.type)}</strong> · ${escapeHtml(formatStatusTimestamp(item.ts))}<br>${escapeHtml(item.message)}</div>`).join('')
+    :'<div class="superadmin-monitor-log-item">Sin eventos de sincronización registrados todavía.</div>';
+}
 async function syncAdminState(){
   if(!storage.hasBackend()||backendSyncInFlight) return;
   backendSyncInFlight=true;
+  renderSuperAdminMonitor();
   try{
     await Promise.all([
       storage.replaceGuardias(data),
@@ -579,24 +760,39 @@ async function syncAdminState(){
       storage.replaceHistorial(historialCambios),
       storage.replaceTeacherSubstitutions(serializeTeacherSubstitutions())
     ]);
+    lastBackendSnapshot=makeBackendSnapshot();
+    superAdminStatus.lastAdminSyncAt=new Date().toISOString();
+    clearSuperAdminError();
+    pushSuperAdminEvent('Admin sync','Guardias, biblioteca, historial y sustituciones sincronizados con backend.');
   }catch(error){
     console.warn('Backend sync failed',error);
+    setSuperAdminError('Fallo en la sincronización de Jefatura.');
+    pushSuperAdminEvent('Error sync',`Jefatura: ${String(error?.message||error)}`);
   }finally{
     backendSyncInFlight=false;
+    renderSuperAdminMonitor();
   }
 }
 async function syncTeacherState(){
   if(!storage.hasBackend()||backendSyncInFlight) return;
   backendSyncInFlight=true;
+  renderSuperAdminMonitor();
   try{
     await Promise.all([
       storage.replaceTareasProfesorado(serializeTeacherTasks()),
       storage.replaceSessionOverrides(serializeSessionOverrides())
     ]);
+    lastBackendSnapshot=makeBackendSnapshot();
+    superAdminStatus.lastTeacherSyncAt=new Date().toISOString();
+    clearSuperAdminError();
+    pushSuperAdminEvent('Teacher sync','Tareas y ajustes de profesorado sincronizados con backend.');
   }catch(error){
     console.warn('Teacher backend sync failed',error);
+    setSuperAdminError('Fallo en la sincronización de profesorado.');
+    pushSuperAdminEvent('Error sync',`Profesorado: ${String(error?.message||error)}`);
   }finally{
     backendSyncInFlight=false;
+    renderSuperAdminMonitor();
   }
 }
 async function hydrateTeacherSubstitutions(){
@@ -611,8 +807,247 @@ async function hydrateTeacherSubstitutions(){
     renderTable();
     renderSubstitutionList();
     if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
+    superAdminStatus.lastHydrateAt=new Date().toISOString();
+    clearSuperAdminError();
+    pushSuperAdminEvent('Hydrate','Sustituciones de profesorado recargadas desde backend.');
   }catch(error){
     console.warn('Teacher substitutions hydration failed',error);
+    setSuperAdminError('Fallo al hidratar sustituciones.');
+  }
+}
+async function hydrateTeacherFutureAbsences(){
+  if(!storage.hasBackend()) return;
+  try{
+    const rows=await storage.fetchTeacherFutureAbsences();
+    if(!Array.isArray(rows)) return;
+    teacherFutureAbsences=rows.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.profesor||'').localeCompare(String(b.profesor||''),'es'));
+    persistTeacherFutureAbsences(teacherFutureAbsences);
+    futureAbsenceSyncFlags.clear();
+    renderFutureAbsenceAdminList();
+    renderTeacherFutureAbsenceOwnList();
+    superAdminStatus.lastHydrateAt=new Date().toISOString();
+    clearSuperAdminError();
+    pushSuperAdminEvent('Hydrate','Faltas futuras recargadas desde backend.');
+  }catch(error){
+    console.warn('Teacher future absences hydration failed',error);
+    setSuperAdminError('Fallo al hidratar faltas futuras.');
+  }
+}
+function sortTeacherFutureAbsences(rows){
+  return (rows||[]).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.profesor||'').localeCompare(String(b.profesor||''),'es'));
+}
+function normalizeTeacherFutureAbsence(row){
+  return {
+    id:cleanText(row?.id),
+    profesor:cleanText(row?.profesor),
+    date:cleanText(row?.date),
+    note:cleanText(row?.note),
+    hours:Array.isArray(row?.hours)?[...new Set(row.hours.map(Number).filter(Number.isInteger).filter(hora=>!HORAS_PATIO.has(hora)))].sort((a,b)=>a-b):[],
+    status:cleanText(row?.status||'pending')||'pending',
+    reviewedAt:cleanText(row?.reviewedAt),
+    reviewerNote:cleanText(row?.reviewerNote),
+    appliedAt:cleanText(row?.appliedAt),
+    createdAt:cleanText(row?.createdAt)||new Date().toISOString()
+  };
+}
+function getFutureAbsenceStatusLabel(status){
+  return status==='approved'?'Validada':status==='rejected'?'Rechazada':status==='applied'?'Aplicada':'Pendiente';
+}
+function getFutureAbsenceStatusClass(status){
+  return status==='approved'?'future-absence-status-approved':status==='rejected'?'future-absence-status-rejected':status==='applied'?'future-absence-status-applied':'future-absence-status-pending';
+}
+function getCurrentDateIso(){
+  return new Date().toISOString().slice(0,10);
+}
+function isCurrentWeekOffset(offset){
+  return Number(offset||0)===0;
+}
+function isTeacherCurrentWeek(){
+  return isCurrentWeekOffset(teacherWeekOffset);
+}
+function getSelectedWeekKey(){
+  return getSchoolWeekKeyFromOffset(weekOffset);
+}
+function getTeacherSelectedWeekKey(){
+  return getSchoolWeekKeyFromOffset(teacherWeekOffset);
+}
+function getSchoolWeekInfoFromDate(dateValue){
+  const base=new Date(`${dateValue}T00:00:00`);
+  if(Number.isNaN(base.getTime())) return null;
+  const dayOfWeek=base.getDay();
+  const mondayOffset=dayOfWeek===0?-6:1-dayOfWeek;
+  const monday=new Date(base);
+  monday.setDate(base.getDate()+mondayOffset);
+  monday.setHours(0,0,0,0);
+  return {
+    weekKey:formatDateKey(monday),
+    dayIndex:dayOfWeek>=1&&dayOfWeek<=5?dayOfWeek-1:null
+  };
+}
+function getFutureAbsenceHoursForEntry(item){
+  if(Array.isArray(item?.hours)&&item.hours.length){
+    return [...new Set(item.hours.map(Number).filter(Number.isInteger).filter(hora=>!HORAS_PATIO.has(hora)))].sort((a,b)=>a-b);
+  }
+  const weekInfo=getSchoolWeekInfoFromDate(item?.date);
+  if(!weekInfo||weekInfo.dayIndex==null) return [];
+  return getHorasLectivasProfesorDia(item.profesor,weekInfo.dayIndex);
+}
+function formatHourListLabel(hours){
+  const rows=(hours||[]).map(hora=>formatHoraLabel(hora));
+  return rows.length?rows.join(', '):'Sin horas lectivas';
+}
+function buildProjectedRowsForWeek(weekKey){
+  const rows=[];
+  const seen=new Set();
+  teacherFutureAbsences
+    .filter(item=>item.status!=='rejected')
+    .forEach(item=>{
+      const weekInfo=getSchoolWeekInfoFromDate(item.date);
+      if(!weekInfo||weekInfo.weekKey!==weekKey||weekInfo.dayIndex==null) return;
+      const horasLectivas=getFutureAbsenceHoursForEntry(item);
+      horasLectivas.forEach(hora=>{
+        const key=`${item.id}|${hora}`;
+        if(seen.has(key)) return;
+        seen.add(key);
+        rows.push({
+          id:key,
+          dia:weekInfo.dayIndex,
+          hora,
+          ausente:item.profesor,
+          guardia:'',
+          aula:getAulaProfesor(item.profesor,weekInfo.dayIndex,hora)||'',
+          faena:false,
+          obs:'',
+          futurePlanned:true,
+          futureStatus:item.status,
+          futureDate:item.date,
+          futureSourceId:item.id,
+          reviewerNote:item.reviewerNote||''
+        });
+      });
+    });
+  return assignGuardiasForRows(rows);
+}
+function getRowsForWeekOffset(offset){
+  return isCurrentWeekOffset(offset)?data:buildProjectedRowsForWeek(getSchoolWeekKeyFromOffset(offset));
+}
+function getSelectedRowsForDay(targetDay){
+  return getRowsForWeekOffset(weekOffset).filter(row=>row.dia===targetDay).sort((a,b)=>a.hora-b.hora);
+}
+function getTeacherWeekRowsForDay(targetDay){
+  return getRowsForWeekOffset(teacherWeekOffset).filter(row=>row.dia===targetDay).sort((a,b)=>a.hora-b.hora);
+}
+async function updateTeacherFutureAbsenceEntry(entry){
+  const normalized=normalizeTeacherFutureAbsence(entry);
+  teacherFutureAbsences=sortTeacherFutureAbsences([normalized,...teacherFutureAbsences.filter(item=>item.id!==normalized.id)]);
+  persistTeacherFutureAbsences(teacherFutureAbsences);
+  renderFutureAbsenceAdminList();
+  renderTeacherFutureAbsenceOwnList();
+  if(!storage.hasBackend()) return {ok:true,localOnly:true};
+  try{
+    const result=await storage.updateTeacherFutureAbsence(normalized.id,normalized);
+    const saved=normalizeTeacherFutureAbsence(result?.entry||normalized);
+    futureAbsenceSyncFlags.delete(`upsert:${saved.id}`);
+    teacherFutureAbsences=sortTeacherFutureAbsences([saved,...teacherFutureAbsences.filter(item=>item.id!==saved.id)]);
+    persistTeacherFutureAbsences(teacherFutureAbsences);
+    renderFutureAbsenceAdminList();
+    renderTeacherFutureAbsenceOwnList();
+    clearSuperAdminError();
+    pushSuperAdminEvent('Future absence',`Aviso futuro actualizado para ${saved.profesor}.`);
+    return result||{ok:true,entry:saved};
+  }catch(error){
+    console.warn('Teacher future absence update backend sync failed; keeping local state',error);
+    futureAbsenceSyncFlags.add(`upsert:${normalized.id}`);
+    setSuperAdminError('Hay avisos futuros pendientes de sincronizar.');
+    pushSuperAdminEvent('Pendiente backend',`Aviso futuro de ${normalized.profesor} guardado solo en local.`);
+    renderSuperAdminMonitor();
+    return {ok:true,localOnly:true,syncError:true,entry:normalized};
+  }
+}
+async function applyApprovedFutureAbsencesForCurrentWeek(){
+  const currentWeekKey=getCurrentSchoolWeekKey();
+  const approvedRows=teacherFutureAbsences.filter(item=>item.status==='approved'&&!item.appliedAt);
+  if(!approvedRows.length) return false;
+  let stateChanged=false;
+  let approvalsChanged=false;
+  for(const item of approvedRows){
+    const weekInfo=getSchoolWeekInfoFromDate(item.date);
+    if(!weekInfo||weekInfo.weekKey!==currentWeekKey||weekInfo.dayIndex==null) continue;
+    const horasLectivas=getFutureAbsenceHoursForEntry(item);
+    if(!horasLectivas.length) continue;
+    horasLectivas.forEach(horaItem=>{
+      if(data.some(row=>row.dia===weekInfo.dayIndex&&row.hora===horaItem&&row.ausente===item.profesor)) return;
+      data.push({dia:weekInfo.dayIndex,hora:horaItem,ausente:item.profesor,guardia:'',aula:getAulaProfesor(item.profesor,weekInfo.dayIndex,horaItem)||'',faena:false,obs:'',id:nid++});
+      stateChanged=true;
+    });
+    item.status='applied';
+    item.appliedAt=new Date().toISOString();
+    approvalsChanged=true;
+  }
+  if(stateChanged){
+    data=normalizeStoredRows(data);
+    reassignAllGuardias();
+    persist(data);
+    renderGuardiaBoard();
+    renderTable();
+  }
+  if(approvalsChanged){
+    persistTeacherFutureAbsences(teacherFutureAbsences);
+    renderFutureAbsenceAdminList();
+    renderTeacherFutureAbsenceOwnList();
+    if(storage.hasBackend()&&isAdmin){
+      await Promise.allSettled(teacherFutureAbsences.filter(item=>item.appliedAt).map(item=>storage.updateTeacherFutureAbsence(item.id,normalizeTeacherFutureAbsence(item))));
+    }
+  }
+  return stateChanged||approvalsChanged;
+}
+async function createTeacherFutureAbsenceEntry(entry){
+  const normalized=normalizeTeacherFutureAbsence(entry);
+  teacherFutureAbsences=sortTeacherFutureAbsences([normalized,...teacherFutureAbsences.filter(item=>item.id!==normalized.id)]);
+  persistTeacherFutureAbsences(teacherFutureAbsences);
+  renderFutureAbsenceAdminList();
+  renderTeacherFutureAbsenceOwnList();
+  if(!storage.hasBackend()) return {ok:true,localOnly:true};
+  try{
+    const result=await storage.createTeacherFutureAbsence(normalized);
+    const saved=normalizeTeacherFutureAbsence(result?.entry||normalized);
+    futureAbsenceSyncFlags.delete(`upsert:${saved.id}`);
+    teacherFutureAbsences=sortTeacherFutureAbsences([saved,...teacherFutureAbsences.filter(item=>item.id!==saved.id)]);
+    persistTeacherFutureAbsences(teacherFutureAbsences);
+    renderFutureAbsenceAdminList();
+    renderTeacherFutureAbsenceOwnList();
+    clearSuperAdminError();
+    pushSuperAdminEvent('Future absence',`Nuevo aviso futuro registrado para ${saved.profesor}.`);
+    return result||{ok:true,entry:saved};
+  }catch(error){
+    console.warn('Teacher future absence create backend sync failed; keeping local state',error);
+    futureAbsenceSyncFlags.add(`upsert:${normalized.id}`);
+    setSuperAdminError('Hay avisos futuros pendientes de sincronizar.');
+    pushSuperAdminEvent('Pendiente backend',`Nuevo aviso futuro de ${normalized.profesor} guardado solo en local.`);
+    renderSuperAdminMonitor();
+    return {ok:true,localOnly:true,syncError:true,entry:normalized};
+  }
+}
+async function deleteTeacherFutureAbsenceEntry(id){
+  teacherFutureAbsences=teacherFutureAbsences.filter(item=>item.id!==id);
+  persistTeacherFutureAbsences(teacherFutureAbsences);
+  renderFutureAbsenceAdminList();
+  renderTeacherFutureAbsenceOwnList();
+  if(!storage.hasBackend()) return {ok:true,localOnly:true};
+  try{
+    futureAbsenceSyncFlags.delete(`upsert:${id}`);
+    futureAbsenceSyncFlags.delete(`delete:${id}`);
+    const result=await storage.deleteTeacherFutureAbsence(id);
+    clearSuperAdminError();
+    pushSuperAdminEvent('Future absence',`Aviso futuro ${id} eliminado en backend.`);
+    return result;
+  }catch(error){
+    console.warn('Teacher future absence delete backend sync failed; keeping local state',error);
+    futureAbsenceSyncFlags.add(`delete:${id}`);
+    setSuperAdminError('Hay eliminaciones pendientes de sincronizar.');
+    pushSuperAdminEvent('Pendiente backend',`Eliminación local pendiente para aviso ${id}.`);
+    renderSuperAdminMonitor();
+    return {ok:true,localOnly:true,syncError:true};
   }
 }
 async function hydrateFromBackend(){
@@ -688,16 +1123,23 @@ async function hydrateFromBackend(){
 
     reassignAllGuardias();
     persist(data);
+    lastBackendSnapshot=makeBackendSnapshot();
+    superAdminStatus.lastHydrateAt=new Date().toISOString();
+    clearSuperAdminError();
+    pushSuperAdminEvent('Hydrate','Estado principal recargado desde backend.');
     renderGuardiaBoard();
     renderTable();
     renderHistoryList();
     renderSubstitutionList();
+    renderFutureAbsenceAdminList();
 
     if(!backendHasData&&!storage.isBackendOnly()&&(data.length||historialCambios.length)){
       syncAdminState();
     }
   }catch(error){
     console.warn('Backend hydration failed',error);
+    setSuperAdminError('Fallo al hidratar el estado principal.');
+    pushSuperAdminEvent('Error hydrate',String(error?.message||error));
   }
 }
 function isAnyOverlayOpen(){
@@ -728,6 +1170,7 @@ async function pollBackendState(){
   if(document.hidden||isAnyOverlayOpen()) return;
 
   backendPollingInFlight=true;
+  renderSuperAdminMonitor();
   try{
     const previousSnapshot=makeBackendSnapshot();
     const [guardiasResult,historialResult,tareasResult,overridesResult,substitutionsResult]=await Promise.allSettled([
@@ -791,16 +1234,25 @@ async function pollBackendState(){
 
     reassignAllGuardias();
     persist(data);
+    lastBackendSnapshot=makeBackendSnapshot();
+    superAdminStatus.lastPollAt=new Date().toISOString();
+    clearSuperAdminError();
     if(previousSnapshot!==makeBackendSnapshot()){
+      pushSuperAdminEvent('Polling','Se detectaron cambios remotos y se actualizaron en local.');
       renderGuardiaBoard();
       renderTable();
       renderHistoryList();
       renderSubstitutionList();
+    }else{
+      pushSuperAdminEvent('Polling','Comprobación remota sin cambios.');
     }
   }catch(error){
     console.warn('Backend polling failed',error);
+    setSuperAdminError('Fallo en la comprobación periódica del backend.');
+    pushSuperAdminEvent('Error polling',String(error?.message||error));
   }finally{
     backendPollingInFlight=false;
+    renderSuperAdminMonitor();
   }
 }
 function isReportAvailable(){
@@ -814,12 +1266,15 @@ function isWeeklyReportAvailable(){
   return weekday===5&&(hours>14||(hours===14&&minutes>=10));
 }
 function updateAdminControls(){
+  const btnAddAusencia=document.getElementById('btnAddAusencia');
   const btnSorteo=document.getElementById('btnSorteo');
   const btnInforme=document.getElementById('btnInforme');
   const btnInformeSemanal=document.getElementById('btnInformeSemanal');
-  if(btnSorteo) btnSorteo.style.display=isAdmin?'':'none';
+  const currentWeek=isCurrentWeekOffset(weekOffset);
+  if(btnAddAusencia) btnAddAusencia.style.display=isAdmin&&currentWeek?'':'none';
+  if(btnSorteo) btnSorteo.style.display=isAdmin&&currentWeek?'':'none';
   if(btnInforme) btnInforme.style.display=isAdmin?'':'none';
-  if(btnInformeSemanal) btnInformeSemanal.style.display=isAdmin&&isWeeklyReportAvailable()?'':'none';
+  if(btnInformeSemanal) btnInformeSemanal.style.display=isAdmin?'':'none';
 }
 function refreshAccessUi(){
   const btnAdmin=document.getElementById('btnAdmin');
@@ -832,13 +1287,14 @@ function refreshAccessUi(){
     btnAdmin.textContent=isAdmin?'Salir Jefatura':'Jefe de estudios';
   }
   if(btnSuperAdmin){
-    btnSuperAdmin.style.display=SUPERADMIN_ENABLED?'':'none';
+    btnSuperAdmin.style.display=(SUPERADMIN_ENABLED||isSuperAdmin)?'':'none';
     btnSuperAdmin.classList.toggle('on',isSuperAdmin);
     btnSuperAdmin.textContent=isSuperAdmin?'Salir Superadmin':'Superadmin';
   }
   if(adminBar) adminBar.classList.toggle('show',isAdmin);
   if(superAdminBar) superAdminBar.classList.toggle('show',isSuperAdmin);
   updateAdminControls();
+  renderSuperAdminMonitor();
 }
 function showToast(message,type){
   const toastStack=document.getElementById('toastStack');
@@ -926,6 +1382,18 @@ async function loadAuthSession(){
   }
   try{
     const session=await storage.fetchAuthSession();
+    if(session?.isSuperAdmin&&!SUPERADMIN_ENABLED){
+      try{
+        await storage.logoutRole();
+      }catch(error){
+        console.warn('Superadmin session cleanup failed',error);
+      }
+      isAdmin=false;
+      isSuperAdmin=false;
+      refreshAccessUi();
+      renderTable();
+      return;
+    }
     isAdmin=session?.role==='admin';
     isSuperAdmin=!!session?.isSuperAdmin;
     refreshAccessUi();
@@ -971,9 +1439,28 @@ async function logoutCurrentRole(){
   backendHydrated=false;
   refreshAccessUi();
 }
+async function ensureSuperAdminRouteAccess(){
+  if(!SUPERADMIN_ENABLED||superAdminRoutePrompted) return true;
+  superAdminRoutePrompted=true;
+  if(isSuperAdmin||isAdmin){
+    await logoutCurrentRole();
+  }
+  const password=await askPassword('Acceso Superadmin','Introduce la contraseña del modo superadmin.');
+  if(!password){
+    window.location.href=window.location.pathname;
+    return false;
+  }
+  const ok=await loginRole('superadmin',password);
+  if(ok) return true;
+  showToast('Contraseña incorrecta.','error');
+  window.location.href=window.location.pathname;
+  return false;
+}
 async function initializeApp(){
   await loadAuthSession();
+  if(!await ensureSuperAdminRouteAccess()) return;
   await hydrateTeacherSubstitutions();
+  await hydrateTeacherFutureAbsences();
   await hydrateFromBackend();
 }
 async function changeRolePasswordFlow(role){
@@ -1011,29 +1498,48 @@ async function changeRolePasswordFlow(role){
 setInterval(()=>{updateClockUi();},1000);
 updateClockUi();
 function initials(n){return(n||'').split(/[\s,]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';}
-function renderPills(){document.getElementById('dNombre').textContent=DIAS[day];document.getElementById('dayPills').innerHTML=DIAS.map((d,i)=>`<button class="day-pill${i===day?' active':''}" onclick="setDay(${i})">${d}</button>`).join('');}
+function renderWeekLabel(){
+  const weekLabel=document.getElementById('weekLabel');
+  if(weekLabel) weekLabel.textContent=formatWeekRangeLabel(getSelectedWeekKey(),weekOffset);
+  const teacherWeekLabel=document.getElementById('teacherWeekLabel');
+  if(teacherWeekLabel) teacherWeekLabel.textContent=formatWeekRangeLabel(getTeacherSelectedWeekKey(),teacherWeekOffset);
+  const saveTs=document.getElementById('saveTs');
+  if(saveTs&&!isCurrentWeekOffset(weekOffset)){
+    saveTs.textContent='Vista de planificación. La edición sigue reservada a la semana actual.';
+  }
+}
+function renderPills(){document.getElementById('dNombre').textContent=DIAS[day];document.getElementById('dayPills').innerHTML=DIAS.map((d,i)=>`<button class="day-pill${i===day?' active':''}" onclick="setDay(${i})">${d}</button>`).join('');renderWeekLabel();}
 function renderGuardiaBoard(){
   const grid=document.getElementById('guardiaGrid');
   const cards=[];
   let firstMobileCard=true;
+  const rowsSource=getRowsForWeekOffset(weekOffset);
+  const coverageCounter=buildGuardiaCoverageCounter({rowsSource});
   for(let hora=1;hora<=9;hora++){
     if(HORAS_PATIO.has(hora)) continue;
     const ordenHora=getOrdenHora(day,hora);
     const profes=ordenHora.map(item=>item.nombre);
-    const biblioteca=getBibliotecaAsignada(day,hora);
-    const banos=getBanosAsignado(day,hora)||'';
-    const asignados=new Set(data.filter(g=>g.dia===day&&g.hora===hora&&g.guardia&&g.guardia.trim()).map(g=>g.guardia.trim()));
+    const biblioteca=getBibliotecaAsignada(day,hora,rowsSource);
+    const banos=getBanosAsignado(day,hora,rowsSource)||'';
+    const teacherAssignedHere=!!(teacherName&&rowsSource.filter(row=>row.dia===day&&row.hora===hora&&row.guardia===teacherName).length);
+    const asignados=new Set(rowsSource.filter(g=>g.dia===day&&g.hora===hora&&g.guardia&&g.guardia.trim()).map(g=>g.guardia.trim()));
     const nombres=profes.map(nombre=>{
+      const coverageCount=coverageCounter[nombre]||0;
       const classes=[
         'guardia-mini',
         asignados.has(nombre)?'guardia-mini-assigned':'',
+        teacherAssignedHere&&nombre===teacherName?'guardia-mini-current':'',
         nombre===biblioteca?'guardia-mini-biblio':'',
         nombre===banos?'guardia-mini-banos':''
       ].filter(Boolean).join(' ');
       const suffix=nombre===biblioteca?' \u00b7 Biblioteca':(nombre===banos?' \u00b7 Ba\u00f1os':'');
-      return `<span class="${classes}">${escapeHtml(getVisibleTeacherName(nombre))}${suffix}</span>`;
+      const counterLabel=` \u00b7 ${coverageCount} ${coverageCount===1?'guardia':'guardias'}`;
+      return `<span class="${classes}" title="${escapeHtml(`${getVisibleTeacherName(nombre)}${counterLabel}`)}">${escapeHtml(getVisibleTeacherName(nombre))}${suffix}<small class="guardia-mini-count">${coverageCount}</small></span>`;
     }).join('')||'<span class="sin-asignar">Sin profesorado asignado</span>';
-    cards.push(`<article class="guardia-card${firstMobileCard?' is-open':''}">
+    const cardClasses=['guardia-card'];
+    if(firstMobileCard) cardClasses.push('is-open');
+    if(teacherAssignedHere) cardClasses.push('guardia-card-current');
+    cards.push(`<article class="${cardClasses.join(' ')}">
       <button class="guardia-card-toggle" type="button" onclick="toggleGuardiaCard(this)">
         <span class="guardia-card-head">
           <span class="guardia-num">${HORA_MAP[hora].label} hora</span>
@@ -1053,6 +1559,13 @@ function toggleGuardiaCard(button){
   button.parentElement.classList.toggle('is-open');
 }
 function setDay(i){day=i;renderPills();renderGuardiaBoard();renderTable();}
+function changeWeekOffset(delta){
+  weekOffset=Math.max(-1,Math.min(3,weekOffset+delta));
+  renderPills();
+  updateAdminControls();
+  renderGuardiaBoard();
+  renderTable();
+}
 function sortearGuardiasDia(){for(let hora=1;hora<=9;hora++){ordenGuardias[day][hora]=makeOrdenHora(day,hora);}persistOrden(ordenGuardias);renderGuardiaBoard();renderTable();}
 function buildDailyReportText(){
   const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
@@ -1119,11 +1632,11 @@ function buildDailyReportHtml(){
           <div class="meta-card"><span class="meta-k">Aula</span><span class="meta-v">${escapeHtml(aula)}</span></div>
           <div class="meta-card"><span class="meta-k">Tarea</span><span class="meta-v">${faenaInfo.faena?'Disponible':'No registrada'}</span></div>
           <div class="meta-card"><span class="meta-k">Biblioteca</span><span class="meta-v">${escapeHtml(biblioteca)}</span></div>
-          <div class="meta-card"><span class="meta-k">Ba�os</span><span class="meta-v">${escapeHtml(banos)}</span></div>
+          <div class="meta-card"><span class="meta-k">Baños</span><span class="meta-v">${escapeHtml(banos)}</span></div>
         </div>
         ${faenaInfo.obs?`<div class="task-box"><div class="task-title">Indicaciones para el grupo</div><div class="task-text">${escapeHtml(faenaInfo.obs)}</div></div>`:''}
       </article>`;
-  }).join(''):`<p class="empty">No hay ausencias registradas para este d�a.</p>`;
+  }).join(''):`<p class="empty empty-left">No hay ausencias registradas para este día.</p>`;
   return `<!DOCTYPE html>
   <html lang="es">
   <head>
@@ -1172,13 +1685,13 @@ function buildDailyReportHtml(){
     <main class="sheet">
       <div class="topbar">
         <div>
-          <div class="title-kicker">IES Alcalans � Guardias</div>
-          <h1>Informe diario � ${escapeHtml(DIAS[day])}</h1>
-          <div class="subtitle">Fecha de generaci�n: ${escapeHtml(fecha)}</div>
+          <div class="title-kicker">IES Alcalans · Guardias</div>
+          <h1>Informe diario · ${escapeHtml(DIAS[day])}</h1>
+          <div class="subtitle">Fecha de generación: ${escapeHtml(fecha)}</div>
         </div>
       </div>
       <section class="summary">
-        <article class="summary-card"><span class="summary-k">Ausencias</span><span class="summary-v">${totalAusencias}</span><span class="summary-note">Registros del d�a</span></article>
+        <article class="summary-card"><span class="summary-k">Ausencias</span><span class="summary-v">${totalAusencias}</span><span class="summary-note">Registros del día</span></article>
         <article class="summary-card"><span class="summary-k">Coberturas</span><span class="summary-v">${totalCubiertas}</span><span class="summary-note">Asignadas o previstas</span></article>
         <article class="summary-card"><span class="summary-k">Con tarea</span><span class="summary-v">${totalConTarea}</span><span class="summary-note">Faena disponible</span></article>
       </section>
@@ -1189,33 +1702,45 @@ function buildDailyReportHtml(){
 }
 function buildWeeklyReportHtml(){
   const fecha=formatNowParts().date.toLocaleDateString('es-ES');
+  const totalAusencias=data.length;
+  const totalCoberturas=data.filter(row=>cleanText(row.guardia)).length;
+  const totalConTarea=data.filter(row=>resolveFaena(row).faena).length;
+  const diasConIncidencia=new Set(data.map(row=>row.dia)).size;
   const daySections=DIAS.map((diaNombre,diaIndex)=>{
     const rows=data
       .filter(row=>row.dia===diaIndex)
       .sort((a,b)=>a.hora-b.hora||String(a.ausente||'').localeCompare(String(b.ausente||''),'es'));
     if(!rows.length){
-      return `<section class="day-block"><h2>${escapeHtml(diaNombre)}</h2><p class="empty">No hay ausencias registradas.</p></section>`;
+      return `<section class="day-block"><div class="day-head"><h2>${escapeHtml(diaNombre)}</h2><span class="day-count">Sin incidencias</span></div><p class="empty empty-left">No hay ausencias registradas para este día.</p></section>`;
     }
     const grouped=new Map();
     rows.forEach(row=>{
       const key=row.ausente||'Profesorado sin identificar';
       if(!grouped.has(key)) grouped.set(key,[]);
-      grouped.get(key).push(row.hora);
+      grouped.get(key).push(row);
     });
     const items=[...grouped.entries()]
-      .map(([ausente,horas])=>({
+      .map(([ausente,entries])=>({
         ausente,
-        horas:[...new Set(horas)].sort((a,b)=>a-b)
+        horas:[...new Set(entries.map(row=>row.hora))].sort((a,b)=>a-b),
+        guardias:[...new Set(entries.map(row=>cleanText(row.guardia)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es')),
+        aulas:[...new Set(entries.map(row=>resolveAulaRegistro(row)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es')),
+        conTarea:entries.some(row=>resolveFaena(row).faena)
       }))
       .sort((a,b)=>a.ausente.localeCompare(b.ausente,'es'))
       .map(item=>`
         <article class="item">
-          <div class="item-head">${escapeHtml(item.ausente)}</div>
-          <div><strong>Horas:</strong> ${escapeHtml(item.horas.map(hora=>HORA_MAP[hora]?.rango||`Hora ${hora}`).join(' | '))}</div>
+          <div class="item-top">
+            <div class="item-head">${escapeHtml(item.ausente)}</div>
+            <span class="pill ${item.conTarea?'pill-ok':'pill-warn'}">${item.conTarea?'Con tarea':'Sin tarea'}</span>
+          </div>
+          <div class="item-row"><span class="item-k">Horas</span><span class="item-v">${escapeHtml(item.horas.map(hora=>`${formatHoraLabel(hora)} (${HORA_MAP[hora]?.rango||''})`).join(' | '))}</span></div>
+          <div class="item-row"><span class="item-k">Cobertura</span><span class="item-v">${escapeHtml(item.guardias.length?item.guardias.join(' | '):'Sin asignar')}</span></div>
+          <div class="item-row"><span class="item-k">Aula</span><span class="item-v">${escapeHtml(item.aulas.length?item.aulas.join(' | '):'Sin aula')}</span></div>
         </article>
       `)
       .join('');
-    return `<section class="day-block"><h2>${escapeHtml(diaNombre)}</h2><div class="grid">${items}</div></section>`;
+    return `<section class="day-block"><div class="day-head"><h2>${escapeHtml(diaNombre)}</h2><span class="day-count">${rows.length} registros</span></div><div class="grid">${items}</div></section>`;
   }).join('');
 
   return `<!DOCTYPE html>
@@ -1224,23 +1749,52 @@ function buildWeeklyReportHtml(){
     <meta charset="UTF-8">
     <title>Informe semanal de guardias</title>
     <style>
-      body{font-family:Arial,sans-serif;color:#1f2937;margin:32px}
-      h1{margin:0 0 6px;font-size:28px}
-      h2{margin:0 0 14px;font-size:20px}
-      .meta{margin-bottom:24px;color:#6b7280}
-      .day-block{margin-bottom:28px;page-break-inside:avoid}
-      .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-      .item{border:1px solid #dbe3ee;border-radius:12px;padding:16px;break-inside:avoid}
-      .item-head{font-weight:700;font-size:16px;margin-bottom:10px}
-      .item div{margin:4px 0}
-      .empty{font-size:16px}
-      @media print{body{margin:16px}.grid{gap:12px}}
+      body{font-family:Arial,sans-serif;color:#1f2937;margin:0;background:#eef3f8}
+      .sheet{max-width:1080px;margin:0 auto;padding:28px 28px 34px}
+      .hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;padding:24px 26px;border-radius:24px;background:linear-gradient(135deg,#153a63,#28588b);color:#fff;margin-bottom:18px}
+      .hero-kicker{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.78;margin-bottom:10px}
+      h1{margin:0 0 8px;font-size:30px;line-height:1.05}
+      .hero-meta{font-size:14px;opacity:.82}
+      .summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}
+      .summary-card{background:#fff;border:1px solid #dbe3ee;border-radius:18px;padding:16px 18px}
+      .summary-k{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8a94a6;margin-bottom:8px}
+      .summary-v{display:block;font-size:28px;font-weight:800;color:#153a63}
+      .summary-note{display:block;font-size:13px;color:#6b7280;margin-top:6px}
+      .day-block{margin-bottom:22px;page-break-inside:avoid;background:#fff;border:1px solid #dbe3ee;border-radius:22px;padding:18px 18px 16px}
+      .day-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}
+      h2{margin:0;font-size:20px}
+      .day-count{display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;border-radius:999px;background:#edf4ff;color:#28588b;font-size:12px;font-weight:700}
+      .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+      .item{border:1px solid #dbe3ee;border-radius:16px;padding:16px;background:#fbfcfe;break-inside:avoid}
+      .item-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+      .item-head{font-weight:800;font-size:18px;line-height:1.2}
+      .item-row{display:grid;grid-template-columns:94px minmax(0,1fr);gap:10px;margin-top:8px}
+      .item-k{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8a94a6}
+      .item-v{font-size:14px;line-height:1.5}
+      .pill{display:inline-flex;align-items:center;justify-content:center;padding:7px 11px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+      .pill-ok{background:#edf9f3;color:#1f9d63;border:1px solid #cdebd9}
+      .pill-warn{background:#fff3cf;color:#8c6707;border:1px solid #efdba6}
+      .empty{font-size:15px;color:#6b7280}.empty-left{text-align:left;margin:0}
+      @media print{body{background:#fff}.sheet{max-width:none;padding:16px}.hero{padding:18px 20px}.summary{gap:10px}.grid{gap:12px}}
     </style>
   </head>
   <body>
-    <h1>Informe semanal de guardias</h1>
-    <div class="meta">Fecha de generación: ${escapeHtml(fecha)}</div>
-    ${daySections}
+    <main class="sheet">
+      <section class="hero">
+        <div>
+          <div class="hero-kicker">IES Alcalans · Guardias</div>
+          <h1>Informe semanal de guardias</h1>
+          <div class="hero-meta">Fecha de generación: ${escapeHtml(fecha)}</div>
+        </div>
+      </section>
+      <section class="summary">
+        <article class="summary-card"><span class="summary-k">Ausencias</span><span class="summary-v">${totalAusencias}</span><span class="summary-note">Registros semanales</span></article>
+        <article class="summary-card"><span class="summary-k">Coberturas</span><span class="summary-v">${totalCoberturas}</span><span class="summary-note">Guardias asignadas</span></article>
+        <article class="summary-card"><span class="summary-k">Con tarea</span><span class="summary-v">${totalConTarea}</span><span class="summary-note">Faena disponible</span></article>
+        <article class="summary-card"><span class="summary-k">Días activos</span><span class="summary-v">${diasConIncidencia}</span><span class="summary-note">Con incidencias registradas</span></article>
+      </section>
+      ${daySections}
+    </main>
   </body>
   </html>`;
 }
@@ -1316,7 +1870,7 @@ async function restoreSnapshotFromFile(file){
   if(!file||!isSuperAdmin||!storage.hasBackend()) return;
   const confirmed=await askConfirm(
     'Restaurar copia',
-    'Se reemplazarán guardias, biblioteca, historial y tareas con el contenido del backup seleccionado.',
+    'Se reemplazar\u00e1n guardias, biblioteca, historial y tareas con el contenido del backup seleccionado.',
     'Restaurar'
   );
   if(!confirmed) return;
@@ -1328,11 +1882,11 @@ async function restoreSnapshotFromFile(file){
     renderTeacherPanel();
     renderTable();
     const restoreTime=new Date(result?.restoredAt||Date.now()).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-    setSuperAdminHint(`JSON restaurado a las ${restoreTime} · ${file.name} · Guardias: ${result?.counts?.guardias ?? 0}`,'success');
+    setSuperAdminHint(`JSON restaurado a las ${restoreTime} \u00b7 ${file.name} \u00b7 Guardias: ${result?.counts?.guardias ?? 0}`,'success');
     showToast(`Copia restaurada. Guardias: ${result?.counts?.guardias ?? 0}.`,'success');
   }catch(error){
     console.warn('Snapshot restore failed',error);
-    setSuperAdminHint(`Error al restaurar ${file?.name||'el backup JSON'}. Revisa el formato o la sesion.`,'error');
+    setSuperAdminHint(`Error al restaurar ${file?.name||'el backup JSON'}. Revisa el formato o la sesión.`,'error');
     showToast('No se pudo restaurar la copia.','error');
   }
 }
@@ -1350,7 +1904,7 @@ function renderHistoryList(){
   });
   if(!visibles.length){
     const texto=historyFilter==='all'
-      ? 'Todavia no hay cambios registrados.'
+      ? 'Todavía no hay cambios registrados.'
       : 'No hay cambios de este tipo en el historial.';
     historyList.innerHTML=`<div class="history-empty">${texto}</div>`;
     return;
@@ -1394,6 +1948,7 @@ function updateClockUi(){
     renderTable();
     renderHistoryList();
     renderSubstitutionList();
+    renderFutureAbsenceAdminList();
     if(document.getElementById('teacherOverlay')?.classList.contains('open')){
       renderTeacherPanel();
     }
@@ -1403,6 +1958,7 @@ function updateClockUi(){
     }
     showToast('Nueva semana lectiva iniciada. El calendario se ha reiniciado.','info');
   }
+  applyApprovedFutureAbsencesForCurrentWeek().catch(error=>console.warn('Future absence auto-apply failed',error));
   document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
   updateAdminControls();
 }
@@ -1427,7 +1983,7 @@ function renderSubstitutionList(){
   if(!list) return;
   const teachers=getFilteredSubstitutionTeachers();
   if(!teachers.length){
-    list.innerHTML='<div class="history-empty">No hay profesores que coincidan con la búsqueda.</div>';
+    list.innerHTML='<div class="history-empty">No hay profesores que coincidan con la b\u00fasqueda.</div>';
     return;
   }
   list.innerHTML=teachers.map(nombre=>{
@@ -1457,6 +2013,210 @@ function closeSubstitutionModal(){
   document.getElementById('substitutionOverlay')?.classList.remove('open');
 }
 function bgSubstitutionClose(e){if(e.target.id==='substitutionOverlay') closeSubstitutionModal();}
+function formatFutureAbsenceDateLabel(value){
+  if(!value) return 'Sin fecha';
+  const date=new Date(`${value}T00:00:00`);
+  if(Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function formatFutureAbsenceAdminSummary(rows){
+  const counts=rows.reduce((acc,item)=>{
+    const status=item.status||'pending';
+    acc.total+=1;
+    acc[status]=(acc[status]||0)+1;
+    return acc;
+  },{total:0,pending:0,approved:0,rejected:0,applied:0});
+  return `
+    <span class="future-absence-chip"><strong>${counts.total}</strong> avisos</span>
+    <span class="future-absence-chip"><strong>${counts.pending}</strong> pendientes</span>
+    <span class="future-absence-chip"><strong>${counts.approved}</strong> validadas</span>
+    <span class="future-absence-chip"><strong>${counts.rejected}</strong> rechazadas</span>
+    <span class="future-absence-chip"><strong>${counts.applied}</strong> aplicadas</span>
+  `;
+}
+function renderFutureAbsenceAdminList(){
+  const list=document.getElementById('futureAbsenceAdminList');
+  const summary=document.getElementById('futureAbsenceAdminSummary');
+  if(!list) return;
+  const rows=sortTeacherFutureAbsences(teacherFutureAbsences);
+  if(summary) summary.innerHTML=rows.length?formatFutureAbsenceAdminSummary(rows):'';
+  if(!rows.length){
+    list.innerHTML='<div class="future-absence-empty">No hay faltas futuras comunicadas.</div>';
+    return;
+  }
+  const teacherFilter=normalizeTeacherSearch(futureAbsenceAdminTeacherFilter);
+  const filtered=rows.filter(item=>{
+    if(futureAbsenceAdminStatusFilter!=='all'&&item.status!==futureAbsenceAdminStatusFilter) return false;
+    if(teacherFilter){
+      const visible=getVisibleTeacherName(item.profesor)||item.profesor;
+      const haystack=[item.profesor,visible,makeTeacherUsername(visible)].map(normalizeTeacherSearch);
+      if(!haystack.some(value=>value.includes(teacherFilter))) return false;
+    }
+    return true;
+  });
+  if(!filtered.length){
+    list.innerHTML='<div class="future-absence-empty">No hay avisos que coincidan con el filtro actual.</div>';
+    return;
+  }
+  list.innerHTML=filtered.map(item=>`<article class="future-absence-item">
+    <div class="future-absence-item-head">
+      <div>
+        <div class="future-absence-item-title">${escapeHtml(getVisibleTeacherName(item.profesor)||item.profesor)}</div>
+        <div class="future-absence-item-date">${escapeHtml(formatFutureAbsenceDateLabel(item.date))}</div>
+      </div>
+      <div class="future-absence-item-meta">
+        <span class="future-absence-status ${getFutureAbsenceStatusClass(item.status)}">${escapeHtml(getFutureAbsenceStatusLabel(item.status))}</span>
+      </div>
+    </div>
+    <div class="future-absence-item-note"><strong>Horas:</strong> ${escapeHtml(formatHourListLabel(getFutureAbsenceHoursForEntry(item)))}</div>
+    <div class="future-absence-item-note"><strong>Observaciones:</strong> ${escapeHtml(item.note||'Sin observaciones adicionales.')}</div>
+    ${item.reviewerNote?`<div class="future-absence-item-note"><strong>Respuesta de Jefatura:</strong> ${escapeHtml(item.reviewerNote)}</div>`:''}
+    ${item.reviewedAt?`<div class="future-absence-item-note"><strong>Revisada:</strong> ${escapeHtml(new Date(item.reviewedAt).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))}</div>`:''}
+    ${isAdmin?`<div class="substitution-item-actions">
+      ${item.status==='pending'?`<button class="btn-substitution" type="button" data-future-absence-approve="${escapeHtml(item.id)}">Validar</button><button class="btn-substitution btn-substitution-danger" type="button" data-future-absence-reject="${escapeHtml(item.id)}">Rechazar</button>`:''}
+      <button class="btn-substitution btn-substitution-danger" type="button" data-future-absence-delete="${escapeHtml(item.id)}">Eliminar aviso</button>
+    </div>`:''}
+  </article>`).join('');
+}
+function renderTeacherFutureAbsenceOwnList(){
+  const list=document.getElementById('teacherFutureAbsenceOwnList');
+  if(!list) return;
+  const rows=sortTeacherFutureAbsences(teacherFutureAbsences.filter(item=>item.profesor===teacherName));
+  if(!rows.length){
+    list.innerHTML='<div class="future-absence-empty">Todavía no has enviado avisos de falta futura.</div>';
+    return;
+  }
+  list.innerHTML=rows.map(item=>`<article class="future-absence-item">
+    <div class="future-absence-item-head">
+      <div class="future-absence-item-title">${escapeHtml(formatFutureAbsenceDateLabel(item.date))}</div>
+      <span class="future-absence-status ${getFutureAbsenceStatusClass(item.status)}">${escapeHtml(getFutureAbsenceStatusLabel(item.status))}</span>
+    </div>
+    <div class="future-absence-item-note">Horas: ${escapeHtml(formatHourListLabel(getFutureAbsenceHoursForEntry(item)))}</div>
+    <div class="future-absence-item-note">${escapeHtml(item.note||'Sin observaciones adicionales.')}</div>
+    ${item.reviewerNote?`<div class="future-absence-item-note">Respuesta de Jefatura: ${escapeHtml(item.reviewerNote)}</div>`:''}
+  </article>`).join('');
+}
+function getTeacherFutureAbsenceDaySelection(){
+  const input=document.getElementById('teacherFutureAbsenceDate');
+  const dateValue=cleanText(input?.value);
+  if(!dateValue) return null;
+  return getSchoolWeekInfoFromDate(dateValue);
+}
+function handleTeacherFutureAbsenceDateChange(){
+  const hoursWrap=document.getElementById('teacherFutureAbsenceHours');
+  const meta=document.getElementById('teacherFutureAbsenceDayMeta');
+  if(!hoursWrap||!meta) return;
+  const selection=getTeacherFutureAbsenceDaySelection();
+  if(!selection||selection.dayIndex==null){
+    meta.textContent='Selecciona una fecha lectiva para ver tus horas de clase.';
+    hoursWrap.innerHTML='<div class="teacher-future-hours-empty">No hay horas para seleccionar.</div>';
+    return;
+  }
+  const hours=getHorasLectivasProfesorDia(teacherName,selection.dayIndex);
+  if(!hours.length){
+    meta.textContent=`${DIAS[selection.dayIndex]} · Sin clases lectivas registradas.`;
+    hoursWrap.innerHTML='<div class="teacher-future-hours-empty">Ese día no tienes clases lectivas en el horario cargado.</div>';
+    return;
+  }
+  meta.textContent=`${DIAS[selection.dayIndex]} · Selecciona las horas que quieres comunicar.`;
+  hoursWrap.innerHTML=hours.map(hora=>{
+    const sesion=resolveTeacherSession(teacherName,selection.dayIndex,hora);
+    const detalle=[sesion?.materia||'Clase',sesion?.grupo||'',sesion?.aula||'Sin aula'].filter(Boolean).join(' · ');
+    return `<label class="teacher-future-hour-option"><input type="checkbox" data-future-hour value="${hora}" checked><span class="teacher-future-hour-copy"><span class="teacher-future-hour-title">${escapeHtml(formatHoraLabel(hora))}</span><span class="teacher-future-hour-meta">${escapeHtml(detalle)}</span></span></label>`;
+  }).join('');
+}
+function openTeacherFutureAbsenceModal(){
+  if(!teacherName) return;
+  const nameInput=document.getElementById('teacherFutureAbsenceName');
+  const dateInput=document.getElementById('teacherFutureAbsenceDate');
+  const noteInput=document.getElementById('teacherFutureAbsenceNote');
+  if(nameInput) nameInput.value=getVisibleTeacherName(teacherName);
+  if(dateInput){ dateInput.min=getCurrentDateIso(); dateInput.value=''; }
+  if(noteInput) noteInput.value='';
+  handleTeacherFutureAbsenceDateChange();
+  renderTeacherFutureAbsenceOwnList();
+  document.getElementById('teacherFutureAbsenceOverlay')?.classList.add('open');
+}
+function closeTeacherFutureAbsenceModal(){
+  document.getElementById('teacherFutureAbsenceOverlay')?.classList.remove('open');
+}
+function bgTeacherFutureAbsenceClose(e){if(e.target.id==='teacherFutureAbsenceOverlay') closeTeacherFutureAbsenceModal();}
+async function submitTeacherFutureAbsence(){
+  if(!teacherName) return;
+  const dateInput=document.getElementById('teacherFutureAbsenceDate');
+  const noteInput=document.getElementById('teacherFutureAbsenceNote');
+  const dateValue=cleanText(dateInput?.value);
+  const noteValue=cleanText(noteInput?.value);
+  const selectedHours=[...document.querySelectorAll('#teacherFutureAbsenceHours [data-future-hour]:checked')].map(input=>Number(input.value)).filter(Number.isInteger);
+  if(!dateValue){
+    showToast('Indica la fecha de la falta prevista.','error');
+    dateInput?.focus();
+    return;
+  }
+  if(!selectedHours.length){
+    showToast('Selecciona al menos una hora lectiva para ese día.','error');
+    return;
+  }
+  const entry={
+    id:`future-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    profesor:teacherName,
+    date:dateValue,
+    note:noteValue,
+    hours:selectedHours,
+    status:'pending',
+    reviewerNote:'',
+    reviewedAt:'',
+    appliedAt:'',
+    createdAt:new Date().toISOString()
+  };
+  try{
+    const result=await createTeacherFutureAbsenceEntry(entry);
+    closeTeacherFutureAbsenceModal();
+    showToast(result?.syncError?'Aviso guardado en local. Pendiente de sincronizar con el servidor.':'Aviso de ausencia futura enviado.','success');
+  }catch(error){
+    console.warn('Teacher future absence create failed',error);
+    showToast('No se pudo enviar el aviso.','error');
+  }
+}
+function openFutureAbsenceAdminModal(){
+  if(!isAdmin) return;
+  const statusFilter=document.getElementById('futureAbsenceAdminStatusFilter');
+  const teacherFilterInput=document.getElementById('futureAbsenceAdminTeacherFilter');
+  if(statusFilter) statusFilter.value=futureAbsenceAdminStatusFilter;
+  if(teacherFilterInput) teacherFilterInput.value=futureAbsenceAdminTeacherFilter;
+  renderFutureAbsenceAdminList();
+  document.getElementById('futureAbsenceAdminOverlay')?.classList.add('open');
+}
+function closeFutureAbsenceAdminModal(){
+  document.getElementById('futureAbsenceAdminOverlay')?.classList.remove('open');
+}
+function bgFutureAbsenceAdminClose(e){if(e.target.id==='futureAbsenceAdminOverlay') closeFutureAbsenceAdminModal();}
+async function handleFutureAbsenceAdminDelete(id){
+  if(!isAdmin||!id) return;
+  if(!await askConfirm('Eliminar aviso','Se eliminará este aviso de ausencia futura.','Eliminar')) return;
+  try{
+    const result=await deleteTeacherFutureAbsenceEntry(id);
+    showToast(result?.syncError?'Aviso eliminado en local. Pendiente de sincronizar con el servidor.':'Aviso eliminado.','success');
+  }catch(error){
+    console.warn('Teacher future absence delete failed',error);
+    showToast('No se pudo eliminar el aviso.','error');
+  }
+}
+async function reviewTeacherFutureAbsence(id,status){
+  if(!isAdmin||!id) return;
+  const current=teacherFutureAbsences.find(item=>item.id===id);
+  if(!current) return;
+  const reviewerNote=cleanText(await askText(status==='approved'?'Validar falta futura':'Rechazar falta futura',`Puedes dejar una respuesta breve para ${getVisibleTeacherName(current.profesor)||current.profesor}.`,current.reviewerNote||'','Respuesta opcional',status==='approved'?'Validar':'Rechazar'));
+  const nextEntry={...current,status,reviewerNote,reviewedAt:new Date().toISOString()};
+  try{
+    const result=await updateTeacherFutureAbsenceEntry(nextEntry);
+    if(status==='approved') await applyApprovedFutureAbsencesForCurrentWeek();
+    showToast(result?.syncError?(status==='approved'?'Falta futura validada en local. Pendiente de sincronizar.':'Falta futura rechazada en local. Pendiente de sincronizar.'):(status==='approved'?'Falta futura validada.':'Falta futura rechazada.'),'success');
+  }catch(error){
+    console.warn('Teacher future absence review failed',error);
+    showToast('No se pudo actualizar el aviso.','error');
+  }
+}
 async function assignTeacherSubstitution(nombre){
   if(!isAdmin||!getProfesor(nombre)) return;
   const current=teacherSubstitutions[nombre]||'';
@@ -1475,7 +2235,7 @@ async function assignTeacherSubstitution(nombre){
 }
 async function clearTeacherSubstitution(nombre){
   if(!isAdmin||!teacherSubstitutions[nombre]) return;
-  if(!await askConfirm('Restaurar titular',`Se restaurará el nombre original de ${nombre}.`,'Restaurar')) return;
+  if(!await askConfirm('Restaurar titular',`Se restaurar\u00e1 el nombre original de ${nombre}.`,'Restaurar')) return;
   delete teacherSubstitutions[nombre];
   teacherSubstitutions={...teacherSubstitutions};
   persistTeacherSubstitutions(teacherSubstitutions);
@@ -1519,22 +2279,29 @@ async function undoLastHistoryChange(){
   showToast('\u00daltimo cambio deshecho.','success');
 }
 function renderTable(){
-  const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
+  const rows=getSelectedRowsForDay(day);
+  const editableWeek=isCurrentWeekOffset(weekOffset);
   const tb=document.getElementById('tbody');
-  if(!rows.length){tb.innerHTML='<tr class="empty-row"><td colspan="7">No hay ausencias registradas para este dia.</td></tr>';}
+  if(!rows.length){tb.innerHTML=`<tr class="empty-row"><td colspan="7">No hay ausencias registradas para ${editableWeek?'este día':'esta vista futura'}.</td></tr>`;}
   else{
     tb.innerHTML=rows.map(g=>{
       const h=HORA_MAP[g.hora]||{label:g.hora+'a',rango:''};
       const cub=g.guardia&&g.guardia.trim();
-      const sugerido=cub||getGuardiaSugerida(day,g.hora,1);
+      const sugerido=cub||getGuardiaSugerida(day,g.hora,1,getRowsForWeekOffset(weekOffset));
       const faenaInfo=resolveFaena(g);
       const aula=resolveAulaRegistro(g)||'-';
       const ausenteNombre=getVisibleTeacherName(g.ausente);
       const guardiaNombre=sugerido?getVisibleTeacherName(sugerido):'';
-      const guardiaEstado=sugerido?(cub?'':'Guardia prevista'):'Sin cobertura';
-      const guardiaBadgeClass=sugerido?(cub?'b-ok status-pill':'status-pill teacher-duty-badge'):'b-nok status-pill';
+      const guardiaEstado=g.futurePlanned?(g.futureStatus==='approved'||g.futureStatus==='applied'?(cub?'Guardia planificada':'Cobertura prevista'):'Pendiente de validar'):(sugerido?(cub?'':'Guardia prevista'):'Sin cobertura');
+      const guardiaBadgeClass=g.futurePlanned
+        ?(g.futureStatus==='approved'||g.futureStatus==='applied'?'b-ok status-pill':'status-pill teacher-duty-badge')
+        :(sugerido?(cub?'b-ok status-pill':'status-pill teacher-duty-badge'):'b-nok status-pill');
       const guardiaChipClass=sugerido?(cub?'guardia-chip guardia-chip-assigned chip-strong':'guardia-chip guardia-chip-suggested chip-strong'):'';
-      return `<tr>
+      const statusText=g.futurePlanned
+        ?(g.futureStatus==='approved'?'Validada':g.futureStatus==='applied'?'Aplicada':g.futureStatus==='pending'?'Pendiente':'Planificada')
+        :(sugerido?(cub?'Cubierta':'Pendiente de confirmar'):'Sin cubrir');
+      const planningMeta=g.futurePlanned?`<span class="badge future-plan-badge ${g.futureStatus==='pending'?'future-plan-badge-pending':'future-plan-badge-approved'}">${g.futureStatus==='pending'?'Falta futura pendiente':'Falta futura validada'}</span>`:'';
+      return `<tr class="${g.futurePlanned?'future-planned-row':''}">
         <td>
           <div class="cell-stack cell-stack-hour">
             <div class="hora-num">${HORA_MAP[g.hora].label} hora</div>
@@ -1544,9 +2311,11 @@ function renderTable(){
         <td>
           <div class="cell-stack">
             <div class="cell-label">Ausente</div>
+            ${planningMeta}
             <div class="guardia-slot">
               <div class="chip chip-absence chip-strong"><div class="avatar av-red">${initials(ausenteNombre)}</div>${escapeHtml(ausenteNombre)}</div>
             </div>
+            ${g.futurePlanned?`<div class="cell-meta">Planificada para ${escapeHtml(formatFutureAbsenceDateLabel(g.futureDate))}</div>`:''}
           </div>
         </td>
         <td>
@@ -1562,27 +2331,28 @@ function renderTable(){
           <div class="cell-stack">
             <div class="cell-label">Tarea</div>
             <div class="guardia-slot">
-              ${faenaInfo.faena?`<div class="faena-status"><span class="badge b-ok">Con tarea</span>${faenaInfo.obs?`<details class="faena-toggle"><summary></summary><div class="faena-text">${escapeHtml(faenaInfo.obs)}</div></details>`:''}</div>`:`<span class="badge b-nok">Sin tarea</span>`}
+              ${g.futurePlanned?`<span class="badge ${g.futureStatus==='pending'?'teacher-duty-badge':'b-ok'}">${g.futureStatus==='pending'?'Pendiente':'Planificada'}</span>`:(faenaInfo.faena?`<div class="faena-status"><span class="badge b-ok">Con tarea</span>${faenaInfo.obs?`<details class="faena-toggle"><summary></summary><div class="faena-text">${escapeHtml(faenaInfo.obs)}</div></details>`:''}</div>`:`<span class="badge b-nok">Sin tarea</span>`)}
             </div>
           </div>
         </td>
         <td>
           <div class="cell-stack cell-stack-compact">
             <div class="cell-label">Estado</div>
-            <div class="guardia-slot"><span class="badge ${guardiaBadgeClass}">${sugerido?(cub?'Cubierta':'Pendiente de confirmar'):'Sin cubrir'}</span></div>
+            <div class="guardia-slot"><span class="badge ${guardiaBadgeClass}">${statusText}</span></div>
           </div>
         </td>
-        <td style="${isAdmin?'':'display:none'}"><button class="btn-edit" onclick="openModal(${g.id})">Editar</button></td>
+        <td style="${isAdmin?'':'display:none'}">${isAdmin&&editableWeek&&Number.isInteger(Number(g.id))?`<button class="btn-edit" onclick="openModal(${g.id})">Editar</button>`:'<span class="cell-meta">Solo lectura</span>'}</td>
       </tr>`;
     }).join('');
   }
   const aus=rows.length;
-  const asig=rows.filter(g=>(g.guardia&&g.guardia.trim())||getGuardiaSugerida(day,g.hora,1)).length;
+  const rowsSource=getRowsForWeekOffset(weekOffset);
+  const asig=rows.filter(g=>(g.guardia&&g.guardia.trim())||getGuardiaSugerida(day,g.hora,1,rowsSource)).length;
   document.getElementById('thAcc').style.display=isAdmin?'':'none';
   document.getElementById('sAus').textContent=aus;
   document.getElementById('sAsig').textContent=asig;
   document.getElementById('sSin').textContent=Math.max(aus-asig,0);
-  document.getElementById('sFaena').textContent=rows.filter(g=>resolveFaena(g).faena).length;
+  document.getElementById('sFaena').textContent=rows.filter(g=>!g.futurePlanned&&resolveFaena(g).faena).length;
 }
 async function toggleAdmin(){
   if(!isAdmin){
@@ -1614,6 +2384,10 @@ async function toggleSuperAdmin(){
     return;
   }
   await logoutCurrentRole();
+  if(SUPERADMIN_ENABLED){
+    window.location.href=window.location.pathname;
+    return;
+  }
   renderTable();
   showToast('Modo Superadmin desactivado.','info');
 }
@@ -1630,10 +2404,10 @@ function renderTeacherAccessPreview(){
   const visibleName=getVisibleTeacherName(nombre);
   const summary=getTeacherSummaryForDay(nombre,day);
   const nextSession=summary.nextHour?resolveTeacherSession(nombre,day,summary.nextHour):null;
-  const nextLabel=summary.nextHour&&nextSession?`${formatHoraLabel(summary.nextHour)} - ${nextSession.materia||nextSession.detalle||'Sesion'}`:'Sin sesiones lectivas hoy';
+  const nextLabel=summary.nextHour&&nextSession?`${formatHoraLabel(summary.nextHour)} - ${nextSession.materia||nextSession.detalle||'Sesión'}`:'Sin sesiones lectivas hoy';
   preview.innerHTML=`
     <div class="teacher-access-preview-title">${escapeHtml(visibleName)}</div>
-    <div class="teacher-access-preview-meta">Usuario: ${escapeHtml(makeTeacherUsername(visibleName))}${profesor?.departamento?` · ${escapeHtml(profesor.departamento)}`:''}${getTeacherDisplayMeta(nombre)?` · ${escapeHtml(getTeacherDisplayMeta(nombre))}`:''}</div>
+    <div class="teacher-access-preview-meta">Usuario: ${escapeHtml(makeTeacherUsername(visibleName))}${profesor?.departamento?` \u00b7 ${escapeHtml(profesor.departamento)}`:''}${getTeacherDisplayMeta(nombre)?` \u00b7 ${escapeHtml(getTeacherDisplayMeta(nombre))}`:''}</div>
     <div class="teacher-access-preview-stats">
       <span class="teacher-access-preview-stat">${summary.horas.length} sesiones hoy</span>
       <span class="teacher-access-preview-stat">${escapeHtml(nextLabel)}</span>
@@ -1777,6 +2551,7 @@ function loginTeacher(){
   if(!nombre){showToast('Selecciona tu nombre de la lista.','error');teacherLoginInput.focus();renderTeacherAccessSuggestions(true);return;}
   teacherName=nombre;
   teacherDay=day;
+  teacherWeekOffset=weekOffset;
   persistTeacherUser(nombre);
   persistTeacherRecents([nombre,...teacherRecents.filter(item=>item!==nombre)]);
   teacherRecents=loadTeacherRecents();
@@ -1790,12 +2565,13 @@ function loginTeacher(){
 function openTeacherPanelFallback(){
   teacherName=teacherName||ALL_PROFESORES[0]||'';
   teacherDay=day;
+  teacherWeekOffset=weekOffset;
   syncTeacherIdentity();
   document.getElementById('teacherOverlay').classList.add('open');
   document.getElementById('teacherBar').classList.add('show');
   renderTeacherPanel();
 }
-function openTeacherPanel(){if(!getProfesor(teacherName)){openTeacherAccess();return;}teacherDay=day;syncTeacherIdentity();document.getElementById('teacherOverlay').classList.add('open');document.getElementById('teacherBar').classList.add('show');renderTeacherPanel();}
+function openTeacherPanel(){if(!getProfesor(teacherName)){openTeacherAccess();return;}teacherDay=day;teacherWeekOffset=weekOffset;syncTeacherIdentity();document.getElementById('teacherOverlay').classList.add('open');document.getElementById('teacherBar').classList.add('show');renderTeacherPanel();}
 function closeTeacherPanel(){document.getElementById('teacherOverlay').classList.remove('open');}
 function exitTeacherMode(){
   closeTeacherPanel();
@@ -1805,9 +2581,26 @@ function exitTeacherMode(){
   document.getElementById('teacherBar').classList.remove('show');
   syncTeacherIdentity();
 }
-function bgTeacherClose(e){if(e.target.id==='teacherOverlay')closeTeacherPanel();}
 function setTeacherDay(dia){teacherDay=dia;renderTeacherPanel();}
+function changeTeacherWeekOffset(delta){
+  teacherWeekOffset=Math.max(-1,Math.min(3,teacherWeekOffset+delta));
+  renderTeacherPanel();
+}
+function focusTeacherDutyHour(hora){
+  const card=document.querySelector(`[data-teacher-hour="${hora}"]`);
+  if(!card) return;
+  card.scrollIntoView({behavior:'smooth',block:'center'});
+  card.classList.remove('teacher-session-duty-focus');
+  void card.offsetWidth;
+  card.classList.add('teacher-session-duty-focus');
+  if(teacherDutyFocusTimer) window.clearTimeout(teacherDutyFocusTimer);
+  teacherDutyFocusTimer=window.setTimeout(()=>{card.classList.remove('teacher-session-duty-focus');},1800);
+}
 function saveTeacherTask(dia,hora,exitAfter){
+  if(!isTeacherCurrentWeek()){
+    showToast('Solo puedes editar tareas en la semana actual.','info');
+    return;
+  }
   const profesor=getProfesor(teacherName);
   if(!profesor) return;
   const sesionBase=getHorarioProfesorDia(teacherName,dia)?.[hora];
@@ -1854,23 +2647,45 @@ function saveTeacherTask(dia,hora,exitAfter){
 function renderTeacherPanel(){
   const profesor=getProfesor(teacherName);
   if(!profesor) return;
+  renderWeekLabel();
   syncTeacherIdentity();
   document.getElementById('teacherName').textContent=getVisibleTeacherName(profesor.nombre);
   document.getElementById('teacherMeta').textContent=`${getVisibleTeacherName(profesor.nombreCompleto||profesor.nombre)} - ${profesor.departamento}${getTeacherDisplayMeta(teacherName)?` - ${getTeacherDisplayMeta(teacherName)}`:''}`;
   const sesiones=getHorarioProfesorDia(teacherName,teacherDay);
   const horas=Object.keys(sesiones).map(Number).sort((a,b)=>a-b);
-  const totalConTarea=horas.filter(hora=>{const tarea=getTareaProfesor(teacherName,teacherDay,hora);return !!(tarea?.dejada||tarea?.tarea);}).length;
-  const dutyAssignments=horas.flatMap(hora=>getTeacherAssignedAbsences(teacherName,teacherDay,hora));
-  document.getElementById('teacherSummary').textContent=`${DIAS[teacherDay]} � ${horas.length} sesiones � ${totalConTarea} con tarea � ${dutyAssignments.length} coberturas`;
+  const currentTeacherWeek=isTeacherCurrentWeek();
+  const teacherRowsForDay=getTeacherWeekRowsForDay(teacherDay);
+  const totalConTarea=currentTeacherWeek?horas.filter(hora=>{const tarea=getTareaProfesor(teacherName,teacherDay,hora);return !!(tarea?.dejada||tarea?.tarea);}).length:0;
+  const dutyAssignments=teacherRowsForDay
+    .filter(row=>row.guardia===teacherName)
+    .map(row=>({
+      ...row,
+      faenaInfo:currentTeacherWeek?resolveFaena(row):{faena:false,obs:''},
+      aula:resolveAulaRegistro(row)
+    }));
+  document.getElementById('teacherSummary').textContent=`${DIAS[teacherDay]} \u00b7 ${horas.length} sesiones \u00b7 ${totalConTarea} con tarea \u00b7 ${dutyAssignments.length} coberturas${currentTeacherWeek?'':` \u00b7 semana futura`}`;
   const dutyAlert=document.getElementById('teacherDutyAlert');
   if(dutyAlert){
     if(dutyAssignments.length){
       const nextDuty=dutyAssignments.slice().sort((a,b)=>a.hora-b.hora)[0];
       dutyAlert.hidden=false;
-      dutyAlert.innerHTML=`<div class="teacher-duty-alert-title">Guardia asignada</div><div class="teacher-duty-alert-copy">Hoy cubres ${dutyAssignments.length} ${dutyAssignments.length===1?'ausencia':'ausencias'}. Pr�xima cobertura: ${escapeHtml(getVisibleTeacherName(nextDuty.ausente))} en ${escapeHtml(nextDuty.aula||'Sin aula')} (${escapeHtml(formatHoraLabel(nextDuty.hora))}).</div>`;
+      dutyAlert.innerHTML=`<div class="teacher-duty-alert-title">${currentTeacherWeek?'Guardia asignada':'Guardia prevista'}</div><div class="teacher-duty-alert-copy">${currentTeacherWeek?'Hoy cubres':'En esta semana cubres'} ${dutyAssignments.length} ${dutyAssignments.length===1?'ausencia':'ausencias'}. Pr\u00f3xima cobertura: ${escapeHtml(getVisibleTeacherName(nextDuty.ausente))} en ${escapeHtml(nextDuty.aula||'Sin aula')} (${escapeHtml(formatHoraLabel(nextDuty.hora))}). Pulsa aqu\u00ed para ir a esa hora.</div>`;
+      dutyAlert.onclick=()=>focusTeacherDutyHour(nextDuty.hora);
+      dutyAlert.setAttribute('role','button');
+      dutyAlert.setAttribute('tabindex','0');
+      dutyAlert.onkeydown=event=>{
+        if(event.key==='Enter'||event.key===' '){
+          event.preventDefault();
+          focusTeacherDutyHour(nextDuty.hora);
+        }
+      };
     }else{
       dutyAlert.hidden=true;
       dutyAlert.innerHTML='';
+      dutyAlert.onclick=null;
+      dutyAlert.onkeydown=null;
+      dutyAlert.removeAttribute('role');
+      dutyAlert.removeAttribute('tabindex');
     }
   }
   document.getElementById('teacherBarName').textContent=`${getVisibleTeacherName(profesor.nombre)} - ${profesor.departamento}`;
@@ -1883,23 +2698,23 @@ function renderTeacherPanel(){
     const sesion=resolveTeacherSession(teacherName,teacherDay,hora);
     const grupo=sesion.grupo?GRUPOS_PROFESORADO[sesion.grupo]?.nombre||sesion.grupo:'';
     const aula=sesion.aula||'Sin aula';
-    const tarea=getTareaProfesor(teacherName,teacherDay,hora);
+    const tarea=currentTeacherWeek?getTareaProfesor(teacherName,teacherDay,hora):null;
     const checked=tarea?!!(tarea.dejada||tarea.tarea):false;
     const texto=tarea?.tarea||'';
     const detalleVisible=grupo||sesion.detalle||'Sin detalle adicional';
-    const guardiaTasks=sesion.tipo==='guardia'?getTeacherAssignedAbsences(teacherName,teacherDay,hora):[];
-    const dutyBadge=guardiaTasks.length?`<span class="badge teacher-duty-badge">Te toca cubrir</span>`:'';
+    const guardiaTasks=sesion.tipo==='guardia'?dutyAssignments.filter(item=>item.hora===hora):[];
+    const dutyBadge=guardiaTasks.length?`<span class="badge teacher-duty-badge">${currentTeacherWeek?'Te toca cubrir':'Cobertura prevista'}</span>`:''; 
     const guardiaTasksMarkup=guardiaTasks.length?`<div class="teacher-guardia-tasks">${guardiaTasks.map(item=>`
       <article class="teacher-guardia-task">
         <div class="teacher-guardia-task-head">
           <div class="teacher-guardia-task-title">Cubres a ${escapeHtml(getVisibleTeacherName(item.ausente))}</div>
           <span class="badge ${item.faenaInfo.faena?'b-ok':'b-nok'}">${item.faenaInfo.faena?'Con tarea':'Sin tarea'}</span>
         </div>
-        <div class="teacher-guardia-task-meta">${escapeHtml(formatHoraLabel(item.hora))} · ${escapeHtml(item.aula||'Sin aula')}</div>
+        <div class="teacher-guardia-task-meta">${escapeHtml(formatHoraLabel(item.hora))} \u00b7 ${escapeHtml(item.aula||'Sin aula')}</div>
         ${item.faenaInfo.obs?`<div class="teacher-guardia-task-text">${escapeHtml(item.faenaInfo.obs)}</div>`:''}
       </article>
     `).join('')}</div>`:'';
-    return `<div class="teacher-session${guardiaTasks.length?' teacher-session-duty':''}">
+    return `<div class="teacher-session${guardiaTasks.length?' teacher-session-duty':''}" data-teacher-hour="${hora}">
       <div class="teacher-session-head">
         <div class="teacher-session-summary">
           <div class="teacher-session-slot">${HORA_MAP[hora].label} hora</div>
@@ -1919,34 +2734,34 @@ function renderTeacherPanel(){
         <div class="teacher-session-grid">
           <div class="fg">
             <label>Materia</label>
-            <input id="sessionMateria-${teacherDay}-${hora}" type="text" value="${sesion.materia||''}">
+            <input id="sessionMateria-${teacherDay}-${hora}" type="text" value="${sesion.materia||''}" ${currentTeacherWeek?'':'readonly'}>
           </div>
           <div class="fg">
             <label>Aula</label>
-            <input id="sessionAula-${teacherDay}-${hora}" type="text" value="${sesion.aula||''}">
+            <input id="sessionAula-${teacherDay}-${hora}" type="text" value="${sesion.aula||''}" ${currentTeacherWeek?'':'readonly'}>
           </div>
           <div class="fg">
             <label>Grupo</label>
-            <input id="sessionGrupo-${teacherDay}-${hora}" type="text" value="${sesion.grupo||''}">
+            <input id="sessionGrupo-${teacherDay}-${hora}" type="text" value="${sesion.grupo||''}" ${currentTeacherWeek?'':'readonly'}>
           </div>
           <div class="fg">
             <label>Detalle</label>
-            <input id="sessionDetalle-${teacherDay}-${hora}" type="text" value="${sesion.detalle||''}">
+            <input id="sessionDetalle-${teacherDay}-${hora}" type="text" value="${sesion.detalle||''}" ${currentTeacherWeek?'':'readonly'}>
           </div>
         </div>
       </div>
       <label class="teacher-check">
-        <input id="taskCheck-${teacherDay}-${hora}" type="checkbox" ${checked?'checked':''}>
+        <input id="taskCheck-${teacherDay}-${hora}" type="checkbox" ${checked?'checked':''} ${currentTeacherWeek?'':'disabled'}>
         <span>He dejado tarea para este grupo</span>
       </label>
       <div class="fg">
         <label>Tarea</label>
-        <textarea id="taskText-${teacherDay}-${hora}" placeholder="Indica que debe hacer el grupo">${texto}</textarea>
+        <textarea id="taskText-${teacherDay}-${hora}" placeholder="${currentTeacherWeek?'Indica que debe hacer el grupo':'Las tareas solo se registran en la semana actual'}" ${currentTeacherWeek?'':'readonly'}>${texto}</textarea>
       </div>
       ${guardiaTasksMarkup}
       <div class="teacher-actions">
-        <button class="teacher-save" type="button" onclick="saveTeacherTask(${teacherDay},${hora},false)">Guardar tarea</button>
-        <button class="teacher-save-exit" type="button" onclick="saveTeacherTask(${teacherDay},${hora},true)">Guardar y salir</button>
+        ${currentTeacherWeek?`<button class="teacher-save" type="button" onclick="saveTeacherTask(${teacherDay},${hora},false)">Guardar tarea</button>
+        <button class="teacher-save-exit" type="button" onclick="saveTeacherTask(${teacherDay},${hora},true)">Guardar y salir</button>`:`<div class="teacher-meta">Vista de planificación. La edición se habilita en la semana actual.</div>`}
       </div>
     </div>`;
   }).join('');
@@ -1959,7 +2774,7 @@ function syncTodoDiaMode(){
   guardiaInput.placeholder='La guardia se asigna automaticamente';
   setFieldError('fGuardia','');
 }
-function openModal(id){editId=id||null;const g=id?data.find(x=>x.id===id):null;const aula=g?resolveAulaRegistro(g):'';const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?getVisibleTeacherName(g.ausente):'';document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fAula').value=aula;document.getElementById('fTodoDia').checked=false;document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';populateProfesoresGuardia();syncAulaFromProfesor(!g||!aula);syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
+function openModal(id){if(!isCurrentWeekOffset(weekOffset)){showToast('La edición solo está disponible en la semana actual.','info');return;}editId=id||null;const g=id?data.find(x=>x.id===id):null;const aula=g?resolveAulaRegistro(g):'';const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?getVisibleTeacherName(g.ausente):'';document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fAula').value=aula;document.getElementById('fTodoDia').checked=false;document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';populateProfesoresGuardia();syncAulaFromProfesor(!g||!aula);syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
 function renderAusentePreview(){
   const input=document.getElementById('fAusente');
   const preview=document.getElementById('ausentePreview');
@@ -1973,7 +2788,7 @@ function renderAusentePreview(){
   const hora=+document.getElementById('fHora').value;
   const aula=getAulaProfesor(nombre,dia,hora)||'Sin aula registrada';
   const horas=getHorasLectivasProfesorDia(nombre,dia);
-  preview.textContent=`${getVisibleTeacherName(nombre)} · ${DIAS[dia]} · ${horas.length} sesiones lectivas · ${aula}`;
+  preview.textContent=`${getVisibleTeacherName(nombre)} \u00b7 ${DIAS[dia]} \u00b7 ${horas.length} sesiones lectivas \u00b7 ${aula}`;
 }
 function renderAbsenceDecisionBar(){
   const panel=document.getElementById('absenceDecisionBar');
@@ -1996,7 +2811,7 @@ function renderAbsenceDecisionBar(){
   const tarea=getAbsenceTaskState(nombre,dia,hora,false,'');
   const horasLectivas=todoDia?getHorasLectivasProfesorDia(nombre,dia):[];
   const extras=[];
-  if(todoDia) extras.push(`Se aplicara a ${horasLectivas.length} ${horasLectivas.length===1?'sesion lectiva':'sesiones lectivas'}`);
+  if(todoDia) extras.push(`Se aplicar\u00e1 a ${horasLectivas.length} ${horasLectivas.length===1?'sesi\u00f3n lectiva':'sesiones lectivas'}`);
   if(tarea.faena&&tarea.obs) extras.push(`Tarea: ${escapeHtml((tarea.obs||'').slice(0,90)+((tarea.obs||'').length>90?'...':''))}`);
   panel.innerHTML=`<strong>Aula:</strong> ${escapeHtml(aula)} | <strong>Guardia prevista:</strong> ${escapeHtml(guardia?getVisibleTeacherName(guardia):'Sin cobertura')} | <strong>Tarea:</strong> ${tarea.faena?'Disponible':'No registrada'}${extras.length?` | ${extras.join(' | ')}`:''}`;
 }function closeModal(){document.getElementById('overlay').classList.remove('open');}
@@ -2173,14 +2988,14 @@ function syncGuardiaPreview(){
   if(!fDia||!fHora||!guardiaInput||!todoDiaInput) return;
   if(todoDiaInput.checked){
     guardiaInput.value='';
-    guardiaInput.placeholder='Se asignará automáticamente en cada hora';
+    guardiaInput.placeholder='Se asignar\u00e1 autom\u00e1ticamente en cada hora';
     return;
   }
   const dia=Number(fDia.value);
   const hora=Number(fHora.value);
   const sugerida=getGuardiaSugerida(dia,hora,1)||'';
   guardiaInput.value=getVisibleTeacherName(sugerida);
-  guardiaInput.placeholder=sugerida?'Asignación automática prevista':'Sin guardia disponible';
+  guardiaInput.placeholder=sugerida?'Asignaci\u00f3n autom\u00e1tica prevista':'Sin guardia disponible';
 }
 function save(){
   const dia=+document.getElementById('fDia').value;
@@ -2307,6 +3122,39 @@ if(substitutionList){
     }
   });
 }
+const futureAbsenceAdminList=document.getElementById('futureAbsenceAdminList');
+if(futureAbsenceAdminList){
+  futureAbsenceAdminList.addEventListener('click',event=>{
+    const deleteButton=event.target.closest('[data-future-absence-delete]');
+    if(deleteButton){
+      handleFutureAbsenceAdminDelete(deleteButton.dataset.futureAbsenceDelete||'');
+      return;
+    }
+    const approveButton=event.target.closest('[data-future-absence-approve]');
+    if(approveButton){
+      reviewTeacherFutureAbsence(approveButton.dataset.futureAbsenceApprove||'','approved');
+      return;
+    }
+    const rejectButton=event.target.closest('[data-future-absence-reject]');
+    if(rejectButton){
+      reviewTeacherFutureAbsence(rejectButton.dataset.futureAbsenceReject||'','rejected');
+    }
+  });
+}
+const futureAbsenceAdminStatusFilterInput=document.getElementById('futureAbsenceAdminStatusFilter');
+if(futureAbsenceAdminStatusFilterInput){
+  futureAbsenceAdminStatusFilterInput.addEventListener('change',event=>{
+    futureAbsenceAdminStatusFilter=event.target.value||'all';
+    renderFutureAbsenceAdminList();
+  });
+}
+const futureAbsenceAdminTeacherFilterInput=document.getElementById('futureAbsenceAdminTeacherFilter');
+if(futureAbsenceAdminTeacherFilterInput){
+  futureAbsenceAdminTeacherFilterInput.addEventListener('input',event=>{
+    futureAbsenceAdminTeacherFilter=event.target.value||'';
+    renderFutureAbsenceAdminList();
+  });
+}
 const teacherLoginInput=document.getElementById('teacherLoginName');
 if(teacherLoginInput){
   teacherLoginInput.addEventListener('input',handleTeacherAccessInput);
@@ -2355,13 +3203,16 @@ safeInitStep(renderPills,'renderPills');
 safeInitStep(renderGuardiaBoard,'renderGuardiaBoard');
 safeInitStep(renderTable,'renderTable');
 safeInitStep(renderSubstitutionList,'renderSubstitutionList');
+safeInitStep(renderFutureAbsenceAdminList,'renderFutureAbsenceAdminList');
+safeInitStep(renderTeacherFutureAbsenceOwnList,'renderTeacherFutureAbsenceOwnList');
 safeInitStep(syncTeacherIdentity,'syncTeacherIdentity');
 safeInitStep(refreshAccessUi,'refreshAccessUi');
 safeInitStep(()=>{initializeApp().catch(error=>console.error('Init step failed: initializeApp',error));},'initializeApp');
-window.setInterval(()=>{pollBackendState();},BACKEND_POLL_INTERVAL_MS);
+window.setInterval(()=>{hydrateTeacherFutureAbsences();pollBackendState();},BACKEND_POLL_INTERVAL_MS);
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){
     hydrateTeacherSubstitutions();
+    hydrateTeacherFutureAbsences();
     pollBackendState();
   }
 });
@@ -2373,6 +3224,21 @@ window.addEventListener('guardias-auth-invalid',()=>{
   renderTable();
   showToast('La sesi\u00f3n ha caducado.','error');
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
