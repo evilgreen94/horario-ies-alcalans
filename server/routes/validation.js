@@ -129,6 +129,22 @@ function sanitizeTeacherSubstitution(row) {
   };
 }
 
+function sanitizeTeacherPracticeGuardia(row) {
+  const input = ensureObject(row, 'Disponibilidad de practicas para guardias');
+  return {
+    profesor: ensureRequiredString(input.profesor, 'profesor')
+  };
+}
+
+function sanitizeTeacherPracticeGuardiaSlot(row) {
+  const input = ensureObject(row, 'Tramo manual de practicas para guardias');
+  return {
+    profesor: ensureRequiredString(input.profesor, 'profesor'),
+    dia: normalizeInteger(input.dia, 'dia', 0, 4),
+    hora: normalizeInteger(input.hora, 'hora', 1, 9)
+  };
+}
+
 function sanitizeTeacherFutureAbsence(row) {
   const input = ensureObject(row, 'Aviso de ausencia futura');
   const status = normalizeString(input.status, 'pending') || 'pending';
@@ -163,6 +179,8 @@ module.exports = {
   sanitizeAusencia,
   sanitizeBiblioteca,
   sanitizeTeacherFutureAbsence,
+  sanitizeTeacherPracticeGuardia,
+  sanitizeTeacherPracticeGuardiaSlot,
   sanitizeHistorial,
   sanitizeTeacherSubstitution,
   sanitizeTareaProfesorado,

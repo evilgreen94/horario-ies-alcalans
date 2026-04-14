@@ -7,6 +7,8 @@ const KEY_TAREAS='IES_Alcalans_Tareas_Profesorado';
 const KEY_TEACHER_USER='IES_Alcalans_Profesorado_Actual';
 const KEY_TEACHER_RECENTS='IES_Alcalans_Profesorado_Recientes';
 const KEY_TEACHER_SUBSTITUTIONS='IES_Alcalans_Profesorado_Sustituciones';
+const KEY_TEACHER_PRACTICAS_GUARDIAS='IES_Alcalans_Profesorado_Practicas_Guardias';
+const KEY_TEACHER_PRACTICAS_GUARDIAS_TRAMOS='IES_Alcalans_Profesorado_Practicas_Guardias_Tramos';
 const KEY_TEACHER_FUTURE_ABSENCES='IES_Alcalans_Profesorado_Faltas_Futuras';
 const KEY_SESSION_OVERRIDES='IES_Alcalans_Sesiones_Profesorado';
 const KEY_HISTORIAL='IES_Alcalans_Historial_Cambios';
@@ -140,6 +142,10 @@ let teacherRecents=[];
 let absenceMatches=[];
 let absenceActiveIndex=-1;
 let teacherSubstitutions={};
+let teacherPracticasGuardias=[];
+let teacherPracticasGuardiasTramos=[];
+let practicasGuardiasFilter='';
+let practicasGuardiasConfigTeacher='';
 let substitutionFilter='';
 let teacherDutyFocusTimer=null;
 let teacherFutureAbsences=[];
@@ -200,6 +206,29 @@ function loadTeacherSubstitutions(){
 }
 function persistTeacherSubstitutions(map){
   storage.writeJson(KEY_TEACHER_SUBSTITUTIONS,Object.entries(map||{}).map(([profesor,sustituto])=>({profesor,sustituto})));
+}
+function loadTeacherPracticasGuardias(){
+  return [...new Set(storage.readJson(KEY_TEACHER_PRACTICAS_GUARDIAS,[]).map(row=>cleanText(typeof row==='string'?row:row?.profesor)).filter(nombre=>getProfesor(nombre)))].sort((a,b)=>a.localeCompare(b,'es'));
+}
+function persistTeacherPracticasGuardias(list){
+  storage.writeJson(KEY_TEACHER_PRACTICAS_GUARDIAS,[...new Set((list||[]).map(cleanText).filter(nombre=>getProfesor(nombre)))].sort((a,b)=>a.localeCompare(b,'es')).map(profesor=>({profesor})));
+}
+function normalizePracticasGuardiasSlot(row){
+  const profesor=cleanText(row?.profesor);
+  const dia=Number(row?.dia);
+  const hora=Number(row?.hora);
+  if(!getProfesor(profesor)||!Number.isInteger(dia)||dia<0||dia>4||!Number.isInteger(hora)||hora<1||hora>9||HORAS_PATIO.has(hora)) return null;
+  return {profesor,dia,hora};
+}
+function loadTeacherPracticasGuardiasTramos(){
+  const rows=storage.readJson(KEY_TEACHER_PRACTICAS_GUARDIAS_TRAMOS,[]);
+  return [...new Map((Array.isArray(rows)?rows:[]).map(normalizePracticasGuardiasSlot).filter(Boolean).map(row=>[`${row.profesor}|${row.dia}|${row.hora}`,row])).values()]
+    .sort((a,b)=>a.profesor.localeCompare(b.profesor,'es')||a.dia-b.dia||a.hora-b.hora);
+}
+function persistTeacherPracticasGuardiasTramos(rows){
+  const normalized=[...new Map((rows||[]).map(normalizePracticasGuardiasSlot).filter(Boolean).map(row=>[`${row.profesor}|${row.dia}|${row.hora}`,row])).values()]
+    .sort((a,b)=>a.profesor.localeCompare(b.profesor,'es')||a.dia-b.dia||a.hora-b.hora);
+  storage.writeJson(KEY_TEACHER_PRACTICAS_GUARDIAS_TRAMOS,normalized);
 }
 function loadTeacherFutureAbsences(){return storage.readJson(KEY_TEACHER_FUTURE_ABSENCES,[]);}
 function persistTeacherFutureAbsences(rows){storage.writeJson(KEY_TEACHER_FUTURE_ABSENCES,Array.isArray(rows)?rows:[]);}
@@ -274,14 +303,14 @@ function getLastUndoableHistoryEntry(){
   return historialCambios.find(entry=>entry?.undoState&&entry.type!=='undo')||null;
 }
 function shuffle(arr){const copy=[...arr];for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}return copy;}
-function makeOrdenHora(dia,hora){return shuffle(HORARIO_GUARDIAS[dia]?.[hora]||[]).map((nombre,index)=>({nombre,numero:index+1}));}
+function makeOrdenHora(dia,hora){return shuffle(getProfesHora(dia,hora)).map((nombre,index)=>({nombre,numero:index+1}));}
 function buildInitialOrden(){const orden={};for(let dia=0;dia<5;dia++){orden[dia]={};for(let hora=1;hora<=9;hora++){orden[dia][hora]=makeOrdenHora(dia,hora);}}persistOrden(orden);return orden;}
 function ensureOrden(base){
   const orden={...base};
   for(let dia=0;dia<5;dia++){
     if(!orden[dia]) orden[dia]={};
     for(let hora=1;hora<=9;hora++){
-      const esperados=HORARIO_GUARDIAS[dia]?.[hora]||[];
+      const esperados=getProfesHora(dia,hora);
       const actuales=Array.isArray(orden[dia][hora])?orden[dia][hora]:[];
       const nombres=actuales.map(item=>item.nombre);
       const invalido=actuales.length!==esperados.length||esperados.some(nombre=>!nombres.includes(nombre));
@@ -293,6 +322,7 @@ function ensureOrden(base){
 }
 function loadOrden(){try{const d=storage.readJson(KEY_ORDEN,null);return d?ensureOrden(d):buildInitialOrden();}catch(e){return buildInitialOrden();}}
 function getOrdenHora(dia,hora){return (ordenGuardias[dia]?.[hora]||[]).slice().sort((a,b)=>a.numero-b.numero);}
+function refreshOrdenGuardias(){ordenGuardias=ensureOrden(ordenGuardias);}
 function hashSeed(value){
   let hash=2166136261;
   const text=String(value||'');
@@ -434,7 +464,43 @@ function reassignAllGuardias(){
 function getGuardiaSugerida(dia,hora,turno,rowsSource=data){
   return getBalancedGuardiaOrder(dia,hora,{excludeNames:[getBibliotecaAsignada(dia,hora,rowsSource),getBanosAsignado(dia,hora,rowsSource)],rowsSource})[turno-1]?.nombre||'';
 }
-function getProfesHora(dia,hora){return HORARIO_GUARDIAS[dia]?.[hora]||[];}
+function isPracticasSessionEligible(sesion){
+  if(!sesion||sesion.tipo==='guardia') return false;
+  const texto=[sesion.materia,sesion.grupo,sesion.detalle,sesion.aula].map(cleanText).filter(Boolean).join(' | ');
+  return /(\bCFB\b|\bCFM\b|\bGM\b|\bGS\b|\bFPB\b|INTERMODULAR|FCT|PRACTIC)/i.test(texto);
+}
+function makePracticasGuardiasSlotKey(profesor,dia,hora){return `${profesor}|${dia}|${hora}`;}
+function getTeacherPracticasGuardiasSet(){
+  return new Set(teacherPracticasGuardias);
+}
+function getTeacherPracticasGuardiasTramosSet(){
+  return new Set(teacherPracticasGuardiasTramos.map(row=>makePracticasGuardiasSlotKey(row.profesor,row.dia,row.hora)));
+}
+function isTeacherPracticasGuardiasEnabled(nombre){
+  return getTeacherPracticasGuardiasSet().has(nombre);
+}
+function isTeacherPracticasGuardiasSlotEnabled(nombre,dia,hora){
+  return getTeacherPracticasGuardiasTramosSet().has(makePracticasGuardiasSlotKey(nombre,dia,hora));
+}
+function getPracticasGuardiaTeachersForSlot(dia,hora){
+  const enabled=getTeacherPracticasGuardiasSet();
+  const manuales=teacherPracticasGuardiasTramos
+    .filter(row=>row.dia===dia&&row.hora===hora)
+    .map(row=>row.profesor);
+  if(!enabled.size&&!manuales.length) return [];
+  return [...new Set([
+      ...teacherPracticasGuardias
+        .filter(nombre=>{
+          const sesion=resolveTeacherSession(nombre,dia,hora);
+          return isPracticasSessionEligible(sesion);
+        }),
+      ...manuales
+    ])]
+    .sort((a,b)=>a.localeCompare(b,'es'));
+}
+function getProfesHora(dia,hora){
+  return [...new Set([...(HORARIO_GUARDIAS[dia]?.[hora]||[]),...getPracticasGuardiaTeachersForSlot(dia,hora)])].sort((a,b)=>a.localeCompare(b,'es'));
+}
 function getProfesor(nombre){return PROFESORES_BASE[nombre]||null;}
 function getVisibleTeacherName(nombre){return cleanText(teacherSubstitutions[nombre])||nombre||'';}
 function getTeacherSearchNames(nombre){
@@ -642,6 +708,9 @@ const BACKEND_POLL_INTERVAL_MS=10000;
 (function(){const wd=new Date().getDay();day=(wd>=1&&wd<=5)?wd-1:0;})();
 teacherRecents=loadTeacherRecents();
 teacherSubstitutions=loadTeacherSubstitutions();
+teacherPracticasGuardias=loadTeacherPracticasGuardias();
+teacherPracticasGuardiasTramos=loadTeacherPracticasGuardiasTramos();
+refreshOrdenGuardias();
 teacherFutureAbsences=loadTeacherFutureAbsences();
 teacherName=getProfesorNombreSeleccionado(loadTeacherUser())||'';
 teacherDay=day;
@@ -680,6 +749,12 @@ function serializeSessionOverrides(){
 }
 function serializeTeacherSubstitutions(){
   return Object.entries(teacherSubstitutions).map(([profesor,sustituto])=>({profesor,sustituto}));
+}
+function serializeTeacherPracticasGuardias(){
+  return teacherPracticasGuardias.map(profesor=>({profesor}));
+}
+function serializeTeacherPracticasGuardiasTramos(){
+  return teacherPracticasGuardiasTramos.map(row=>({profesor:row.profesor,dia:row.dia,hora:row.hora}));
 }
 function formatStatusTimestamp(value){
   if(!value) return 'Sin registro';
@@ -758,12 +833,14 @@ async function syncAdminState(){
       storage.replaceGuardias(data),
       storage.replaceBiblioteca(serializeBibliotecaAssignments()),
       storage.replaceHistorial(historialCambios),
-      storage.replaceTeacherSubstitutions(serializeTeacherSubstitutions())
+      storage.replaceTeacherSubstitutions(serializeTeacherSubstitutions()),
+      storage.replaceTeacherPracticasGuardias(serializeTeacherPracticasGuardias()),
+      storage.replaceTeacherPracticasGuardiasTramos(serializeTeacherPracticasGuardiasTramos())
     ]);
     lastBackendSnapshot=makeBackendSnapshot();
     superAdminStatus.lastAdminSyncAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Admin sync','Guardias, biblioteca, historial y sustituciones sincronizados con backend.');
+    pushSuperAdminEvent('Admin sync','Guardias, biblioteca, historial, sustituciones y ajustes de practicas sincronizados con backend.');
   }catch(error){
     console.warn('Backend sync failed',error);
     setSuperAdminError('Fallo en la sincronización de Jefatura.');
@@ -831,6 +908,30 @@ async function hydrateTeacherFutureAbsences(){
   }catch(error){
     console.warn('Teacher future absences hydration failed',error);
     setSuperAdminError('Fallo al hidratar faltas futuras.');
+  }
+}
+async function hydrateTeacherPracticasGuardias(){
+  if(!storage.hasBackend()||!isAdmin) return;
+  try{
+    const [rows,tramos]=await Promise.all([
+      storage.fetchTeacherPracticasGuardias(),
+      storage.fetchTeacherPracticasGuardiasTramos()
+    ]);
+    if(!Array.isArray(rows)||!Array.isArray(tramos)) return;
+    teacherPracticasGuardias=[...new Set(rows.map(row=>cleanText(row?.profesor)).filter(nombre=>getProfesor(nombre)))].sort((a,b)=>a.localeCompare(b,'es'));
+    teacherPracticasGuardiasTramos=[...new Map(tramos.map(normalizePracticasGuardiasSlot).filter(Boolean).map(row=>[makePracticasGuardiasSlotKey(row.profesor,row.dia,row.hora),row])).values()]
+      .sort((a,b)=>a.profesor.localeCompare(b.profesor,'es')||a.dia-b.dia||a.hora-b.hora);
+    persistTeacherPracticasGuardias(teacherPracticasGuardias);
+    persistTeacherPracticasGuardiasTramos(teacherPracticasGuardiasTramos);
+    refreshOrdenGuardias();
+    reassignAllGuardias();
+    persist(data);
+    renderGuardiaBoard();
+    renderTable();
+    renderPracticasGuardiasList();
+    renderPracticasGuardiasConfig();
+  }catch(error){
+    console.warn('Teacher practicas guardias hydration failed',error);
   }
 }
 function sortTeacherFutureAbsences(rows){
@@ -1055,25 +1156,31 @@ async function hydrateFromBackend(){
   if(!isAdmin&&!isSuperAdmin) return;
   backendHydrated=true;
   try{
-    const [guardiasResult,historialResult,tareasResult,overridesResult,substitutionsResult]=await Promise.allSettled([
+    const [guardiasResult,historialResult,tareasResult,overridesResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult]=await Promise.allSettled([
       storage.fetchGuardias(),
       storage.fetchHistorial(),
       storage.fetchTareasProfesorado(),
       storage.fetchSessionOverrides(),
-      storage.fetchTeacherSubstitutions()
+      storage.fetchTeacherSubstitutions(),
+      storage.fetchTeacherPracticasGuardias(),
+      storage.fetchTeacherPracticasGuardiasTramos()
     ]);
     const guardiasRows=guardiasResult.status==='fulfilled'?guardiasResult.value:null;
     const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
     const tareasRows=tareasResult.status==='fulfilled'?tareasResult.value:null;
     const overridesRows=overridesResult.status==='fulfilled'?overridesResult.value:null;
     const substitutionsRows=substitutionsResult.status==='fulfilled'?substitutionsResult.value:null;
+    const practicasGuardiasRows=practicasGuardiasResult.status==='fulfilled'?practicasGuardiasResult.value:null;
+    const practicasGuardiasTramosRows=practicasGuardiasTramosResult.status==='fulfilled'?practicasGuardiasTramosResult.value:null;
 
     const backendHasData=
       (Array.isArray(guardiasRows)&&guardiasRows.length)||
       (Array.isArray(historialRows)&&historialRows.length)||
       (Array.isArray(tareasRows)&&tareasRows.length)||
       (Array.isArray(overridesRows)&&overridesRows.length)||
-      (Array.isArray(substitutionsRows)&&substitutionsRows.length);
+      (Array.isArray(substitutionsRows)&&substitutionsRows.length)||
+      (Array.isArray(practicasGuardiasRows)&&practicasGuardiasRows.length)||
+      (Array.isArray(practicasGuardiasTramosRows)&&practicasGuardiasTramosRows.length);
 
     if(Array.isArray(guardiasRows)&&guardiasRows.length){
       data=normalizeStoredRows(guardiasRows.map(row=>({...row,faena:!!row.faena})));
@@ -1120,6 +1227,16 @@ async function hydrateFromBackend(){
       teacherSubstitutions=Object.fromEntries(substitutionsRows.map(row=>[row.profesor,row.sustituto]).filter(([profesor,sustituto])=>getProfesor(profesor)&&cleanText(sustituto)));
       persistTeacherSubstitutions(teacherSubstitutions);
     }
+    if(Array.isArray(practicasGuardiasRows)){
+      teacherPracticasGuardias=[...new Set(practicasGuardiasRows.map(row=>cleanText(row?.profesor)).filter(nombre=>getProfesor(nombre)))].sort((a,b)=>a.localeCompare(b,'es'));
+      persistTeacherPracticasGuardias(teacherPracticasGuardias);
+    }
+    if(Array.isArray(practicasGuardiasTramosRows)){
+      teacherPracticasGuardiasTramos=[...new Map(practicasGuardiasTramosRows.map(normalizePracticasGuardiasSlot).filter(Boolean).map(row=>[makePracticasGuardiasSlotKey(row.profesor,row.dia,row.hora),row])).values()]
+        .sort((a,b)=>a.profesor.localeCompare(b.profesor,'es')||a.dia-b.dia||a.hora-b.hora);
+      persistTeacherPracticasGuardiasTramos(teacherPracticasGuardiasTramos);
+    }
+    refreshOrdenGuardias();
 
     reassignAllGuardias();
     persist(data);
@@ -1131,6 +1248,8 @@ async function hydrateFromBackend(){
     renderTable();
     renderHistoryList();
     renderSubstitutionList();
+    renderPracticasGuardiasList();
+    renderPracticasGuardiasConfig();
     renderFutureAbsenceAdminList();
 
     if(!backendHasData&&!storage.isBackendOnly()&&(data.length||historialCambios.length)){
@@ -1143,7 +1262,7 @@ async function hydrateFromBackend(){
   }
 }
 function isAnyOverlayOpen(){
-  return ['overlay','teacherOverlay','teacherAccessOverlay','historyOverlay','dialogOverlay']
+  return ['overlay','teacherOverlay','teacherAccessOverlay','historyOverlay','substitutionOverlay','practicasGuardiasOverlay','futureAbsenceAdminOverlay','dialogOverlay']
     .some(id=>document.getElementById(id)?.classList.contains('open'));
 }
 function makeBackendSnapshot(){
@@ -1153,6 +1272,8 @@ function makeBackendSnapshot(){
     tareas:serializeTeacherTasks(),
     overrides:serializeSessionOverrides(),
     substitutions:serializeTeacherSubstitutions(),
+    practicasGuardias:serializeTeacherPracticasGuardias(),
+    practicasGuardiasTramos:serializeTeacherPracticasGuardiasTramos(),
     historial:historialCambios.map(entry=>({
       id:entry.id,
       title:entry.title,
@@ -1173,18 +1294,22 @@ async function pollBackendState(){
   renderSuperAdminMonitor();
   try{
     const previousSnapshot=makeBackendSnapshot();
-    const [guardiasResult,historialResult,tareasResult,overridesResult,substitutionsResult]=await Promise.allSettled([
+    const [guardiasResult,historialResult,tareasResult,overridesResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult]=await Promise.allSettled([
       storage.fetchGuardias(),
       storage.fetchHistorial(),
       storage.fetchTareasProfesorado(),
       storage.fetchSessionOverrides(),
-      storage.fetchTeacherSubstitutions()
+      storage.fetchTeacherSubstitutions(),
+      storage.fetchTeacherPracticasGuardias(),
+      storage.fetchTeacherPracticasGuardiasTramos()
     ]);
     const guardiasRows=guardiasResult.status==='fulfilled'?guardiasResult.value:null;
     const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
     const tareasRows=tareasResult.status==='fulfilled'?tareasResult.value:null;
     const overridesRows=overridesResult.status==='fulfilled'?overridesResult.value:null;
     const substitutionsRows=substitutionsResult.status==='fulfilled'?substitutionsResult.value:null;
+    const practicasGuardiasRows=practicasGuardiasResult.status==='fulfilled'?practicasGuardiasResult.value:null;
+    const practicasGuardiasTramosRows=practicasGuardiasTramosResult.status==='fulfilled'?practicasGuardiasTramosResult.value:null;
 
     if(Array.isArray(guardiasRows)){
       data=normalizeStoredRows(guardiasRows.map(row=>({...row,faena:!!row.faena})));
@@ -1231,6 +1356,16 @@ async function pollBackendState(){
       teacherSubstitutions=Object.fromEntries(substitutionsRows.map(row=>[row.profesor,row.sustituto]).filter(([profesor,sustituto])=>getProfesor(profesor)&&cleanText(sustituto)));
       persistTeacherSubstitutions(teacherSubstitutions);
     }
+    if(Array.isArray(practicasGuardiasRows)){
+      teacherPracticasGuardias=[...new Set(practicasGuardiasRows.map(row=>cleanText(row?.profesor)).filter(nombre=>getProfesor(nombre)))].sort((a,b)=>a.localeCompare(b,'es'));
+      persistTeacherPracticasGuardias(teacherPracticasGuardias);
+    }
+    if(Array.isArray(practicasGuardiasTramosRows)){
+      teacherPracticasGuardiasTramos=[...new Map(practicasGuardiasTramosRows.map(normalizePracticasGuardiasSlot).filter(Boolean).map(row=>[makePracticasGuardiasSlotKey(row.profesor,row.dia,row.hora),row])).values()]
+        .sort((a,b)=>a.profesor.localeCompare(b.profesor,'es')||a.dia-b.dia||a.hora-b.hora);
+      persistTeacherPracticasGuardiasTramos(teacherPracticasGuardiasTramos);
+    }
+    refreshOrdenGuardias();
 
     reassignAllGuardias();
     persist(data);
@@ -1243,6 +1378,8 @@ async function pollBackendState(){
       renderTable();
       renderHistoryList();
       renderSubstitutionList();
+      renderPracticasGuardiasList();
+      renderPracticasGuardiasConfig();
     }else{
       pushSuperAdminEvent('Polling','Comprobación remota sin cambios.');
     }
@@ -1460,6 +1597,7 @@ async function initializeApp(){
   await loadAuthSession();
   if(!await ensureSuperAdminRouteAccess()) return;
   await hydrateTeacherSubstitutions();
+  await hydrateTeacherPracticasGuardias();
   await hydrateTeacherFutureAbsences();
   await hydrateFromBackend();
 }
@@ -1978,6 +2116,33 @@ function getFilteredSubstitutionTeachers(){
     return teacherMatchesQuery(nombre,query);
   });
 }
+function getPracticasGuardiasCandidateTeachers(){
+  return ALL_PROFESORES.filter(nombre=>Object.values(getHorarioProfesorDia(nombre,0)).length||Object.values(getHorarioProfesorDia(nombre,1)).length||Object.values(getHorarioProfesorDia(nombre,2)).length||Object.values(getHorarioProfesorDia(nombre,3)).length||Object.values(getHorarioProfesorDia(nombre,4)).length)
+    .filter(nombre=>DIAS.some((_,dia)=>Object.values(getHorarioProfesorDia(nombre,dia)).some(isPracticasSessionEligible)))
+    .sort((a,b)=>a.localeCompare(b,'es'));
+}
+function getPracticasGuardiasFreedSlots(nombre){
+  let total=0;
+  for(let dia=0;dia<5;dia++){
+    total+=Object.values(getHorarioProfesorDia(nombre,dia)).filter(isPracticasSessionEligible).length;
+  }
+  return total;
+}
+function getPracticasGuardiasManualSlotsCount(nombre){
+  return teacherPracticasGuardiasTramos.filter(row=>row.profesor===nombre).length;
+}
+function getFilteredPracticasGuardiasTeachers(){
+  const query=normalizeTeacherSearch(practicasGuardiasFilter);
+  return getPracticasGuardiasCandidateTeachers().filter(nombre=>{
+    if(!query) return true;
+    return teacherMatchesQuery(nombre,query);
+  });
+}
+function getPracticasGuardiasTeacherManualSlots(nombre){
+  return teacherPracticasGuardiasTramos
+    .filter(row=>row.profesor===nombre)
+    .sort((a,b)=>a.dia-b.dia||a.hora-b.hora);
+}
 function renderSubstitutionList(){
   const list=document.getElementById('substitutionList');
   if(!list) return;
@@ -2001,6 +2166,36 @@ function renderSubstitutionList(){
     </article>`;
   }).join('');
 }
+function renderPracticasGuardiasList(){
+  const list=document.getElementById('practicasGuardiasList');
+  const summary=document.getElementById('practicasGuardiasSummary');
+  if(!list) return;
+  const teachers=getFilteredPracticasGuardiasTeachers();
+  const enabledSet=getTeacherPracticasGuardiasSet();
+  if(summary){
+    const candidates=getPracticasGuardiasCandidateTeachers().length;
+    summary.innerHTML=`<span class="future-absence-chip"><strong>${enabledSet.size}</strong> habilitados</span><span class="future-absence-chip"><strong>${candidates}</strong> candidatos</span>`;
+  }
+  if(!teachers.length){
+    list.innerHTML='<div class="history-empty">No hay profesorado de ciclos que coincida con la búsqueda.</div>';
+    return;
+  }
+  list.innerHTML=teachers.map(nombre=>{
+    const enabled=enabledSet.has(nombre);
+    const slots=getPracticasGuardiasFreedSlots(nombre);
+    const manualSlots=getPracticasGuardiasManualSlotsCount(nombre);
+    return `<article class="substitution-item">
+      <div>
+        <div class="substitution-item-title">${escapeHtml(getVisibleTeacherName(nombre))}</div>
+        <div class="substitution-item-meta">${escapeHtml(`${enabled?'Disponible para entrar en la rotacion':'Fuera de la rotacion'} · ${slots} horas potenciales por practicas · ${manualSlots} tramos manuales`)}</div>
+      </div>
+      <div class="substitution-item-actions">
+        <button class="btn-substitution${enabled?' btn-substitution-danger':''}" type="button" data-practicas-guardias-toggle="${escapeHtml(nombre)}">${enabled?'Quitar de guardias':'Habilitar guardias'}</button>
+        <button class="btn-substitution" type="button" data-practicas-guardias-config="${escapeHtml(nombre)}">Configurar horas</button>
+      </div>
+    </article>`;
+  }).join('');
+}
 function openSubstitutionModal(){
   if(!isAdmin) return;
   substitutionFilter='';
@@ -2013,6 +2208,74 @@ function closeSubstitutionModal(){
   document.getElementById('substitutionOverlay')?.classList.remove('open');
 }
 function bgSubstitutionClose(e){if(e.target.id==='substitutionOverlay') closeSubstitutionModal();}
+function openPracticasGuardiasModal(){
+  if(!isAdmin) return;
+  practicasGuardiasFilter='';
+  const input=document.getElementById('practicasGuardiasSearch');
+  if(input) input.value='';
+  practicasGuardiasConfigTeacher='';
+  renderPracticasGuardiasList();
+  renderPracticasGuardiasConfig();
+  document.getElementById('practicasGuardiasOverlay')?.classList.add('open');
+}
+function closePracticasGuardiasModal(){
+  document.getElementById('practicasGuardiasOverlay')?.classList.remove('open');
+}
+function bgPracticasGuardiasClose(e){if(e.target.id==='practicasGuardiasOverlay') closePracticasGuardiasModal();}
+function openPracticasGuardiasTeacherConfig(nombre){
+  if(!isAdmin||!getProfesor(nombre)) return;
+  practicasGuardiasConfigTeacher=nombre;
+  renderPracticasGuardiasConfig();
+}
+function closePracticasGuardiasTeacherConfig(){
+  practicasGuardiasConfigTeacher='';
+  renderPracticasGuardiasConfig();
+}
+function renderPracticasGuardiasConfig(){
+  const panel=document.getElementById('practicasGuardiasConfig');
+  if(!panel) return;
+  const nombre=practicasGuardiasConfigTeacher;
+  if(!nombre||!getProfesor(nombre)){
+    panel.innerHTML='<div class="history-empty">Selecciona un profesor y pulsa en "Configurar horas" para habilitar tramos concretos.</div>';
+    return;
+  }
+  const manualSet=getTeacherPracticasGuardiasTramosSet();
+  const rows=[];
+  for(let dia=0;dia<5;dia++){
+    const chips=[];
+    for(let hora=1;hora<=9;hora++){
+      if(HORAS_PATIO.has(hora)) continue;
+      const sesion=resolveTeacherSession(nombre,dia,hora);
+      const eligible=isPracticasSessionEligible(sesion);
+      const manual=manualSet.has(makePracticasGuardiasSlotKey(nombre,dia,hora));
+      const classes=['practicas-slot-chip',manual?'is-manual':'',eligible?'is-eligible':''].filter(Boolean).join(' ');
+      const stateLabel=manual?'Manual':(eligible?'Practicas':'No activo');
+      chips.push(`<button class="${classes}" type="button" data-practicas-slot-toggle="${escapeHtml(nombre)}|${dia}|${hora}" title="${escapeHtml(`${DIAS[dia]} · ${formatHoraLabel(hora)} · ${stateLabel}`)}">${escapeHtml(HORA_MAP[hora].label)}<span>${escapeHtml(stateLabel)}</span></button>`);
+    }
+    rows.push(`<div class="practicas-config-row"><div class="practicas-config-day">${escapeHtml(DIAS[dia])}</div><div class="practicas-config-slots">${chips.join('')}</div></div>`);
+  }
+  const manualSlots=getPracticasGuardiasTeacherManualSlots(nombre);
+  const manualList=manualSlots.length
+    ?manualSlots.map(row=>`${DIAS[row.dia]} ${formatHoraLabel(row.hora)}`).join(' · ')
+    :'Sin tramos manuales.';
+  panel.innerHTML=`<article class="practicas-config-card">
+    <div class="practicas-config-head">
+      <div>
+        <div class="substitution-item-title">${escapeHtml(getVisibleTeacherName(nombre))}</div>
+        <div class="substitution-item-meta">Activa aqui tramos manuales aunque no entren por practicas de forma general.</div>
+      </div>
+      <div class="substitution-item-actions">
+        <button class="btn-substitution" type="button" onclick="closePracticasGuardiasTeacherConfig()">Cerrar detalle</button>
+      </div>
+    </div>
+    <div class="practicas-config-legend">
+      <span class="future-absence-chip"><strong>Practicas</strong> hora elegible por horario</span>
+      <span class="future-absence-chip"><strong>Manual</strong> hora forzada por Jefatura</span>
+    </div>
+    <div class="practicas-config-grid">${rows.join('')}</div>
+    <div class="substitution-item-meta">Tramos manuales activos: ${escapeHtml(manualList)}</div>
+  </article>`;
+}
 function formatFutureAbsenceDateLabel(value){
   if(!value) return 'Sin fecha';
   const date=new Date(`${value}T00:00:00`);
@@ -2246,6 +2509,44 @@ async function clearTeacherSubstitution(nombre){
   renderTable();
   if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
   showToast('Titular restaurado.','success');
+  syncAdminState();
+}
+async function toggleTeacherPracticasGuardias(nombre){
+  if(!isAdmin||!getProfesor(nombre)) return;
+  const enabled=isTeacherPracticasGuardiasEnabled(nombre);
+  teacherPracticasGuardias=enabled
+    ?teacherPracticasGuardias.filter(item=>item!==nombre)
+    :[...teacherPracticasGuardias,nombre];
+  teacherPracticasGuardias=[...new Set(teacherPracticasGuardias)].sort((a,b)=>a.localeCompare(b,'es'));
+  persistTeacherPracticasGuardias(teacherPracticasGuardias);
+  refreshOrdenGuardias();
+  reassignAllGuardias();
+  persist(data);
+  renderPracticasGuardiasList();
+  renderPracticasGuardiasConfig();
+  renderGuardiaBoard();
+  renderTable();
+  showToast(enabled?'Profesor retirado de la rotaci\u00f3n por pr\u00e1cticas.':'Profesor habilitado para entrar en guardias por pr\u00e1cticas.','success');
+  syncAdminState();
+}
+async function toggleTeacherPracticasGuardiasSlot(nombre,dia,hora){
+  if(!isAdmin||!getProfesor(nombre)||HORAS_PATIO.has(hora)) return;
+  const key=makePracticasGuardiasSlotKey(nombre,dia,hora);
+  const current=getTeacherPracticasGuardiasTramosSet();
+  if(current.has(key)){
+    teacherPracticasGuardiasTramos=teacherPracticasGuardiasTramos.filter(row=>makePracticasGuardiasSlotKey(row.profesor,row.dia,row.hora)!==key);
+  }else{
+    teacherPracticasGuardiasTramos=[...teacherPracticasGuardiasTramos,{profesor:nombre,dia,hora}];
+  }
+  persistTeacherPracticasGuardiasTramos(teacherPracticasGuardiasTramos);
+  refreshOrdenGuardias();
+  reassignAllGuardias();
+  persist(data);
+  renderPracticasGuardiasList();
+  renderPracticasGuardiasConfig();
+  renderGuardiaBoard();
+  renderTable();
+  showToast(current.has(key)?'Tramo manual retirado de guardias.':'Tramo manual habilitado para guardias.','success');
   syncAdminState();
 }
 async function clearHistory(){
@@ -3107,6 +3408,13 @@ if(substitutionSearch){
     renderSubstitutionList();
   });
 }
+const practicasGuardiasSearch=document.getElementById('practicasGuardiasSearch');
+if(practicasGuardiasSearch){
+  practicasGuardiasSearch.addEventListener('input',event=>{
+    practicasGuardiasFilter=event.target.value||'';
+    renderPracticasGuardiasList();
+  });
+}
 const substitutionList=document.getElementById('substitutionList');
 if(substitutionList){
   substitutionList.addEventListener('click',event=>{
@@ -3120,6 +3428,29 @@ if(substitutionList){
     if(button.dataset.substitutionAction==='clear'){
       clearTeacherSubstitution(teacherName);
     }
+  });
+}
+const practicasGuardiasList=document.getElementById('practicasGuardiasList');
+if(practicasGuardiasList){
+  practicasGuardiasList.addEventListener('click',event=>{
+    const button=event.target.closest('[data-practicas-guardias-toggle]');
+    if(button){
+      toggleTeacherPracticasGuardias(button.dataset.practicasGuardiasToggle||'');
+      return;
+    }
+    const configButton=event.target.closest('[data-practicas-guardias-config]');
+    if(configButton){
+      openPracticasGuardiasTeacherConfig(configButton.dataset.practicasGuardiasConfig||'');
+    }
+  });
+}
+const practicasGuardiasConfig=document.getElementById('practicasGuardiasConfig');
+if(practicasGuardiasConfig){
+  practicasGuardiasConfig.addEventListener('click',event=>{
+    const button=event.target.closest('[data-practicas-slot-toggle]');
+    if(!button) return;
+    const [profesor,dia,hora]=(button.dataset.practicasSlotToggle||'').split('|');
+    toggleTeacherPracticasGuardiasSlot(profesor||'',Number(dia),Number(hora));
   });
 }
 const futureAbsenceAdminList=document.getElementById('futureAbsenceAdminList');
@@ -3203,6 +3534,8 @@ safeInitStep(renderPills,'renderPills');
 safeInitStep(renderGuardiaBoard,'renderGuardiaBoard');
 safeInitStep(renderTable,'renderTable');
 safeInitStep(renderSubstitutionList,'renderSubstitutionList');
+safeInitStep(renderPracticasGuardiasList,'renderPracticasGuardiasList');
+safeInitStep(renderPracticasGuardiasConfig,'renderPracticasGuardiasConfig');
 safeInitStep(renderFutureAbsenceAdminList,'renderFutureAbsenceAdminList');
 safeInitStep(renderTeacherFutureAbsenceOwnList,'renderTeacherFutureAbsenceOwnList');
 safeInitStep(syncTeacherIdentity,'syncTeacherIdentity');
@@ -3212,6 +3545,7 @@ window.setInterval(()=>{hydrateTeacherFutureAbsences();pollBackendState();},BACK
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){
     hydrateTeacherSubstitutions();
+    hydrateTeacherPracticasGuardias();
     hydrateTeacherFutureAbsences();
     pollBackendState();
   }

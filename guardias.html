@@ -59,6 +59,7 @@
     </div>
     <div class="admin-actions admin-actions-secondary">
       <button class="btn-add btn-add-secondary" type="button" onclick="openSubstitutionModal()">Sustituciones</button>
+      <button class="btn-add btn-add-secondary" type="button" onclick="openPracticasGuardiasModal()">Pr&aacute;cticas y guardias</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="openFutureAbsenceAdminModal()">Faltas futuras</button>
       <button class="btn-add btn-add-secondary" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe diario</button>
       <button class="btn-add btn-add-secondary" id="btnInformeSemanal" onclick="printWeeklyReportPdf()" style="display:none">Informe semanal</button>
@@ -293,6 +294,24 @@
       <input type="text" id="substitutionSearch" placeholder="Filtra por titular o sustituto">
     </div>
     <div class="substitution-list" id="substitutionList"></div>
+  </div>
+</div>
+<div class="overlay" id="practicasGuardiasOverlay" onclick="bgPracticasGuardiasClose(event)">
+  <div class="modal substitution-modal">
+    <div class="modal-hd">
+      <span>Pr&aacute;cticas y guardias</span>
+      <button class="modal-x" type="button" onclick="closePracticasGuardiasModal()">x</button>
+    </div>
+    <div class="history-copy">Habilita al profesorado de ciclos que, mientras su alumnado est&aacute; de pr&aacute;cticas, puede entrar en la rotaci&oacute;n de guardias en esas horas.</div>
+    <div class="future-absence-toolbar">
+      <div class="future-absence-summary" id="practicasGuardiasSummary"></div>
+      <div class="fg">
+        <label>Buscar profesorado de ciclos</label>
+        <input type="text" id="practicasGuardiasSearch" placeholder="Filtra por nombre">
+      </div>
+    </div>
+    <div class="substitution-list" id="practicasGuardiasList"></div>
+    <div class="substitution-list" id="practicasGuardiasConfig"></div>
   </div>
 </div>
 <div class="overlay" id="teacherFutureAbsenceOverlay" onclick="bgTeacherFutureAbsenceClose(event)">

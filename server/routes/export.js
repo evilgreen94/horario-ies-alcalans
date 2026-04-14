@@ -13,6 +13,9 @@ const {
   normalizeString,
   sanitizeBiblioteca,
   sanitizeSessionOverride,
+  sanitizeTeacherPracticeGuardia,
+  sanitizeTeacherPracticeGuardiaSlot,
+  sanitizeTeacherSubstitution,
   sanitizeTareaProfesorado
 } = require('./validation');
 
@@ -37,6 +40,13 @@ function ensureBackupSection(payload, key, label) {
     badRequest(`El backup no incluye la seccion obligatoria "${key}".`);
   }
   return ensureArray(payload[key], label);
+}
+
+function ensureOptionalBackupSection(payload, key, label, sanitizer) {
+  if (!Object.prototype.hasOwnProperty.call(payload, key)) {
+    return [];
+  }
+  return ensureArray(payload[key], label).map(sanitizer);
 }
 
 function sanitizeRestoreAusencia(row) {
@@ -82,7 +92,10 @@ function sanitizeBackupPayload(payload) {
     biblioteca: ensureBackupSection(input, 'biblioteca', 'biblioteca').map(sanitizeBiblioteca),
     historial: ensureBackupSection(input, 'historial', 'historial').map(sanitizeRestoreHistorial),
     tareasProfesorado: ensureBackupSection(input, 'tareasProfesorado', 'tareasProfesorado').map(sanitizeTareaProfesorado),
-    sessionOverrides: ensureBackupSection(input, 'sessionOverrides', 'sessionOverrides').map(sanitizeSessionOverride)
+    sessionOverrides: ensureBackupSection(input, 'sessionOverrides', 'sessionOverrides').map(sanitizeSessionOverride),
+    teacherSubstitutions: ensureOptionalBackupSection(input, 'teacherSubstitutions', 'teacherSubstitutions', sanitizeTeacherSubstitution),
+    teacherPracticasGuardias: ensureOptionalBackupSection(input, 'teacherPracticasGuardias', 'teacherPracticasGuardias', sanitizeTeacherPracticeGuardia),
+    teacherPracticasGuardiasTramos: ensureOptionalBackupSection(input, 'teacherPracticasGuardiasTramos', 'teacherPracticasGuardiasTramos', sanitizeTeacherPracticeGuardiaSlot)
   };
 }
 
@@ -101,12 +114,15 @@ function formatStamp() {
 router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) => {
   try {
     const db = await getDatabase();
-    const [guardias, biblioteca, historial, tareasProfesorado, sessionOverrides] = await Promise.all([
+    const [guardias, biblioteca, historial, tareasProfesorado, sessionOverrides, substitutionsState, practicasGuardiasState, practicasGuardiasTramosState] = await Promise.all([
       db.all('SELECT * FROM ausencias ORDER BY dia, hora, id'),
       db.all('SELECT dia, hora, profesor FROM biblioteca_guardias ORDER BY dia, hora'),
       db.all('SELECT * FROM historial ORDER BY ts DESC'),
       db.all('SELECT * FROM tareas_profesorado ORDER BY profesor, dia, hora'),
-      db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora')
+      db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora'),
+      db.get('SELECT value FROM app_state WHERE key = ?', ['teacher_substitutions']),
+      db.get('SELECT value FROM app_state WHERE key = ?', ['teacher_practicas_guardias']),
+      db.get('SELECT value FROM app_state WHERE key = ?', ['teacher_practicas_guardias_tramos'])
     ]);
 
     const payload = {
@@ -130,7 +146,10 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
         dejada: !!row.dejada,
         tarea: row.tarea || ''
       })),
-      sessionOverrides
+      sessionOverrides,
+      teacherSubstitutions: substitutionsState?.value ? JSON.parse(substitutionsState.value) : [],
+      teacherPracticasGuardias: practicasGuardiasState?.value ? JSON.parse(practicasGuardiasState.value) : [],
+      teacherPracticasGuardiasTramos: practicasGuardiasTramosState?.value ? JSON.parse(practicasGuardiasTramosState.value) : []
     };
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -163,7 +182,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
     restoreStarted = true;
 
     const payload = sanitizeBackupPayload(req.body);
-    const { guardias, biblioteca, historial, tareasProfesorado, sessionOverrides } = payload;
+    const { guardias, biblioteca, historial, tareasProfesorado, sessionOverrides, teacherSubstitutions, teacherPracticasGuardias, teacherPracticasGuardiasTramos } = payload;
 
     const db = await getDatabase();
     await db.exec('BEGIN TRANSACTION');
@@ -173,6 +192,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       await db.exec('DELETE FROM historial');
       await db.exec('DELETE FROM tareas_profesorado');
       await db.exec('DELETE FROM session_overrides');
+      await db.run('DELETE FROM app_state WHERE key IN (?, ?, ?)', ['teacher_substitutions', 'teacher_practicas_guardias', 'teacher_practicas_guardias_tramos']);
 
       for (const row of guardias) {
         await db.run(
@@ -233,6 +253,30 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         );
       }
 
+      if (teacherSubstitutions.length) {
+        await db.run(
+          `INSERT INTO app_state (key, value, updated_at)
+           VALUES (?, ?, CURRENT_TIMESTAMP)`,
+          ['teacher_substitutions', JSON.stringify(teacherSubstitutions)]
+        );
+      }
+
+      if (teacherPracticasGuardias.length) {
+        await db.run(
+          `INSERT INTO app_state (key, value, updated_at)
+           VALUES (?, ?, CURRENT_TIMESTAMP)`,
+          ['teacher_practicas_guardias', JSON.stringify(teacherPracticasGuardias)]
+        );
+      }
+
+      if (teacherPracticasGuardiasTramos.length) {
+        await db.run(
+          `INSERT INTO app_state (key, value, updated_at)
+           VALUES (?, ?, CURRENT_TIMESTAMP)`,
+          ['teacher_practicas_guardias_tramos', JSON.stringify(teacherPracticasGuardiasTramos)]
+        );
+      }
+
       await db.exec('COMMIT');
     } catch (error) {
       await db.exec('ROLLBACK');
@@ -247,7 +291,10 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         biblioteca: biblioteca.length,
         historial: historial.length,
         tareasProfesorado: tareasProfesorado.length,
-        sessionOverrides: sessionOverrides.length
+        sessionOverrides: sessionOverrides.length,
+        teacherSubstitutions: teacherSubstitutions.length,
+        teacherPracticasGuardias: teacherPracticasGuardias.length,
+        teacherPracticasGuardiasTramos: teacherPracticasGuardiasTramos.length
       }
     });
   } catch (error) {
