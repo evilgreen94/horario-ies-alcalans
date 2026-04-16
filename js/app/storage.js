@@ -155,6 +155,24 @@
         body: JSON.stringify(rows)
       });
     },
+    fetchTeacherPracticasGuardias(){
+      return request('/profesorado/practicas-guardias');
+    },
+    replaceTeacherPracticasGuardias(rows){
+      return request('/profesorado/practicas-guardias/replace', {
+        method: 'PUT',
+        body: JSON.stringify(rows)
+      });
+    },
+    fetchTeacherPracticasGuardiasTramos(){
+      return request('/profesorado/practicas-guardias-tramos');
+    },
+    replaceTeacherPracticasGuardiasTramos(rows){
+      return request('/profesorado/practicas-guardias-tramos/replace', {
+        method: 'PUT',
+        body: JSON.stringify(rows)
+      });
+    },
     fetchTeacherFutureAbsences(){
       return request('/profesorado/future-absences');
     },
