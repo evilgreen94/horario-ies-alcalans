@@ -66,6 +66,35 @@
       <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('admin')">Cambiar contrase&ntilde;a</button>
       <button class="btn-add btn-add-ghost" type="button" onclick="toggleAdmin()">Salir de Jefatura</button>
     </div>
+    <div class="admin-workspace">
+      <section class="admin-panel">
+        <div class="admin-section-head">
+          <div>
+            <div class="admin-section-title">Atenci&oacute;n del d&iacute;a</div>
+            <div class="admin-section-copy">Lo que conviene revisar primero en la jornada activa.</div>
+          </div>
+        </div>
+        <div class="admin-overview-grid" id="adminOverviewGrid"></div>
+      </section>
+      <section class="admin-panel">
+        <div class="admin-section-head">
+          <div>
+            <div class="admin-section-title">Filtro r&aacute;pido</div>
+            <div class="admin-section-copy">Deja la tabla en modo trabajo y centra solo las incidencias que importan ahora.</div>
+          </div>
+        </div>
+        <div class="admin-filter-chips" id="adminFilterChips"></div>
+      </section>
+      <section class="admin-panel">
+        <div class="admin-section-head">
+          <div>
+            <div class="admin-section-title">Actividad reciente</div>
+            <div class="admin-section-copy">Resumen corto de los &uacute;ltimos cambios hechos desde jefatura.</div>
+          </div>
+        </div>
+        <div class="admin-activity-list" id="adminActivityList"></div>
+      </section>
+    </div>
   </div>
   <div class="admin-bar superadmin-bar" id="superAdminBar">
     <div class="admin-bar-head">

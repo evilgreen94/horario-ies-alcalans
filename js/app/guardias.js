@@ -155,6 +155,7 @@ let futureAbsenceAdminStatusFilter='all';
 let futureAbsenceAdminTeacherFilter='';
 let weekOffset=0;
 let teacherWeekOffset=0;
+let adminTableFilter='all';
 const demo=[];
 const APP_URL_PARAMS=new URLSearchParams(window.location.search||'');
 const SUPERADMIN_ENABLED=APP_URL_PARAMS.get('panel')==='superadmin';
@@ -820,6 +821,83 @@ function formatStatusTimestamp(value){
   const date=new Date(value);
   if(Number.isNaN(date.getTime())) return 'Sin registro';
   return date.toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function getAdminFilteredRows(rows){
+  switch(adminTableFilter){
+    case 'uncovered':
+      return rows.filter(row=>!((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,getRowsForWeekOffset(weekOffset))));
+    case 'pending':
+      return rows.filter(row=>row.futurePlanned&&row.futureStatus==='pending');
+    case 'notask':
+      return rows.filter(row=>!row.futurePlanned&&!resolveFaena(row).faena);
+    case 'attention':
+      return rows.filter(row=>
+        (row.futurePlanned&&row.futureStatus==='pending')||
+        !((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,getRowsForWeekOffset(weekOffset)))||
+        (!row.futurePlanned&&!resolveFaena(row).faena)
+      );
+    default:
+      return rows;
+  }
+}
+function getAdminDayInsight(rows){
+  const rowsSource=getRowsForWeekOffset(weekOffset);
+  const uncovered=rows.filter(row=>!((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,rowsSource)));
+  const withoutTask=rows.filter(row=>!row.futurePlanned&&!resolveFaena(row).faena);
+  const pendingFuture=rows.filter(row=>row.futurePlanned&&row.futureStatus==='pending');
+  const covered=rows.filter(row=>(row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,rowsSource));
+  return {uncovered,withoutTask,pendingFuture,covered};
+}
+function setAdminTableFilter(filter){
+  adminTableFilter=filter||'all';
+  renderAdminWorkspace();
+  renderTable();
+}
+function renderAdminWorkspace(){
+  const overviewGrid=document.getElementById('adminOverviewGrid');
+  const filterChips=document.getElementById('adminFilterChips');
+  const activityList=document.getElementById('adminActivityList');
+  if(!overviewGrid||!filterChips||!activityList) return;
+  const rows=getSelectedRowsForDay(day);
+  const insight=getAdminDayInsight(rows);
+  overviewGrid.innerHTML=[
+    {
+      label:'Sin cubrir',
+      value:insight.uncovered.length,
+      note:insight.uncovered.length?'Conviene confirmar guardia en estas ausencias.':'Todas las ausencias tienen cobertura prevista.',
+      className:insight.uncovered.length?'admin-overview-card admin-overview-card-danger':'admin-overview-card'
+    },
+    {
+      label:'Sin tarea',
+      value:insight.withoutTask.length,
+      note:insight.withoutTask.length?'Hay grupos sin instrucciones registradas.':'Toda la faena del día está registrada.',
+      className:insight.withoutTask.length?'admin-overview-card admin-overview-card-warn':'admin-overview-card'
+    },
+    {
+      label:'Futuras pendientes',
+      value:insight.pendingFuture.length,
+      note:insight.pendingFuture.length?'Faltas futuras pendientes de validar en esta vista.':'No hay faltas futuras pendientes en este día.',
+      className:insight.pendingFuture.length?'admin-overview-card admin-overview-card-warn':'admin-overview-card'
+    },
+    {
+      label:'Coberturas listas',
+      value:insight.covered.length,
+      note:`${rows.length} ausencias en total para ${DIAS[day]}.`,
+      className:'admin-overview-card'
+    }
+  ].map(card=>`<article class="${card.className}"><div class="admin-overview-label">${card.label}</div><div class="admin-overview-value">${card.value}</div><div class="admin-overview-note">${card.note}</div></article>`).join('');
+  const filterOptions=[
+    {id:'all',label:'Todas',count:rows.length},
+    {id:'attention',label:'Requieren atención',count:insight.uncovered.length+insight.withoutTask.length+insight.pendingFuture.length},
+    {id:'uncovered',label:'Sin cubrir',count:insight.uncovered.length},
+    {id:'notask',label:'Sin tarea',count:insight.withoutTask.length},
+    {id:'pending',label:'Pendientes',count:insight.pendingFuture.length}
+  ];
+  filterChips.innerHTML=filterOptions.map(item=>`<button class="admin-filter-chip${adminTableFilter===item.id?' active':''}" type="button" onclick="setAdminTableFilter('${item.id}')">${item.label}<span class="admin-filter-chip-count">${item.count}</span></button>`).join('');
+  const recentEntries=historialCambios.slice(0,3);
+  activityList.innerHTML=recentEntries.length
+    ?recentEntries.map(entry=>`<article class="admin-activity-item"><div class="admin-activity-title">${escapeHtml(entry.title||'Cambio')}</div><div class="admin-activity-meta">${escapeHtml(formatHistoryTimestamp(entry.ts))} · ${escapeHtml(entry.detail||'Sin detalle adicional.')}</div></article>`).join('')
+    :'<div class="admin-activity-empty">Todavía no hay cambios recientes en la jornada actual.</div>';
 }
 function formatBytes(value){
   const bytes=Number(value)||0;
@@ -1713,6 +1791,7 @@ function refreshAccessUi(){
   if(adminBar) adminBar.classList.toggle('show',isAdmin);
   if(superAdminBar) superAdminBar.classList.toggle('show',isSuperAdmin);
   updateAdminControls();
+  renderAdminWorkspace();
   renderSuperAdminMonitor();
   if(isSuperAdmin){
     refreshSuperAdminOps(false);
@@ -2331,6 +2410,7 @@ function renderHistoryList(){
       ? 'Todavía no hay cambios registrados.'
       : 'No hay cambios de este tipo en el historial.';
     historyList.innerHTML=`<div class="history-empty">${texto}</div>`;
+    renderAdminWorkspace();
     return;
   }
   historyList.innerHTML=visibles.map(entry=>`<article class="history-item">
@@ -2340,6 +2420,7 @@ function renderHistoryList(){
     </div>
     <div class="history-item-body">${escapeHtml(entry.detail||'')}</div>
   </article>`).join('');
+  renderAdminWorkspace();
 }
 function setHistoryFilter(filter){
   historyFilter=filter||'all';
@@ -2934,11 +3015,17 @@ async function undoLastHistoryChange(){
 }
 function renderTable(){
   const rows=getSelectedRowsForDay(day);
+  const filteredRows=getAdminFilteredRows(rows);
   const editableWeek=isCurrentWeekOffset(weekOffset);
   const tb=document.getElementById('tbody');
-  if(!rows.length){tb.innerHTML=`<tr class="empty-row"><td colspan="7">No hay ausencias registradas para ${editableWeek?'este dÃ­a':'esta vista futura'}.</td></tr>`;}
+  if(!filteredRows.length){
+    const emptyMessage=rows.length
+      ? 'No hay ausencias que coincidan con el filtro actual.'
+      : `No hay ausencias registradas para ${editableWeek?'este día':'esta vista futura'}.`;
+    tb.innerHTML=`<tr class="empty-row"><td colspan="7">${emptyMessage}</td></tr>`;
+  }
   else{
-    tb.innerHTML=rows.map(g=>{
+    tb.innerHTML=filteredRows.map(g=>{
       const h=HORA_MAP[g.hora]||{label:g.hora+'a',rango:''};
       const cub=g.guardia&&g.guardia.trim();
       const sugerido=cub||getGuardiaSugerida(day,g.hora,1,getRowsForWeekOffset(weekOffset));
@@ -2955,7 +3042,11 @@ function renderTable(){
         ?(g.futureStatus==='approved'?'Validada':g.futureStatus==='applied'?'Aplicada':g.futureStatus==='pending'?'Pendiente':'Planificada')
         :(sugerido?(cub?'Cubierta':'Pendiente de confirmar'):'Sin cubrir');
       const planningMeta=g.futurePlanned?`<span class="badge future-plan-badge ${g.futureStatus==='pending'?'future-plan-badge-pending':'future-plan-badge-approved'}">${g.futureStatus==='pending'?'Falta futura pendiente':'Falta futura validada'}</span>`:'';
-      return `<tr class="${g.futurePlanned?'future-planned-row':''}">
+      const rowClasses=[
+        g.futurePlanned?'future-planned-row':'',
+        !sugerido?'admin-row-urgent':(!faenaInfo.faena||g.futureStatus==='pending')?'admin-row-warning':''
+      ].filter(Boolean).join(' ');
+      return `<tr class="${rowClasses}">
         <td>
           <div class="cell-stack cell-stack-hour">
             <div class="hora-num">${HORA_MAP[g.hora].label} hora</div>
@@ -3007,6 +3098,7 @@ function renderTable(){
   document.getElementById('sAsig').textContent=asig;
   document.getElementById('sSin').textContent=Math.max(aus-asig,0);
   document.getElementById('sFaena').textContent=rows.filter(g=>!g.futurePlanned&&resolveFaena(g).faena).length;
+  renderAdminWorkspace();
 }
 async function toggleAdmin(){
   if(!isAdmin){

@@ -409,6 +409,147 @@ main { width: min(1380px, calc(100vw - 32px)); margin: 0 auto; padding: 1.75rem 
 .admin-actions-secondary {
   grid-column: 2;
 }
+.admin-workspace {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(220px, .9fr) minmax(240px, 1fr);
+  gap: 1rem;
+}
+.admin-panel {
+  display: grid;
+  gap: .8rem;
+  padding: .95rem;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.82);
+  border: 1px solid rgba(217,161,29,0.14);
+}
+.admin-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .8rem;
+}
+.admin-section-title {
+  font-family: var(--font-h);
+  font-size: .96rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.admin-section-copy {
+  margin-top: .18rem;
+  font-size: .77rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.admin-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+}
+.admin-overview-card {
+  display: grid;
+  gap: .28rem;
+  padding: .85rem .9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(217,161,29,0.12);
+  background: rgba(255,255,255,0.9);
+}
+.admin-overview-card-warn {
+  background: linear-gradient(180deg, #fffaf0, #fff3cf);
+  border-color: rgba(217,161,29,0.24);
+}
+.admin-overview-card-danger {
+  background: linear-gradient(180deg, #fff7f7, #fff0f0);
+  border-color: rgba(217,83,79,0.2);
+}
+.admin-overview-label {
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted2);
+}
+.admin-overview-value {
+  font-family: var(--font-h);
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text);
+}
+.admin-overview-note {
+  font-size: .77rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.admin-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+.admin-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .5rem .75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(217,161,29,0.2);
+  background: rgba(255,255,255,0.86);
+  color: #8c6707;
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.admin-filter-chip.active {
+  background: #d9a11d;
+  border-color: #d9a11d;
+  color: #000;
+}
+.admin-filter-chip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: .1rem .32rem;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.08);
+  color: inherit;
+  font-size: .7rem;
+}
+.admin-activity-list {
+  display: grid;
+  gap: .55rem;
+}
+.admin-activity-item {
+  padding: .7rem .8rem;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(217,161,29,0.12);
+}
+.admin-activity-title {
+  font-size: .8rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.admin-activity-meta {
+  margin-top: .16rem;
+  font-size: .74rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.admin-activity-empty {
+  padding: .85rem;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: rgba(255,255,255,0.86);
+  color: var(--muted);
+  font-size: .79rem;
+}
+.admin-row-urgent td:first-child {
+  box-shadow: inset 4px 0 0 #d9534f;
+}
+.admin-row-warning td:first-child {
+  box-shadow: inset 4px 0 0 #d9a11d;
+}
 .admin-actions-primary .admin-status {
   flex: 1 1 280px;
   min-height: 42px;
@@ -1750,6 +1891,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .admin-bar, .teacher-bar { align-items: flex-start; }
   .admin-bar { grid-template-columns: 1fr; }
   .admin-actions-secondary { grid-column: auto; }
+  .admin-workspace { grid-column: auto; grid-template-columns: 1fr; }
   .superadmin-layout { grid-column: auto; grid-template-columns: 1fr; }
   .save-ts, .teacher-name { margin-left: 0; width: 100%; }
 }
@@ -1760,6 +1902,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .modal { width: min(95vw, 680px); padding: 1.1rem; }
   .teacher-modal { width: min(95vw, 760px); }
   .teacher-head { grid-template-columns: 1fr; }
+  .admin-overview-grid { grid-template-columns: 1fr 1fr; }
   .teacher-overview { grid-template-columns: 1fr; }
   .teacher-head-side,
   .teacher-summary-card,
@@ -1840,6 +1983,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
     z-index: 35;
     box-shadow: 0 12px 26px rgba(31,41,55,0.10);
   }
+  .admin-overview-grid { grid-template-columns: 1fr; }
   .superadmin-layout { gap: .8rem; }
   .admin-tag, .teacher-tag, .save-ts, .teacher-name { width: 100%; }
   .admin-bar-head { width: 100%; }
