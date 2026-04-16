@@ -62,10 +62,10 @@ function formatWeekRangeLabel(weekKey,offset){
   const friday=new Date(monday);
   friday.setDate(monday.getDate()+4);
   const range=`${monday.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})} - ${friday.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})}`;
-  if(offset===0) return `Semana actual Â· ${range}`;
-  if(offset===1) return `Semana siguiente Â· ${range}`;
-  if(offset===-1) return `Semana anterior Â· ${range}`;
-  return `${offset>0?`+${offset}`:offset} semanas Â· ${range}`;
+  if(offset===0) return `Semana actual · ${range}`;
+  if(offset===1) return `Semana siguiente · ${range}`;
+  if(offset===-1) return `Semana anterior · ${range}`;
+  return `${offset>0?`+${offset}`:offset} semanas · ${range}`;
 }
 function stripDiacritics(value){return cleanText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 const DIA_INDEX={'lunes':0,'martes':1,'miercoles':2,'mi\u00e9rcoles':2,'jueves':3,'viernes':4};
@@ -81,7 +81,7 @@ function parseSesion(item){
   if(isGuardiaTexto(texto)) return {tipo:'guardia',materia:'Guardia',detalle:'Guardia',grupo:'',aula:aula||''};
   if(partes.length>=3) return {tipo:'clase',materia:partes[0],grupo:partes[1],detalle:texto,aula:aula||partes[2]||''};
   if(partes.length===2) return {tipo:'clase',materia:partes[0],grupo:'',detalle:texto,aula:aula||partes[1]||''};
-  return {tipo:'clase',materia:partes[0]||texto||'Sesi\u00f3n',grupo:'',detalle:texto||'Sesi\u00f3n',aula:aula||''};
+  return {tipo:'clase',materia:partes[0]||texto||'Sesi?n',grupo:'',detalle:texto||'Sesi?n',aula:aula||''};
 }
 function buildProfesoradoData(){
   const profesoresBase={};
@@ -291,7 +291,7 @@ function formatHistoryAbsence(row){
   const aula=resolveAulaRegistro(row)||row.aula||'';
   if(aula) partes.push(aula);
   if(row.guardia) partes.push(`Guardia: ${getVisibleTeacherName(row.guardia)}`);
-  return partes.join(' \u00b7 ');
+  return partes.join(' ? ');
 }
 function buildUndoState(targetDay){
   return {
@@ -491,7 +491,7 @@ function getGuardiaSugerida(dia,hora,turno,rowsSource=data){
 }
 function isPracticasSessionEligible(sesion){
   if(!sesion||sesion.tipo==='guardia') return false;
-  const texto=[sesion.materia,sesion.grupo,sesion.detalle,sesion.aula].map(cleanText).filter(Boolean).join(' | ');
+  const texto=[sesion.materia,sesion.grupo,sesion.detalle,sesion.aula].map(cleanText).filter(Boolean).join(' ? ');
   return /(\bCFB\b|\bCFM\b|\bGM\b|\bGS\b|\bFPB\b|INTERMODULAR|FCT|PRACTIC)/i.test(texto);
 }
 function makePracticasGuardiasSlotKey(profesor,dia,hora){return `${profesor}|${dia}|${hora}`;}
@@ -1361,7 +1361,7 @@ async function applyApprovedFutureAbsencesForCurrentWeek(){
     historialCambios.unshift({
       id:`hist-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
       title:appliedSummaries.length===1?'Falta futura aplicada':'Faltas futuras aplicadas',
-      detail:appliedSummaries.join(' | '),
+      detail:appliedSummaries.join(' ? '),
       type:'create',
       undoState,
       actor:'Jefatura',
@@ -2157,9 +2157,9 @@ function buildWeeklyReportHtml(){
             <div class="item-head">${escapeHtml(item.ausente)}</div>
             <span class="pill ${item.conTarea?'pill-ok':'pill-warn'}">${item.conTarea?'Con tarea':'Sin tarea'}</span>
           </div>
-          <div class="item-row"><span class="item-k">Horas</span><span class="item-v">${escapeHtml(item.horas.map(hora=>`${formatHoraLabel(hora)} (${HORA_MAP[hora]?.rango||''})`).join(' | '))}</span></div>
-          <div class="item-row"><span class="item-k">Cobertura</span><span class="item-v">${escapeHtml(item.guardias.length?item.guardias.join(' | '):'Sin asignar')}</span></div>
-          <div class="item-row"><span class="item-k">Aula</span><span class="item-v">${escapeHtml(item.aulas.length?item.aulas.join(' | '):'Sin aula')}</span></div>
+          <div class="item-row"><span class="item-k">Horas</span><span class="item-v">${escapeHtml(item.horas.map(hora=>`${formatHoraLabel(hora)} (${HORA_MAP[hora]?.rango||''})`).join(' ? '))}</span></div>
+          <div class="item-row"><span class="item-k">Cobertura</span><span class="item-v">${escapeHtml(item.guardias.length?item.guardias.join(' ? '):'Sin asignar')}</span></div>
+          <div class="item-row"><span class="item-k">Aula</span><span class="item-v">${escapeHtml(item.aulas.length?item.aulas.join(' ? '):'Sin aula')}</span></div>
         </article>
       `)
       .join('');
@@ -2328,7 +2328,7 @@ function renderHistoryList(){
   });
   if(!visibles.length){
     const texto=historyFilter==='all'
-      ? 'TodavÃ­a no hay cambios registrados.'
+      ? 'Todavía no hay cambios registrados.'
       : 'No hay cambios de este tipo en el historial.';
     historyList.innerHTML=`<div class="history-empty">${texto}</div>`;
     return;
@@ -2543,7 +2543,7 @@ function renderPracticasGuardiasConfig(){
   }
   const manualSlots=getPracticasGuardiasTeacherManualSlots(nombre);
   const manualList=manualSlots.length
-    ?manualSlots.map(row=>`${DIAS[row.dia]} ${formatHoraLabel(row.hora)}`).join(' · ')
+    ?manualSlots.map(row=>`${DIAS[row.dia]} ${formatHoraLabel(row.hora)}`).join(' ? ')
     :'Sin tramos manuales.';
   panel.innerHTML=`<article class="practicas-config-card">
     <div class="practicas-config-head">
@@ -2690,7 +2690,7 @@ function renderTeacherFutureAbsenceOwnList(){
   if(!list) return;
   const rows=sortFutureAbsenceRowsForDisplay(teacherFutureAbsences.filter(item=>item.profesor===teacherName));
   if(!rows.length){
-    list.innerHTML='<div class="future-absence-empty">TodavÃ­a no has enviado avisos de falta futura.</div>';
+    list.innerHTML='<div class="future-absence-empty">Todavía no has enviado avisos de falta futura.</div>';
     return;
   }
   const groups=groupFutureAbsenceRowsByStatus(rows);
@@ -2720,14 +2720,14 @@ function handleTeacherFutureAbsenceDateChange(){
   }
   const hours=getHorasLectivasProfesorDia(teacherName,selection.dayIndex);
   if(!hours.length){
-    meta.textContent=`${DIAS[selection.dayIndex]} Â· Sin clases lectivas registradas.`;
-    hoursWrap.innerHTML='<div class="teacher-future-hours-empty">Ese dÃ­a no tienes clases lectivas en el horario cargado.</div>';
+    meta.textContent=`${DIAS[selection.dayIndex]} · Sin clases lectivas registradas.`;
+    hoursWrap.innerHTML='<div class="teacher-future-hours-empty">Ese día no tienes clases lectivas en el horario cargado.</div>';
     return;
   }
-  meta.textContent=`${DIAS[selection.dayIndex]} Â· Selecciona las horas que quieres comunicar.`;
+  meta.textContent=`${DIAS[selection.dayIndex]} · Selecciona las horas que quieres comunicar.`;
   hoursWrap.innerHTML=hours.map(hora=>{
     const sesion=resolveTeacherSession(teacherName,selection.dayIndex,hora);
-    const detalle=[sesion?.materia||'Clase',sesion?.grupo||'',sesion?.aula||'Sin aula'].filter(Boolean).join(' Â· ');
+    const detalle=[sesion?.materia||'Clase',sesion?.grupo||'',sesion?.aula||'Sin aula'].filter(Boolean).join(' · ');
     return `<label class="teacher-future-hour-option"><input type="checkbox" data-future-hour value="${hora}" checked><span class="teacher-future-hour-copy"><span class="teacher-future-hour-title">${escapeHtml(formatHoraLabel(hora))}</span><span class="teacher-future-hour-meta">${escapeHtml(detalle)}</span></span></label>`;
   }).join('');
 }
@@ -2760,7 +2760,7 @@ async function submitTeacherFutureAbsence(){
     return;
   }
   if(!selectedHours.length){
-    showToast('Selecciona al menos una hora lectiva para ese dÃ­a.','error');
+    showToast('Selecciona al menos una hora lectiva para ese día.','error');
     return;
   }
   const entry={
@@ -2804,7 +2804,7 @@ function closeFutureAbsenceAdminModal(){
 function bgFutureAbsenceAdminClose(e){if(e.target.id==='futureAbsenceAdminOverlay') closeFutureAbsenceAdminModal();}
 async function handleFutureAbsenceAdminDelete(id){
   if(!isAdmin||!id) return;
-  if(!await askConfirm('Eliminar aviso','Se eliminarÃ¡ este aviso de ausencia futura.','Eliminar')) return;
+  if(!await askConfirm('Eliminar aviso','Se eliminar? este aviso de ausencia futura.','Eliminar')) return;
   try{
     const result=await deleteTeacherFutureAbsenceEntry(id);
     showToast(result?.syncError?'Aviso eliminado en local. Pendiente de sincronizar con el servidor.':'Aviso eliminado.','success');
@@ -3058,7 +3058,7 @@ function renderTeacherAccessPreview(){
   const visibleName=getVisibleTeacherName(nombre);
   const summary=getTeacherSummaryForDay(nombre,day);
   const nextSession=summary.nextHour?resolveTeacherSession(nombre,day,summary.nextHour):null;
-  const nextLabel=summary.nextHour&&nextSession?`${formatHoraLabel(summary.nextHour)} - ${nextSession.materia||nextSession.detalle||'SesiÃ³n'}`:'Sin sesiones lectivas hoy';
+  const nextLabel=summary.nextHour&&nextSession?`${formatHoraLabel(summary.nextHour)} - ${nextSession.materia||nextSession.detalle||'Sesión'}`:'Sin sesiones lectivas hoy';
   preview.innerHTML=`
     <div class="teacher-access-preview-title">${escapeHtml(visibleName)}</div>
     <div class="teacher-access-preview-meta">Usuario: ${escapeHtml(makeTeacherUsername(visibleName))}${profesor?.departamento?` \u00b7 ${escapeHtml(profesor.departamento)}`:''}${getTeacherDisplayMeta(nombre)?` \u00b7 ${escapeHtml(getTeacherDisplayMeta(nombre))}`:''}</div>
@@ -3523,7 +3523,7 @@ function renderAbsenceDecisionBar(){
   const extras=[];
   if(todoDia) extras.push(`Se aplicar\u00e1 a ${horasLectivas.length} ${horasLectivas.length===1?'sesi\u00f3n lectiva':'sesiones lectivas'}`);
   if(tarea.faena&&tarea.obs) extras.push(`Tarea: ${escapeHtml((tarea.obs||'').slice(0,90)+((tarea.obs||'').length>90?'...':''))}`);
-  panel.innerHTML=`<strong>Aula:</strong> ${escapeHtml(aula)} | <strong>Guardia prevista:</strong> ${escapeHtml(guardia?getVisibleTeacherName(guardia):'Sin cobertura')} | <strong>Tarea:</strong> ${tarea.faena?'Disponible':'No registrada'}${extras.length?` | ${extras.join(' | ')}`:''}`;
+  panel.innerHTML=`<strong>Aula:</strong> ${escapeHtml(aula)} | <strong>Guardia prevista:</strong> ${escapeHtml(guardia?getVisibleTeacherName(guardia):'Sin cobertura')} | <strong>Tarea:</strong> ${tarea.faena?'Disponible':'No registrada'}${extras.length?` | ${extras.join(' ? ')}`:''}`;
 }function closeModal(){document.getElementById('overlay').classList.remove('open');}
 function bgClose(e){if(e.target.id==='overlay')closeModal();}
 function populateProfesoresAusencias(){
