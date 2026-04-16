@@ -213,11 +213,123 @@ node --check server/routes/report.js
 npm.cmd run smoke
 ```
 
+## Pruebas futuras
+
+### Prueba de carga / estrés
+
+Cuando la aplicación esté montada en el equipo definitivo del centro, conviene hacer una prueba de carga para estimar:
+
+1. Cuántos usuarios pueden consultar la web a la vez
+2. Cuántos pueden operar simultáneamente sin degradación apreciable
+3. Qué impacto tienen las escrituras concurrentes y la generación de PDF
+
+Escenarios recomendados:
+
+- Consulta simple de panel principal
+- Acceso de profesorado a su panel
+- Alta y edición de ausencias desde Jefatura
+- Envío y revisión de faltas futuras
+- Generación de informe diario y semanal
+
+Métricas a registrar:
+
+- Latencia media
+- Percentil 95 / 99
+- Errores HTTP
+- Uso de CPU
+- Uso de RAM
+- Uso de disco
+- Bloqueos o esperas derivados de SQLite
+
+Herramientas libres que encajan bien:
+
+- `k6`
+- `Apache JMeter`
+- `wrk`
+- `hey`
+
+Nota: al usar `SQLite`, el cuello de botella más probable no será la lectura concurrente sino las escrituras simultáneas y ciertos picos de exportación / informes.
+
 ## Notas operativas
 
 - El horario base que consume la app está en [`js/data/profesorado_horarios_guardias.js`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\js\data\profesorado_horarios_guardias.js)
 - El JSON limpio de trabajo sigue aparte en [`json_profes/profesorado_horarios_guardias_limpio.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_limpio.json)
-- Si se actualiza ese JSON, luego habrá que sincronizar la fuente `.js` que usa la web
+- Si se actualiza ese JSON, luego hay que regenerar la fuente `.js` que usa la web con:
+
+```powershell
+npm.cmd run annual:build
+```
+
+## Separación anual / semanal
+
+### Datos anuales
+
+- Plantilla de profesorado
+- Horario base
+- Guardias base
+
+Fuente editable:
+
+- [`json_profes/profesorado_horarios_guardias_limpio.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_limpio.json)
+
+Artefacto generado que consume la web:
+
+- [`js/data/profesorado_horarios_guardias.js`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\js\data\profesorado_horarios_guardias.js)
+
+### Datos semanales / operativos
+
+- Ausencias
+- Biblioteca y baños
+- Tareas dejadas
+- Historial
+- Sustituciones temporales
+- Faltas futuras
+- Ajustes puntuales de sesiones
+
+### Cambio de curso recomendado
+
+1. Guardar copia del estado actual:
+   el script de reinicio crea un backup JSON en `BD/backups/`
+2. Actualizar el JSON anual:
+   [`json_profes/profesorado_horarios_guardias_limpio.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_limpio.json)
+3. Regenerar la fuente anual:
+
+```powershell
+npm.cmd run annual:build
+```
+
+4. Reiniciar el curso operativo:
+
+```powershell
+npm.cmd run course:reset -- --yes
+```
+
+Ese reinicio borra datos semanales y temporales, mantiene credenciales y archiva un snapshot del curso anterior.
+
+## Backup pendiente
+
+### Copia integral automática de la base
+
+Pendiente para una fase posterior del despliegue en servidor local:
+
+1. Configurar copia automática de [`BD/guardias.sqlite`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\BD\guardias.sqlite)
+2. Guardar varias versiones con rotación:
+   - diarias
+   - semanales
+   - mensuales
+3. Guardar la copia fuera de la carpeta activa del proyecto
+4. Preferiblemente guardar al menos una copia en otra ubicación física o de red
+5. Preparar procedimiento de restauración probado
+
+### Recomendación práctica
+
+- Backup diario automático de la base SQLite
+- Snapshot JSON técnico adicional de forma periódica
+- Restauración documentada y ensayada al menos una vez
+
+### Nota técnica
+
+Como la aplicación usa `SQLite`, la estrategia de copia debe contemplar una copia consistente de la base completa y no depender solo de exportaciones manuales desde la interfaz.
 
 ## Siguiente paso recomendado
 

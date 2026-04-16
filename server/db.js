@@ -125,6 +125,7 @@ async function ensureWeeklyResetIfNeeded(dbInstance) {
     await db.exec('DELETE FROM biblioteca_guardias');
     await db.exec('DELETE FROM historial');
     await db.exec('DELETE FROM tareas_profesorado');
+    await db.exec('DELETE FROM session_overrides');
     await db.run(
       `UPDATE app_state
        SET value = ?, updated_at = CURRENT_TIMESTAMP

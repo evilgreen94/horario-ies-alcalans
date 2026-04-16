@@ -5,6 +5,7 @@ const path = require('path');
 const { ensureWeeklyResetIfNeeded, initializeDatabase } = require('./db');
 const { rejectWritesDuringRestore } = require('./maintenance');
 const { getSessionSecret } = require('./session');
+const { requestTelemetryMiddleware } = require('./telemetry');
 const guardiasRouter = require('./routes/guardias');
 const bibliotecaRouter = require('./routes/biblioteca');
 const historialRouter = require('./routes/historial');
@@ -62,6 +63,7 @@ configureTrustProxy(TRUST_PROXY);
 
 app.use(cors(createCorsOptions()));
 app.use(express.json({ limit: '5mb' }));
+app.use(requestTelemetryMiddleware);
 app.use('/api', rejectWritesDuringRestore);
 app.use('/api', async (_req, _res, next) => {
   try {

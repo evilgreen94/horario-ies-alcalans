@@ -21,6 +21,7 @@ const HORA_MAP = {
 
 const LOGO_IES_PATH = path.join(__dirname, '..', '..', 'imagenes', 'logo-ies-alcalans.jpg');
 const LOGO_CONSELLERIA_PATH = path.join(__dirname, '..', '..', 'imagenes', 'gv_conselleria_educacion_cmyk_cast-1024x505-2.png');
+const SUBSTITUTIONS_STATE_KEY = 'teacher_substitutions';
 
 function badRequest(message) {
   const error = new Error(message);
@@ -43,6 +44,28 @@ function formatReportDate() {
     year: 'numeric',
     timeZone: 'Europe/Madrid'
   }).format(new Date());
+}
+
+async function loadTeacherSubstitutionMap(db) {
+  const row = await db.get('SELECT value FROM app_state WHERE key = ?', [SUBSTITUTIONS_STATE_KEY]);
+  const parsed = row?.value ? JSON.parse(row.value) : [];
+  if (!Array.isArray(parsed)) return {};
+
+  return Object.fromEntries(
+    parsed
+      .filter(item => item && typeof item === 'object')
+      .map(item => [String(item.profesor || '').trim(), String(item.sustituto || '').trim()])
+      .filter(([profesor, sustituto]) => profesor && sustituto)
+  );
+}
+
+function formatTeacherDisplayName(name, substitutionMap) {
+  const canonicalName = String(name || '').trim() || 'Profesorado sin identificar';
+  const substitutionName = String(substitutionMap?.[canonicalName] || '').trim();
+  if (!substitutionName || substitutionName === canonicalName) {
+    return canonicalName;
+  }
+  return `${substitutionName} (titular: ${canonicalName})`;
 }
 
 function ensurePageSpace(doc, minHeight = 110) {
@@ -166,17 +189,20 @@ router.get('/daily.pdf', requireRole('admin'), async (req, res, next) => {
   try {
     const day = parseDay(req.query.day);
     const db = await getDatabase();
-    const rows = await db.all(
+    const [rows, substitutionMap] = await Promise.all([
+      db.all(
       `SELECT dia, hora, ausente
        FROM ausencias
        WHERE dia = ?
        ORDER BY hora, ausente, id`,
       [day]
-    );
+      ),
+      loadTeacherSubstitutionMap(db)
+    ]);
 
     const groupedRows = Array.from(
       rows.reduce((map, row) => {
-        const key = row.ausente || 'Profesorado sin identificar';
+        const key = formatTeacherDisplayName(row.ausente, substitutionMap);
         if (!map.has(key)) map.set(key, []);
         map.get(key).push(row.hora);
         return map;
@@ -258,17 +284,20 @@ router.get('/daily.pdf', requireRole('admin'), async (req, res, next) => {
 router.get('/weekly.pdf', requireRole('admin'), async (_req, res, next) => {
   try {
     const db = await getDatabase();
-    const rows = await db.all(
+    const [rows, substitutionMap] = await Promise.all([
+      db.all(
       `SELECT dia, hora, ausente
        FROM ausencias
        ORDER BY dia, hora, ausente, id`
-    );
+      ),
+      loadTeacherSubstitutionMap(db)
+    ]);
 
     const groupedByDay = Array.from({ length: 5 }, (_, day) => {
       const dayRows = rows.filter(row => row.dia === day);
       return Array.from(
         dayRows.reduce((map, row) => {
-          const key = row.ausente || 'Profesorado sin identificar';
+          const key = formatTeacherDisplayName(row.ausente, substitutionMap);
           if (!map.has(key)) map.set(key, []);
           map.get(key).push(row.hora);
           return map;

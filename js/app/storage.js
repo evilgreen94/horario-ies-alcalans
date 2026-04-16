@@ -115,6 +115,17 @@
         body: JSON.stringify(rows)
       });
     },
+    saveTeacherTaskEntry(row){
+      return request('/profesorado/tareas', {
+        method: 'POST',
+        body: JSON.stringify(row)
+      });
+    },
+    deleteTeacherTaskEntry(id){
+      return request(`/profesorado/tareas/${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
+    },
     fetchSessionOverrides(){
       return request('/profesorado/session-overrides');
     },
@@ -122,6 +133,17 @@
       return request('/profesorado/session-overrides/replace', {
         method: 'PUT',
         body: JSON.stringify(rows)
+      });
+    },
+    saveSessionOverrideEntry(row){
+      return request('/profesorado/session-overrides', {
+        method: 'POST',
+        body: JSON.stringify(row)
+      });
+    },
+    deleteSessionOverrideEntry(id){
+      return request(`/profesorado/session-overrides/${encodeURIComponent(id)}`, {
+        method: 'DELETE'
       });
     },
     fetchTeacherSubstitutions(){
@@ -172,6 +194,9 @@
         method: 'POST',
         body: JSON.stringify(payload)
       });
+    },
+    fetchSuperAdminInfo(){
+      return request('/export/info');
     },
     changeRolePassword(role, currentPassword, newPassword){
       return request('/auth/change-password', {

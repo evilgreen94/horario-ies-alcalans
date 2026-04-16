@@ -261,11 +261,70 @@ main { width: min(1380px, calc(100vw - 32px)); margin: 0 auto; padding: 1.75rem 
 }
 .superadmin-bar { background: rgba(217,83,79,0.05); border-color: rgba(217,83,79,0.18); }
 .superadmin-tag { color: var(--red); }
+.superadmin-layout {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 1rem;
+}
+.superadmin-panel {
+  display: grid;
+  gap: .85rem;
+  padding: .95rem;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.78);
+  border: 1px solid rgba(217,83,79,0.12);
+}
+.superadmin-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .8rem;
+}
+.superadmin-section-title {
+  font-family: var(--font-h);
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.superadmin-section-copy {
+  margin-top: .2rem;
+  font-size: .78rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.superadmin-actions {
+  align-items: stretch;
+}
+.superadmin-actions .btn-add {
+  flex: 1 1 100%;
+}
+.superadmin-ops-list {
+  display: grid;
+  gap: .6rem;
+}
+.superadmin-ops-item {
+  padding: .8rem .85rem;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(217,83,79,0.12);
+  display: grid;
+  gap: .25rem;
+}
+.superadmin-ops-title {
+  font-size: .8rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.superadmin-ops-note {
+  font-size: .75rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
 .superadmin-monitor {
   width: 100%;
   display: grid;
   gap: .85rem;
-  margin-top: .4rem;
 }
 .superadmin-monitor-grid {
   display: grid;
@@ -863,6 +922,40 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   background: var(--surface2);
   padding: .9rem 1rem;
 }
+.future-absence-group {
+  display: grid;
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+.future-absence-group:last-child {
+  margin-bottom: 0;
+}
+.future-absence-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+.future-absence-group-head h3 {
+  margin: 0;
+  font-size: .95rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.future-absence-group-count {
+  min-width: 28px;
+  padding: .2rem .5rem;
+  border-radius: 999px;
+  background: rgba(40,40,58,0.08);
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 700;
+  text-align: center;
+}
+.future-absence-group-list {
+  display: grid;
+  gap: .75rem;
+}
 .future-absence-toolbar {
   display: grid;
   gap: .8rem;
@@ -960,6 +1053,18 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   background: #fff1f1;
   color: var(--red);
   border: 1px solid #f3d1d1;
+}
+.future-absence-time-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: .28rem .55rem;
+  border-radius: 999px;
+  font-size: .7rem;
+  font-weight: 800;
+  background: rgba(61,116,197,0.1);
+  color: var(--blue);
+  border: 1px solid rgba(61,116,197,0.16);
 }
 .future-absence-empty {
   padding: 1rem;
@@ -1068,6 +1173,56 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
 .teacher-panel-actions { display: flex; justify-content: flex-end; gap: .6rem; flex-wrap: wrap; }
 .btn-teacher-panel { background: transparent; color: var(--blue); border: 1px solid rgba(61,116,197,0.28); border-radius: 8px; padding: 8px 12px; font-weight: 800; cursor: pointer; }
 .btn-teacher-panel-danger { color: var(--red); border-color: rgba(217,83,79,0.28); }
+.teacher-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .85rem;
+  margin-bottom: 1rem;
+}
+.teacher-overview-card {
+  display: grid;
+  gap: .4rem;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(61,116,197,0.14);
+  background: rgba(255,255,255,0.94);
+}
+.teacher-overview-card-duty {
+  border-color: rgba(217,161,29,0.24);
+  background: linear-gradient(180deg, #fffdfa, #fff7e6);
+}
+.teacher-overview-label {
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted2);
+}
+.teacher-overview-value {
+  font-family: var(--font-h);
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text);
+}
+.teacher-overview-copy {
+  min-height: 42px;
+  font-size: .8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.teacher-overview-action {
+  justify-self: start;
+}
+.teacher-overview-action-primary {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+.teacher-overview-action[disabled] {
+  cursor: default;
+  opacity: .55;
+}
 .teacher-access-head {
   margin: -1.2rem -1.75rem 1rem;
   padding: 1.1rem 1.75rem .9rem;
@@ -1325,6 +1480,53 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
 }
 .teacher-session-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .teacher-edit-toggle { background: transparent; color: var(--blue); border: 1px solid rgba(31,122,224,.22); border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; }
+.teacher-session-quick {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .6rem;
+}
+.teacher-quick-item {
+  display: grid;
+  gap: .18rem;
+  padding: .75rem .8rem;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid rgba(61,116,197,0.1);
+}
+.teacher-quick-label {
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted2);
+}
+.teacher-quick-value {
+  font-size: .82rem;
+  line-height: 1.4;
+  color: var(--text);
+}
+.teacher-session-panel {
+  margin-top: .9rem;
+  display: grid;
+  gap: .85rem;
+}
+.teacher-session-settings {
+  border: 1px solid rgba(219,227,238,0.9);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.84);
+  padding: .15rem .85rem .85rem;
+}
+.teacher-session-settings summary {
+  cursor: pointer;
+  padding: .8rem 0 .55rem;
+  font-size: .82rem;
+  font-weight: 800;
+  color: var(--blue);
+  list-style: none;
+}
+.teacher-session-settings summary::-webkit-details-marker {
+  display: none;
+}
 .teacher-session-empty { color: var(--muted); font-size: .9rem; padding: .5rem 0; }
 .teacher-check {
   display: flex;
@@ -1472,6 +1674,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .admin-bar, .teacher-bar { align-items: flex-start; }
   .admin-bar { grid-template-columns: 1fr; }
   .admin-actions-secondary { grid-column: auto; }
+  .superadmin-layout { grid-column: auto; grid-template-columns: 1fr; }
   .save-ts, .teacher-name { margin-left: 0; width: 100%; }
 }
 @media(max-width:900px) {
@@ -1481,6 +1684,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .modal { width: min(95vw, 680px); padding: 1.1rem; }
   .teacher-modal { width: min(95vw, 760px); }
   .teacher-head { grid-template-columns: 1fr; }
+  .teacher-overview { grid-template-columns: 1fr; }
   .teacher-head-side,
   .teacher-summary-card,
   .teacher-week-strip,
@@ -1529,6 +1733,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .teacher-sessions { gap: .75rem; }
   .teacher-session { padding: .85rem; }
   .teacher-session-grid { grid-template-columns: 1fr; }
+  .teacher-session-quick { grid-template-columns: 1fr; }
   .teacher-session-head { align-items: flex-start; }
   .teacher-session-side { width: 100%; justify-items: start; }
   .teacher-session-badges { justify-content: flex-start; }
@@ -1559,6 +1764,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
     z-index: 35;
     box-shadow: 0 12px 26px rgba(31,41,55,0.10);
   }
+  .superadmin-layout { gap: .8rem; }
   .admin-tag, .teacher-tag, .save-ts, .teacher-name { width: 100%; }
   .admin-bar-head { width: 100%; }
   .admin-actions { width: 100%; }

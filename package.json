@@ -8,7 +8,9 @@
     "dev": "node server/app.js",
     "start": "node server/app.js",
     "db:init": "node server/scripts/init-db.js",
-    "smoke": "node server/scripts/smoke-test.js"
+    "smoke": "node server/scripts/smoke-test.js",
+    "annual:build": "node server/scripts/build-profesorado-source.js",
+    "course:reset": "node server/scripts/reset-course.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

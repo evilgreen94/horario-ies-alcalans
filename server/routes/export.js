@@ -1,8 +1,11 @@
 const express = require('express');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { DB_PATH, getDatabase } = require('../db');
-const { finishRestore, startRestore } = require('../maintenance');
+const { finishRestore, isRestoreInProgress, startRestore } = require('../maintenance');
 const { requireRole } = require('../session');
+const { getTelemetrySnapshot } = require('../telemetry');
 const {
   ensureArray,
   ensureOptionalId,
@@ -13,10 +16,15 @@ const {
   normalizeString,
   sanitizeBiblioteca,
   sanitizeSessionOverride,
+  sanitizeTeacherFutureAbsence,
+  sanitizeTeacherSubstitution,
   sanitizeTareaProfesorado
 } = require('./validation');
 
 const router = express.Router();
+const SUBSTITUTIONS_STATE_KEY = 'teacher_substitutions';
+const FUTURE_ABSENCES_STATE_KEY = 'teacher_future_absences';
+const WEEK_STATE_KEY = 'school_week_key';
 
 function badRequest(message, details) {
   const error = new Error(message);
@@ -82,7 +90,10 @@ function sanitizeBackupPayload(payload) {
     biblioteca: ensureBackupSection(input, 'biblioteca', 'biblioteca').map(sanitizeBiblioteca),
     historial: ensureBackupSection(input, 'historial', 'historial').map(sanitizeRestoreHistorial),
     tareasProfesorado: ensureBackupSection(input, 'tareasProfesorado', 'tareasProfesorado').map(sanitizeTareaProfesorado),
-    sessionOverrides: ensureBackupSection(input, 'sessionOverrides', 'sessionOverrides').map(sanitizeSessionOverride)
+    sessionOverrides: ensureBackupSection(input, 'sessionOverrides', 'sessionOverrides').map(sanitizeSessionOverride),
+    substitutions: ensureBackupSection(input, 'substitutions', 'substitutions').map(sanitizeTeacherSubstitution),
+    futureAbsences: ensureBackupSection(input, 'futureAbsences', 'futureAbsences').map(sanitizeTeacherFutureAbsence),
+    schoolWeekKey: normalizeString(input.schoolWeekKey)
   };
 }
 
@@ -101,13 +112,21 @@ function formatStamp() {
 router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) => {
   try {
     const db = await getDatabase();
-    const [guardias, biblioteca, historial, tareasProfesorado, sessionOverrides] = await Promise.all([
+    const [guardias, biblioteca, historial, tareasProfesorado, sessionOverrides, appStateRows] = await Promise.all([
       db.all('SELECT * FROM ausencias ORDER BY dia, hora, id'),
       db.all('SELECT dia, hora, profesor FROM biblioteca_guardias ORDER BY dia, hora'),
       db.all('SELECT * FROM historial ORDER BY ts DESC'),
       db.all('SELECT * FROM tareas_profesorado ORDER BY profesor, dia, hora'),
-      db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora')
+      db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora'),
+      db.all(
+        'SELECT key, value FROM app_state WHERE key IN (?, ?, ?) ORDER BY key',
+        [SUBSTITUTIONS_STATE_KEY, FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY]
+      )
     ]);
+    const appState = Object.fromEntries(appStateRows.map(row => [row.key, row.value]));
+    const substitutions = appState[SUBSTITUTIONS_STATE_KEY] ? JSON.parse(appState[SUBSTITUTIONS_STATE_KEY]) : [];
+    const futureAbsences = appState[FUTURE_ABSENCES_STATE_KEY] ? JSON.parse(appState[FUTURE_ABSENCES_STATE_KEY]) : [];
+    const schoolWeekKey = appState[WEEK_STATE_KEY] || '';
 
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -130,7 +149,10 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
         dejada: !!row.dejada,
         tarea: row.tarea || ''
       })),
-      sessionOverrides
+      sessionOverrides,
+      substitutions: Array.isArray(substitutions) ? substitutions : [],
+      futureAbsences: Array.isArray(futureAbsences) ? futureAbsences : [],
+      schoolWeekKey
     };
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -149,10 +171,53 @@ router.get('/database.sqlite', requireRole('superadmin'), (_req, res, next) => {
   }
 });
 
-router.get('/info', requireRole('superadmin'), (_req, res) => {
-  res.json({
-    dbFileName: path.basename(DB_PATH)
-  });
+router.get('/info', requireRole('superadmin'), async (_req, res, next) => {
+  try {
+    const db = await getDatabase();
+    const dbStat = fs.statSync(DB_PATH);
+    const [ausenciasRow, historialRow, tareasRow, overridesRow, appStateRows] = await Promise.all([
+      db.get('SELECT COUNT(*) AS total FROM ausencias'),
+      db.get('SELECT COUNT(*) AS total FROM historial'),
+      db.get('SELECT COUNT(*) AS total FROM tareas_profesorado'),
+      db.get('SELECT COUNT(*) AS total FROM session_overrides'),
+      db.all(
+        'SELECT key, LENGTH(value) AS size, updated_at FROM app_state WHERE key IN (?, ?, ?) ORDER BY key',
+        [SUBSTITUTIONS_STATE_KEY, FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY]
+      )
+    ]);
+
+    res.json({
+      dbFileName: path.basename(DB_PATH),
+      dbPath: DB_PATH,
+      dbSizeBytes: dbStat.size,
+      restoreInProgress: isRestoreInProgress(),
+      server: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        uptimeSec: Math.round(process.uptime()),
+        pid: process.pid,
+        memory: process.memoryUsage(),
+        loadAverage: os.loadavg().map(value => Number(value.toFixed(2))),
+        cpuCount: os.cpus().length,
+        hostname: os.hostname(),
+        currentTime: new Date().toISOString(),
+        telemetry: getTelemetrySnapshot()
+      },
+      counts: {
+        guardias: ausenciasRow?.total || 0,
+        historial: historialRow?.total || 0,
+        tareasProfesorado: tareasRow?.total || 0,
+        sessionOverrides: overridesRow?.total || 0,
+        appState: appStateRows.map(row => ({
+          key: row.key,
+          size: row.size || 0,
+          updatedAt: row.updated_at || ''
+        }))
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
@@ -163,7 +228,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
     restoreStarted = true;
 
     const payload = sanitizeBackupPayload(req.body);
-    const { guardias, biblioteca, historial, tareasProfesorado, sessionOverrides } = payload;
+    const { guardias, biblioteca, historial, tareasProfesorado, sessionOverrides, substitutions, futureAbsences, schoolWeekKey } = payload;
 
     const db = await getDatabase();
     await db.exec('BEGIN TRANSACTION');
@@ -173,6 +238,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       await db.exec('DELETE FROM historial');
       await db.exec('DELETE FROM tareas_profesorado');
       await db.exec('DELETE FROM session_overrides');
+      await db.run('DELETE FROM app_state WHERE key IN (?, ?, ?)', [SUBSTITUTIONS_STATE_KEY, FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY]);
 
       for (const row of guardias) {
         await db.run(
@@ -233,6 +299,30 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         );
       }
 
+      if (substitutions.length) {
+        await db.run(
+          `INSERT INTO app_state (key, value, updated_at)
+           VALUES (?, ?, CURRENT_TIMESTAMP)`,
+          [SUBSTITUTIONS_STATE_KEY, JSON.stringify(substitutions)]
+        );
+      }
+
+      if (futureAbsences.length) {
+        await db.run(
+          `INSERT INTO app_state (key, value, updated_at)
+           VALUES (?, ?, CURRENT_TIMESTAMP)`,
+          [FUTURE_ABSENCES_STATE_KEY, JSON.stringify(futureAbsences)]
+        );
+      }
+
+      if (schoolWeekKey) {
+        await db.run(
+          `INSERT INTO app_state (key, value, updated_at)
+           VALUES (?, ?, CURRENT_TIMESTAMP)`,
+          [WEEK_STATE_KEY, schoolWeekKey]
+        );
+      }
+
       await db.exec('COMMIT');
     } catch (error) {
       await db.exec('ROLLBACK');
@@ -247,7 +337,9 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         biblioteca: biblioteca.length,
         historial: historial.length,
         tareasProfesorado: tareasProfesorado.length,
-        sessionOverrides: sessionOverrides.length
+        sessionOverrides: sessionOverrides.length,
+        substitutions: substitutions.length,
+        futureAbsences: futureAbsences.length
       }
     });
   } catch (error) {

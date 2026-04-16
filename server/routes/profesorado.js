@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../db');
 const {
   ensureArray,
+  ensureRequiredString,
   sanitizeSessionOverride,
   sanitizeTeacherFutureAbsence,
   sanitizeTeacherSubstitution,
@@ -52,6 +53,39 @@ router.put('/tareas/replace', requireRole('admin'), async (req, res, next) => {
   }
 });
 
+router.post('/tareas', async (req, res, next) => {
+  try {
+    const row = sanitizeTareaProfesorado(req.body);
+    const db = await getDatabase();
+    await db.run(
+      `INSERT INTO tareas_profesorado (id, profesor, dia, hora, dejada, tarea, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(id) DO UPDATE SET
+         profesor = excluded.profesor,
+         dia = excluded.dia,
+         hora = excluded.hora,
+         dejada = excluded.dejada,
+         tarea = excluded.tarea,
+         updated_at = CURRENT_TIMESTAMP`,
+      [row.id, row.profesor, row.dia, row.hora, row.dejada ? 1 : 0, row.tarea || '']
+    );
+    res.json({ ok: true, entry: row });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/tareas/:id', async (req, res, next) => {
+  try {
+    const id = ensureRequiredString(req.params.id, 'id');
+    const db = await getDatabase();
+    await db.run('DELETE FROM tareas_profesorado WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/session-overrides', requireRole('admin'), async (_req, res, next) => {
   try {
     const db = await getDatabase();
@@ -87,6 +121,41 @@ router.put('/session-overrides/replace', requireRole('admin'), async (req, res, 
       );
     }
 
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/session-overrides', async (req, res, next) => {
+  try {
+    const row = sanitizeSessionOverride(req.body);
+    const db = await getDatabase();
+    await db.run(
+      `INSERT INTO session_overrides (id, profesor, dia, hora, materia, grupo, detalle, aula, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(id) DO UPDATE SET
+         profesor = excluded.profesor,
+         dia = excluded.dia,
+         hora = excluded.hora,
+         materia = excluded.materia,
+         grupo = excluded.grupo,
+         detalle = excluded.detalle,
+         aula = excluded.aula,
+         updated_at = CURRENT_TIMESTAMP`,
+      [row.id, row.profesor, row.dia, row.hora, row.materia || '', row.grupo || '', row.detalle || '', row.aula || '']
+    );
+    res.json({ ok: true, entry: row });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/session-overrides/:id', async (req, res, next) => {
+  try {
+    const id = ensureRequiredString(req.params.id, 'id');
+    const db = await getDatabase();
+    await db.run('DELETE FROM session_overrides WHERE id = ?', [id]);
     res.json({ ok: true });
   } catch (error) {
     next(error);

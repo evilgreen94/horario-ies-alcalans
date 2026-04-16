@@ -67,16 +67,40 @@
     </div>
   </div>
   <div class="admin-bar superadmin-bar" id="superAdminBar">
-    <span class="admin-tag superadmin-tag">Modo Superadmin</span>
-    <button class="btn-add btn-add-secondary" type="button" onclick="downloadBackupJson()">Backup JSON</button>
-    <button class="btn-add btn-add-secondary" type="button" onclick="triggerRestoreSnapshot()">Restaurar JSON</button>
-    <button class="btn-add btn-add-secondary" type="button" onclick="downloadDatabaseBackup()">Base SQLite</button>
-    <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('superadmin')">Cambiar contrase&ntilde;a</button>
-    <button class="btn-add btn-add-ghost" type="button" onclick="toggleSuperAdmin()">Salir de Superadmin</button>
-    <span class="save-ts" id="superAdminHint">Acceso t&eacute;cnico oculto por URL especial.</span>
-    <div class="superadmin-monitor" id="superAdminMonitor">
-      <div class="superadmin-monitor-grid" id="superAdminMonitorGrid"></div>
-      <div class="superadmin-monitor-log" id="superAdminMonitorLog"></div>
+    <div class="admin-bar-head">
+      <span class="admin-tag superadmin-tag">Modo Superadmin</span>
+      <div class="admin-status save-ts" id="superAdminHint">Zona de operaciones t&eacute;cnicas. Revisa salud, carga y copias antes de intervenir.</div>
+    </div>
+    <div class="superadmin-layout">
+      <section class="superadmin-panel">
+        <div class="superadmin-section-head">
+          <div>
+            <div class="superadmin-section-title">Operaciones</div>
+            <div class="superadmin-section-copy">Mantenimiento, copias y acceso t&eacute;cnico.</div>
+          </div>
+        </div>
+        <div class="admin-actions superadmin-actions">
+          <button class="btn-add btn-add-secondary" type="button" onclick="refreshSuperAdminOps(true)">Actualizar estado</button>
+          <button class="btn-add btn-add-secondary" type="button" onclick="downloadBackupJson()">Backup JSON</button>
+          <button class="btn-add btn-add-secondary" type="button" onclick="triggerRestoreSnapshot()">Restaurar JSON</button>
+          <button class="btn-add btn-add-secondary" type="button" onclick="downloadDatabaseBackup()">Base SQLite</button>
+          <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('superadmin')">Cambiar contrase&ntilde;a</button>
+          <button class="btn-add btn-add-ghost" type="button" onclick="toggleSuperAdmin()">Salir de Superadmin</button>
+        </div>
+        <div class="superadmin-ops-list" id="superAdminOpsList"></div>
+      </section>
+      <section class="superadmin-panel">
+        <div class="superadmin-section-head">
+          <div>
+            <div class="superadmin-section-title">Estado del sistema</div>
+            <div class="superadmin-section-copy">Salud del servidor, carga reciente y sincronizaci&oacute;n.</div>
+          </div>
+        </div>
+        <div class="superadmin-monitor" id="superAdminMonitor">
+          <div class="superadmin-monitor-grid" id="superAdminMonitorGrid"></div>
+          <div class="superadmin-monitor-log" id="superAdminMonitorLog"></div>
+        </div>
+      </section>
     </div>
     <input type="file" id="restoreSnapshotInput" accept="application/json,.json" hidden>
   </div>
@@ -214,6 +238,7 @@
         </div>
       </div>
     </div>
+    <div class="teacher-overview" id="teacherOverview"></div>
     <div class="teacher-day-pills" id="teacherDayPills"></div>
     <div class="teacher-sessions" id="teacherSessions"></div>
   </div>

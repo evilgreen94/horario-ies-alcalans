@@ -167,6 +167,8 @@ async function testSuperadminFlow() {
   const snapshot = await request('/api/export/snapshot.json', {}, jar);
   assert(snapshot.response.status === 200, `GET /api/export/snapshot.json expected 200, got ${snapshot.response.status}`);
   assert(snapshot.body && Array.isArray(snapshot.body.guardias), 'snapshot JSON expected guardias array');
+  assert(Array.isArray(snapshot.body.substitutions), 'snapshot JSON expected substitutions array');
+  assert(Array.isArray(snapshot.body.futureAbsences), 'snapshot JSON expected futureAbsences array');
 
   const sqlite = await request('/api/export/database.sqlite', {}, jar);
   assert(sqlite.response.status === 200, `GET /api/export/database.sqlite expected 200, got ${sqlite.response.status}`);
