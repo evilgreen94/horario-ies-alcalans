@@ -6,3 +6,4 @@ server/data/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+server-local*.log

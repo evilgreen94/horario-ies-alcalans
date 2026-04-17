@@ -10,6 +10,7 @@ const KEY_TEACHER_SUBSTITUTIONS='IES_Alcalans_Profesorado_Sustituciones';
 const KEY_TEACHER_PRACTICAS_GUARDIAS='IES_Alcalans_Profesorado_Practicas_Guardias';
 const KEY_TEACHER_PRACTICAS_GUARDIAS_TRAMOS='IES_Alcalans_Profesorado_Practicas_Guardias_Tramos';
 const KEY_TEACHER_FUTURE_ABSENCES='IES_Alcalans_Profesorado_Faltas_Futuras';
+const KEY_TEACHER_MOODS='IES_Alcalans_Profesorado_Estado_Animo';
 const KEY_SESSION_OVERRIDES='IES_Alcalans_Sesiones_Profesorado';
 const KEY_HISTORIAL='IES_Alcalans_Historial_Cambios';
 const KEY_WEEK='IES_Alcalans_School_Week_Key';
@@ -134,6 +135,13 @@ const PROFES_PLANTILLA=PROFESORADO_DATA.profesPlantilla;
 const PROFESORES_BASE=PROFESORADO_DATA.profesoresBase;
 const HORARIO_GUARDIAS=PROFESORADO_DATA.guardiasPorHora;
 const ALL_PROFESORES=[...new Set([...PROFES_PLANTILLA,...Object.keys(PROFESORES_BASE)])].sort((a,b)=>a.localeCompare(b,'es'));
+const TEACHER_MOOD_OPTIONS=[
+  {id:'contento',emoji:'😊',label:'Contento',tone:'warm',welcome:'Hoy vienes con buena cara.',copy:'Hoy voy con buen ánimo y ganas de tirar del día.'},
+  {id:'cansado',emoji:'😴',label:'Cansado',tone:'soft',welcome:'Día de ir con calma y café cerca.',copy:'Necesito café y que la tercera hora me trate con cariño.'},
+  {id:'enfadado',emoji:'😤',label:'Enfadado',tone:'strong',welcome:'Respiramos hondo y seguimos.',copy:'Mejor respirar hondo antes de que empiece el festival.'},
+  {id:'triste',emoji:'😔',label:'Triste',tone:'soft',welcome:'Hoy toca cuidarse un poco más.',copy:'Hoy toca ir pasito a pasito y con un poco más de mimo.'},
+  {id:'guino',emoji:'😉',label:'Guiño gracioso',tone:'playful',welcome:'Modo ironía elegante activado.',copy:'Modo supervivencia elegante activado. Que sea leve.'}
+];
 let isAdmin=false,day=0,editId=null;
 let isSuperAdmin=false;
 let teacherName='';
@@ -141,6 +149,8 @@ let teacherDay=0;
 let teacherAccessMatches=[];
 let teacherAccessActiveIndex=-1;
 let teacherRecents=[];
+let teacherIdentityConfirmedFor='';
+let teacherMoodEntries={};
 let absenceMatches=[];
 let absenceActiveIndex=-1;
 let teacherSubstitutions={};
@@ -172,10 +182,30 @@ function syncTeacherIdentity(){
   const teacherMetaEl=document.getElementById('teacherMeta');
   const teacherBarNameEl=document.getElementById('teacherBarName');
   const teacherUserEl=document.getElementById('teacherUser');
+  const teacherIdentityNoticeEl=document.getElementById('teacherIdentityNotice');
   if(teacherNameEl) teacherNameEl.textContent=nombre;
   if(teacherMetaEl) teacherMetaEl.textContent=`${nombreCompleto} - ${detalle}${substitutionMeta?` - ${substitutionMeta}`:''}`;
   if(teacherBarNameEl) teacherBarNameEl.textContent=`${nombre} - ${detalle}`;
-  if(teacherUserEl) teacherUserEl.textContent=profesor?`Usuario: ${makeTeacherUsername(nombre)}`:'';
+  if(teacherUserEl) teacherUserEl.textContent=profesor?`Trabajando como ${nombre} · ${makeTeacherUsername(nombre)}`:'';
+  if(teacherIdentityNoticeEl){
+    teacherIdentityNoticeEl.innerHTML=profesor?`<div class="teacher-identity-copy"><div class="teacher-identity-title">Comprueba siempre este nombre antes de guardar cambios</div><div class="teacher-identity-meta">Ahora mismo estás operando como ${escapeHtml(nombreCompleto)}.</div></div><button class="btn-teacher-panel" type="button" onclick="changeTeacherUser()">Cambiar profesor</button>`:'';
+  }
+}
+function clearTeacherIdentityConfirmation(){
+  teacherIdentityConfirmedFor='';
+}
+async function ensureTeacherIdentityConfirmed(actionLabel){
+  const profesor=getProfesor(teacherName);
+  if(!profesor) return false;
+  if(teacherIdentityConfirmedFor===teacherName) return true;
+  const nombre=getVisibleTeacherName(profesor.nombreCompleto||profesor.nombre||teacherName);
+  const confirmed=await askConfirm(
+    'Confirmar profesor',
+    `Vas a trabajar como ${nombre}. Comprueba que es tu panel antes de ${actionLabel}.`,
+    'Confirmar profesor'
+  );
+  if(confirmed) teacherIdentityConfirmedFor=teacherName;
+  return confirmed;
 }
 function load(){
   try{
@@ -197,6 +227,42 @@ function loadTeacherUser(){return storage.readText(KEY_TEACHER_USER,'');}
 function persistTeacherUser(nombre){storage.writeText(KEY_TEACHER_USER,nombre||'');}
 function loadTeacherRecents(){return storage.readJson(KEY_TEACHER_RECENTS,[]).filter(nombre=>getProfesor(nombre));}
 function persistTeacherRecents(list){storage.writeJson(KEY_TEACHER_RECENTS,(list||[]).filter(nombre=>getProfesor(nombre)).slice(0,6));}
+function makeTeacherMoodKey(nombre,dateKey){
+  return `${cleanText(nombre)}|${cleanText(dateKey)}`;
+}
+function getTeacherMoodEntry(nombre,dateKey){
+  return teacherMoodEntries[makeTeacherMoodKey(nombre,dateKey)]||null;
+}
+function getTeacherMoodOption(id){
+  return TEACHER_MOOD_OPTIONS.find(option=>option.id===id)||null;
+}
+function getTeacherMoodForDate(nombre,dateKey){
+  const entry=getTeacherMoodEntry(nombre,dateKey);
+  return entry?getTeacherMoodOption(entry.moodId):null;
+}
+function getTeacherMoodForToday(nombre){
+  return getTeacherMoodForDate(nombre,getCurrentDateIso());
+}
+function saveTeacherMood(nombre,moodId,dateKey){
+  const option=getTeacherMoodOption(moodId);
+  if(!option||!nombre||!dateKey) return;
+  teacherMoodEntries={
+    ...teacherMoodEntries,
+    [makeTeacherMoodKey(nombre,dateKey)]:{
+      moodId:option.id,
+      ts:new Date().toISOString()
+    }
+  };
+  persistTeacherMoods(teacherMoodEntries);
+}
+function clearTeacherMood(nombre,dateKey){
+  const key=makeTeacherMoodKey(nombre,dateKey);
+  if(!teacherMoodEntries[key]) return;
+  const nextEntries={...teacherMoodEntries};
+  delete nextEntries[key];
+  teacherMoodEntries=nextEntries;
+  persistTeacherMoods(teacherMoodEntries);
+}
 function loadTeacherSubstitutions(){
   const rows=storage.readJson(KEY_TEACHER_SUBSTITUTIONS,[]);
   if(Array.isArray(rows)){
@@ -235,6 +301,8 @@ function persistTeacherPracticasGuardiasTramos(rows){
 }
 function loadTeacherFutureAbsences(){return storage.readJson(KEY_TEACHER_FUTURE_ABSENCES,[]);}
 function persistTeacherFutureAbsences(rows){storage.writeJson(KEY_TEACHER_FUTURE_ABSENCES,Array.isArray(rows)?rows:[]);}
+function loadTeacherMoods(){return storage.readJson(KEY_TEACHER_MOODS,{});}
+function persistTeacherMoods(rows){storage.writeJson(KEY_TEACHER_MOODS,rows&&typeof rows==='object'?rows:{});}
 function loadSessionOverrides(){return storage.readJson(KEY_SESSION_OVERRIDES,{});}
 function persistSessionOverrides(d){storage.writeJson(KEY_SESSION_OVERRIDES,d);}
 function loadHistorial(){return storage.readJson(KEY_HISTORIAL,[]);}
@@ -772,6 +840,7 @@ teacherPracticasGuardias=loadTeacherPracticasGuardias();
 teacherPracticasGuardiasTramos=loadTeacherPracticasGuardiasTramos();
 refreshOrdenGuardias();
 teacherFutureAbsences=loadTeacherFutureAbsences();
+teacherMoodEntries=loadTeacherMoods();
 teacherName=getProfesorNombreSeleccionado(loadTeacherUser())||'';
 teacherDay=day;
 function serializeBibliotecaAssignments(){
@@ -1027,10 +1096,39 @@ function clearSuperAdminError(){
   superAdminStatus.lastErrorAt='';
   renderSuperAdminMonitor();
 }
+function buildSuperAdminIncidentItems(){
+  const items=[];
+  if(superAdminStatus.lastError){
+    items.push({
+      level:'error',
+      title:'Aviso activo del sistema',
+      meta:`${formatStatusTimestamp(superAdminStatus.lastErrorAt)} · ${superAdminStatus.lastError}`
+    });
+  }
+  superAdminEvents
+    .filter(item=>/error|pendiente/i.test(String(item.type||''))||/error|fallo|pendiente/i.test(String(item.message||'')))
+    .slice(0,6)
+    .forEach(item=>{
+      items.push({
+        level:/error|fallo/i.test(`${item.type||''} ${item.message||''}`)?'error':'warn',
+        title:item.type||'Incidencia',
+        meta:`${formatStatusTimestamp(item.ts)} · ${item.message||'Sin detalle'}`
+      });
+    });
+  if(!items.length){
+    items.push({
+      level:'ok',
+      title:'Sin incidencias activas',
+      meta:'No hay errores recientes ni avisos pendientes de sincronización.'
+    });
+  }
+  return items.slice(0,6);
+}
 function renderSuperAdminMonitor(){
   const grid=document.getElementById('superAdminMonitorGrid');
   const log=document.getElementById('superAdminMonitorLog');
   const opsList=document.getElementById('superAdminOpsList');
+  const incidentList=document.getElementById('superAdminIncidentList');
   if(!grid||!log) return;
   const backendConnected=storage.hasBackend();
   const syncPending=futureAbsenceSyncFlags.size;
@@ -1099,6 +1197,11 @@ function renderSuperAdminMonitor(){
   if(opsList){
     opsList.innerHTML=buildSuperAdminOpsItems()
       .map(item=>`<article class="superadmin-ops-item"><div class="superadmin-ops-title">${escapeHtml(item.title)}</div><div class="superadmin-ops-note">${escapeHtml(item.note)}</div></article>`)
+      .join('');
+  }
+  if(incidentList){
+    incidentList.innerHTML=buildSuperAdminIncidentItems()
+      .map(item=>`<article class="superadmin-incident-item${item.level==='error'?' is-error':item.level==='warn'?' is-warn':''}"><div class="superadmin-incident-title">${escapeHtml(item.title)}</div><div class="superadmin-incident-meta">${escapeHtml(item.meta)}</div></article>`)
       .join('');
   }
   log.innerHTML=superAdminEvents.length
@@ -2830,6 +2933,7 @@ function closeTeacherFutureAbsenceModal(){
 function bgTeacherFutureAbsenceClose(e){if(e.target.id==='teacherFutureAbsenceOverlay') closeTeacherFutureAbsenceModal();}
 async function submitTeacherFutureAbsence(){
   if(!teacherName) return;
+  if(!await ensureTeacherIdentityConfirmed('enviar una falta futura')) return;
   const dateInput=document.getElementById('teacherFutureAbsenceDate');
   const noteInput=document.getElementById('teacherFutureAbsenceNote');
   const dateValue=cleanText(dateInput?.value);
@@ -3033,11 +3137,14 @@ function renderTable(){
       const aula=resolveAulaRegistro(g)||'-';
       const ausenteNombre=getVisibleTeacherName(g.ausente);
       const guardiaNombre=sugerido?getVisibleTeacherName(sugerido):'';
+      const ausenteMood=getTeacherMoodForToday(g.ausente);
+      const guardiaMood=sugerido?getTeacherMoodForToday(sugerido):null;
       const guardiaEstado=g.futurePlanned?(g.futureStatus==='approved'||g.futureStatus==='applied'?(cub?'Guardia planificada':'Cobertura prevista'):'Pendiente de validar'):(sugerido?(cub?'':'Guardia prevista'):'Sin cobertura');
       const guardiaBadgeClass=g.futurePlanned
         ?(g.futureStatus==='approved'||g.futureStatus==='applied'?'b-ok status-pill':'status-pill teacher-duty-badge')
         :(sugerido?(cub?'b-ok status-pill':'status-pill teacher-duty-badge'):'b-nok status-pill');
-      const guardiaChipClass=sugerido?(cub?'guardia-chip guardia-chip-assigned chip-strong':'guardia-chip guardia-chip-suggested chip-strong'):'';
+      const guardiaChipClass=sugerido?`${cub?'guardia-chip guardia-chip-assigned chip-strong':'guardia-chip guardia-chip-suggested chip-strong'}${guardiaMood?` chip-mood chip-mood-${guardiaMood.tone}`:''}`:'';
+      const ausenteChipClass=`chip chip-absence chip-strong${ausenteMood?` chip-mood chip-mood-${ausenteMood.tone}`:''}`;
       const statusText=g.futurePlanned
         ?(g.futureStatus==='approved'?'Validada':g.futureStatus==='applied'?'Aplicada':g.futureStatus==='pending'?'Pendiente':'Planificada')
         :(sugerido?(cub?'Cubierta':'Pendiente de confirmar'):'Sin cubrir');
@@ -3058,13 +3165,13 @@ function renderTable(){
             <div class="cell-label">Ausente</div>
             ${planningMeta}
             <div class="guardia-slot">
-              <div class="chip chip-absence chip-strong"><div class="avatar av-red">${initials(ausenteNombre)}</div>${escapeHtml(ausenteNombre)}</div>
+              <div class="${ausenteChipClass}"><div class="avatar av-red">${initials(ausenteNombre)}</div>${escapeHtml(ausenteNombre)}${ausenteMood?`<span class="chip-mood-tag" title="${escapeHtml(ausenteMood.label)}">${ausenteMood.emoji}</span>`:''}</div>
             </div>
             ${g.futurePlanned?`<div class="cell-meta">Planificada para ${escapeHtml(formatFutureAbsenceDateLabel(g.futureDate))}</div>`:''}
           </div>
         </td>
         <td>
-          ${sugerido?`<div class="cell-stack"><div class="cell-label">Cubre</div><div class="guardia-slot"><div class="chip ${guardiaChipClass}"><div class="avatar av-yellow">${initials(guardiaNombre)}</div>${escapeHtml(guardiaNombre)}</div></div><div class="cell-meta">${guardiaEstado}</div></div>`:`<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">Sin asignar</span><div class="cell-meta">No hay profesor disponible en este turno.</div></div>`}
+          ${sugerido?`<div class="cell-stack"><div class="cell-label">Cubre</div><div class="guardia-slot"><div class="chip ${guardiaChipClass}"><div class="avatar av-yellow">${initials(guardiaNombre)}</div>${escapeHtml(guardiaNombre)}${guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(guardiaMood.label)}">${guardiaMood.emoji}</span>`:''}</div></div><div class="cell-meta">${guardiaEstado}</div></div>`:`<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">Sin asignar</span><div class="cell-meta">No hay profesor disponible en este turno.</div></div>`}
         </td>
         <td>
           <div class="cell-stack cell-stack-compact">
@@ -3158,6 +3265,7 @@ function renderTeacherAccessPreview(){
       <span class="teacher-access-preview-stat">${summary.horas.length} sesiones hoy</span>
       <span class="teacher-access-preview-stat">${escapeHtml(nextLabel)}</span>
     </div>
+    <div class="teacher-access-preview-meta">Antes de entrar, confirma que este nombre es el tuyo.</div>
   `;
 }
 function renderTeacherAccessRecents(){
@@ -3288,16 +3396,21 @@ function closeTeacherAccess(){
 function bgTeacherAccessClose(e){if(e.target.id==='teacherAccessOverlay')closeTeacherAccess();}
 function changeTeacherUser(){
   closeTeacherPanel();
+  clearTeacherIdentityConfirmation();
   openTeacherAccess(true);
 }
-function loginTeacher(){
+async function loginTeacher(){
   const teacherLoginInput=document.getElementById('teacherLoginName');
   if(!teacherLoginInput) return;
   const nombre=getProfesorNombreSeleccionado(teacherLoginInput.value);
   if(!nombre){showToast('Selecciona tu nombre de la lista.','error');teacherLoginInput.focus();renderTeacherAccessSuggestions(true);return;}
+  const profesor=getProfesor(nombre);
+  const confirmed=await askConfirm('Confirmar profesorado',`Vas a entrar como ${getVisibleTeacherName(profesor?.nombreCompleto||nombre)}. Revisa bien el nombre antes de continuar.`,'Entrar con este nombre');
+  if(!confirmed) return;
   teacherName=nombre;
   teacherDay=day;
   teacherWeekOffset=weekOffset;
+  teacherIdentityConfirmedFor=nombre;
   persistTeacherUser(nombre);
   persistTeacherRecents([nombre,...teacherRecents.filter(item=>item!==nombre)]);
   teacherRecents=loadTeacherRecents();
@@ -3323,6 +3436,7 @@ function exitTeacherMode(){
   closeTeacherPanel();
   closeTeacherAccess();
   teacherName='';
+  clearTeacherIdentityConfirmation();
   persistTeacherUser('');
   document.getElementById('teacherBar').classList.remove('show');
   syncTeacherIdentity();
@@ -3351,11 +3465,23 @@ function focusTeacherDutyHour(hora){
   if(teacherDutyFocusTimer) window.clearTimeout(teacherDutyFocusTimer);
   teacherDutyFocusTimer=window.setTimeout(()=>{card.classList.remove('teacher-session-duty-focus');},1800);
 }
+function selectTeacherMood(moodId){
+  if(!teacherName) return;
+  const dateKey=getCurrentDateIso();
+  saveTeacherMood(teacherName,moodId,dateKey);
+  renderTeacherPanel();
+}
+function resetTeacherMood(){
+  if(!teacherName) return;
+  clearTeacherMood(teacherName,getCurrentDateIso());
+  renderTeacherPanel();
+}
 async function saveTeacherTask(dia,hora,exitAfter){
   if(!isTeacherCurrentWeek()){
     showToast('Solo puedes editar tareas en la semana actual.','info');
     return;
   }
+  if(!await ensureTeacherIdentityConfirmed('guardar una tarea')) return;
   const profesor=getProfesor(teacherName);
   if(!profesor) return;
   const sesionBase=getHorarioProfesorDia(teacherName,dia)?.[hora];
@@ -3397,7 +3523,7 @@ async function saveTeacherTask(dia,hora,exitAfter){
   if(exitAfter){
     renderTable();
     showToast(syncResult?.syncError?'Tarea guardada en local. Pendiente de sincronizar con el servidor.':'Tarea guardada correctamente.','success');
-    exitTeacherMode();
+    closeTeacherPanel();
     return;
   }
   renderTeacherPanel();
@@ -3407,6 +3533,10 @@ async function saveTeacherTask(dia,hora,exitAfter){
 function renderTeacherPanel(){
   const profesor=getProfesor(teacherName);
   if(!profesor) return;
+  const moodCard=document.getElementById('teacherMoodCard');
+  const moodDateKey=getCurrentDateIso();
+  const moodEntry=getTeacherMoodEntry(teacherName,moodDateKey);
+  const moodOption=moodEntry?getTeacherMoodOption(moodEntry.moodId):null;
   renderWeekLabel();
   syncTeacherIdentity();
   document.getElementById('teacherName').textContent=getVisibleTeacherName(profesor.nombre);
@@ -3453,6 +3583,12 @@ function renderTeacherPanel(){
     }
   }
   document.getElementById('teacherBarName').textContent=`${getVisibleTeacherName(profesor.nombre)} - ${profesor.departamento}`;
+  if(moodCard){
+    moodCard.innerHTML=moodOption
+      ?`<div class="teacher-mood-copy"><div class="teacher-mood-title">${moodOption.emoji} ${escapeHtml(moodOption.welcome)}</div><div class="teacher-mood-text">Hoy te sientes ${escapeHtml(moodOption.label.toLowerCase())}. ${escapeHtml(moodOption.copy)}</div></div><button class="btn-teacher-panel" type="button" onclick="resetTeacherMood()">Cambiar estado</button>`
+      :`<div class="teacher-mood-copy"><div class="teacher-mood-title">¿Cómo te sientes hoy?</div><div class="teacher-mood-text">Elige una opción rápida y seguimos. Es solo un guiño del panel para arrancar el día.</div></div><div class="teacher-mood-options">${TEACHER_MOOD_OPTIONS.map(option=>`<button class="teacher-mood-option" type="button" onclick="selectTeacherMood('${option.id}')" aria-label="${escapeHtml(option.label)}"><span class="teacher-mood-option-emoji">${option.emoji}</span><span class="teacher-mood-option-label">${escapeHtml(option.label)}</span></button>`).join('')}</div>`;
+    moodCard.className=`teacher-mood-card${moodOption?` is-${moodOption.tone}`:''}`;
+  }
   document.getElementById('teacherDayPills').innerHTML=DIAS.map((nombreDia,index)=>`<button class="${index===teacherDay?'active':''}" onclick="setTeacherDay(${index})">${nombreDia}</button>`).join('');
   if(overview){
     overview.innerHTML=`
@@ -3560,7 +3696,7 @@ function renderTeacherPanel(){
         </details>
       <div class="teacher-actions">
         ${currentTeacherWeek?`<button class="teacher-save" type="button" onclick="saveTeacherTask(${teacherDay},${hora},false)">Guardar tarea</button>
-        <button class="teacher-save-exit" type="button" onclick="saveTeacherTask(${teacherDay},${hora},true)">Guardar y salir</button>`:`<div class="teacher-meta">Vista de planificación. La edición se habilita en la semana actual.</div>`}
+        <button class="teacher-save-exit" type="button" onclick="saveTeacherTask(${teacherDay},${hora},true)">Guardar y cerrar</button>`:`<div class="teacher-meta">Vista de planificación. La edición se habilita en la semana actual.</div>`}
       </div>
       </div>
     </div>`;

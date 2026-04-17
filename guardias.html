@@ -102,20 +102,28 @@
       <div class="admin-status save-ts" id="superAdminHint">Zona de operaciones t&eacute;cnicas. Revisa salud, carga y copias antes de intervenir.</div>
     </div>
     <div class="superadmin-layout">
-      <section class="superadmin-panel">
+      <section class="superadmin-panel superadmin-panel-toolbar">
         <div class="superadmin-section-head">
           <div>
-            <div class="superadmin-section-title">Operaciones</div>
-            <div class="superadmin-section-copy">Mantenimiento, copias y acceso t&eacute;cnico.</div>
+            <div class="superadmin-section-title">Acciones rápidas</div>
+            <div class="superadmin-section-copy">Operaciones manuales y acceso técnico sin mezclarlo con el estado cambiante del servidor.</div>
           </div>
         </div>
-        <div class="admin-actions superadmin-actions">
+        <div class="superadmin-toolbar-actions">
           <button class="btn-add btn-add-secondary" type="button" onclick="refreshSuperAdminOps(true)">Actualizar estado</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="downloadBackupJson()">Backup JSON</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="triggerRestoreSnapshot()">Restaurar JSON</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="downloadDatabaseBackup()">Base SQLite</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('superadmin')">Cambiar contrase&ntilde;a</button>
           <button class="btn-add btn-add-ghost" type="button" onclick="toggleSuperAdmin()">Salir de Superadmin</button>
+        </div>
+      </section>
+      <section class="superadmin-panel superadmin-panel-summary">
+        <div class="superadmin-section-head">
+          <div>
+            <div class="superadmin-section-title">Resumen operativo</div>
+            <div class="superadmin-section-copy">Lectura rápida de la base, la actividad reciente y el estado de sincronización.</div>
+          </div>
         </div>
         <div class="superadmin-ops-list" id="superAdminOpsList"></div>
       </section>
@@ -128,6 +136,13 @@
         </div>
         <div class="superadmin-monitor" id="superAdminMonitor">
           <div class="superadmin-monitor-grid" id="superAdminMonitorGrid"></div>
+          <div class="superadmin-incident-shell">
+            <div class="superadmin-incident-head">
+              <div class="superadmin-section-title">Incidencias</div>
+              <button class="btn-add btn-add-secondary btn-add-compact" type="button" onclick="clearSuperAdminError()">Limpiar aviso actual</button>
+            </div>
+            <div class="superadmin-incident-list" id="superAdminIncidentList"></div>
+          </div>
           <div class="superadmin-monitor-log" id="superAdminMonitorLog"></div>
         </div>
       </section>
@@ -138,7 +153,7 @@
     <span class="teacher-tag">Modo Profesorado</span>
     <button class="btn-teacher" onclick="openTeacherPanel()">Mis tareas</button>
     <button class="btn-teacher" onclick="changeTeacherUser()">Cambiar usuario</button>
-    <button class="btn-teacher" onclick="exitTeacherMode()">Salir</button>
+    <button class="btn-teacher" onclick="closeTeacherPanel()">Cerrar panel</button>
     <span class="teacher-name" id="teacherBarName">Profesorado</span>
   </div>
   <div class="tbl-wrap">
@@ -254,6 +269,8 @@
         <div class="teacher-session-title" id="teacherName">Profesorado</div>
         <div class="teacher-meta" id="teacherMeta">Horario del profesorado</div>
         <div class="teacher-user" id="teacherUser"></div>
+        <div class="teacher-identity-notice" id="teacherIdentityNotice"></div>
+        <div class="teacher-mood-card" id="teacherMoodCard"></div>
       </div>
       <div class="teacher-head-side">
         <div class="teacher-summary-card">
@@ -264,7 +281,6 @@
         <div class="teacher-panel-actions">
           <button class="btn-teacher-panel" type="button" onclick="openTeacherFutureAbsenceModal()">Avisar falta futura</button>
           <button class="btn-teacher-panel" type="button" onclick="closeTeacherPanel()">Cerrar panel</button>
-          <button class="btn-teacher-panel btn-teacher-panel-danger" type="button" onclick="exitTeacherMode()">Salir del modo</button>
         </div>
       </div>
     </div>

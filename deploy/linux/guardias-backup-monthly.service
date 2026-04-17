@@ -1,0 +1,8 @@
+[Unit]
+Description=Backup mensual de Guardias IES Alcalans
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/guardias/horario-ies-alcalans
+Environment=BACKUP_ROOT=/var/backups/guardias
+ExecStart=/usr/bin/env bash ./deploy/linux/backup-guardias.sh monthly

@@ -1,0 +1,10 @@
+[Unit]
+Description=Temporizador backup mensual de Guardias IES Alcalans
+
+[Timer]
+OnCalendar=*-*-last 23:45:00
+Persistent=true
+Unit=guardias-backup-monthly.service
+
+[Install]
+WantedBy=timers.target
