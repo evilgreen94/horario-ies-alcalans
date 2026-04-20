@@ -306,8 +306,9 @@ Nota: al usar `SQLite`, el cuello de botella mÃ¡s probable no serÃ¡ la lectu
 ## Notas operativas
 
 - El horario base que consume la app estÃ¡ en [`js/data/profesorado_horarios_guardias.js`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\js\data\profesorado_horarios_guardias.js)
-- El JSON limpio de trabajo sigue aparte en [`json_profes/profesorado_horarios_guardias_limpio.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_limpio.json)
-- Si se actualiza ese JSON, luego hay que regenerar la fuente `.js` que usa la web con:
+- La fuente anual predeterminada es [`json_profes/profesorado_horarios_guardias_con_guardias_updated.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_con_guardias_updated.json)
+- Si hace falta usar otra fuente, se indica de forma explícita con `--source ...` o con `ANNUAL_SOURCE_PATH=...`
+- Si se actualiza la fuente anual, luego hay que regenerar la fuente `.js` que usa la web con:
 
 ```powershell
 npm.cmd run annual:build
@@ -321,8 +322,14 @@ npm.cmd run annual:build
 - Horario base
 - Guardias base
 
-Fuente editable:
+Fuente editable principal y predeterminada:
 
+- [`json_profes/profesorado_horarios_guardias_con_guardias_updated.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_con_guardias_updated.json)
+
+Otras fuentes, solo si se piden de forma explícita:
+
+- [`json_profes/profesorado_horarios_guardias_definitvo.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_definitvo.json)
+- [`json_profes/profesorado_horarios_guardias_con_guardias.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_con_guardias.json)
 - [`json_profes/profesorado_horarios_guardias_limpio.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_limpio.json)
 
 Artefacto generado que consume la web:
@@ -343,15 +350,19 @@ Artefacto generado que consume la web:
 
 1. Guardar copia del estado actual:
    el script de reinicio crea un backup JSON en `BD/backups/`
-2. Actualizar el JSON anual:
-   [`json_profes/profesorado_horarios_guardias_limpio.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_limpio.json)
-3. Regenerar la fuente anual:
+2. Regenerar la fuente anual:
 
 ```powershell
 npm.cmd run annual:build
 ```
 
-4. Reiniciar el curso operativo:
+   Si hiciera falta usar otra fuente, se pasa de forma explícita:
+
+```powershell
+npm.cmd run annual:build -- --source json_profes/profesorado_horarios_guardias_limpio.json
+```
+
+3. Reiniciar el curso operativo:
 
 ```powershell
 npm.cmd run course:reset -- --yes

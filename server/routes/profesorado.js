@@ -57,7 +57,7 @@ router.put('/tareas/replace', requireRole('admin'), async (req, res, next) => {
   }
 });
 
-router.post('/tareas', async (req, res, next) => {
+router.post('/tareas', requireRole('admin'), async (req, res, next) => {
   try {
     const row = sanitizeTareaProfesorado(req.body);
     const db = await getDatabase();
@@ -79,7 +79,7 @@ router.post('/tareas', async (req, res, next) => {
   }
 });
 
-router.delete('/tareas/:id', async (req, res, next) => {
+router.delete('/tareas/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const id = ensureRequiredString(req.params.id, 'id');
     const db = await getDatabase();
@@ -131,7 +131,7 @@ router.put('/session-overrides/replace', requireRole('admin'), async (req, res, 
   }
 });
 
-router.post('/session-overrides', async (req, res, next) => {
+router.post('/session-overrides', requireRole('admin'), async (req, res, next) => {
   try {
     const row = sanitizeSessionOverride(req.body);
     const db = await getDatabase();
@@ -155,7 +155,7 @@ router.post('/session-overrides', async (req, res, next) => {
   }
 });
 
-router.delete('/session-overrides/:id', async (req, res, next) => {
+router.delete('/session-overrides/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const id = ensureRequiredString(req.params.id, 'id');
     const db = await getDatabase();
@@ -258,7 +258,7 @@ router.get('/future-absences', async (_req, res, next) => {
   }
 });
 
-router.post('/future-absences', async (req, res, next) => {
+router.post('/future-absences', requireRole('admin'), async (req, res, next) => {
   try {
     const entry = sanitizeTeacherFutureAbsence(req.body);
     const db = await getDatabase();

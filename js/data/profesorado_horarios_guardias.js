@@ -1,7 +1,7 @@
 window.PROFESORADO_SOURCE={
   "fuente": "PROFESSORAT.pdf",
   "formato": "js_desde_json_limpio",
-  "datasetId": "15b748741b26",
+  "datasetId": "6fdf8f49bb5e",
   "teachers": [
     {
       "nombre": "ADRIAN CAMPOS MUÑOZ",
@@ -174,12 +174,6 @@ window.PROFESORADO_SOURCE={
           "franja": "10:05-11:00",
           "texto": "Valenciano | 3 ESO A | A17",
           "aula": "A17"
-        },
-        {
-          "dia": "Lunes",
-          "franja": "11:25-12:20",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Lunes",
@@ -456,8 +450,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "11:25-12:20",
-          "texto": "1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Martes",
@@ -498,8 +492,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Miércoles",
           "franja": "12:20-13:15",
-          "texto": "1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Jueves",
@@ -510,8 +504,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Jueves",
           "franja": "09:10-10:05",
-          "texto": "Formación y Orientac | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "Formación y Orientac | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Jueves",
@@ -727,12 +721,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Lunes",
-          "franja": "10:05-11:00",
-          "texto": "CONVIVENCIA",
-          "aula": ""
-        },
-        {
-          "dia": "Lunes",
           "franja": "11:25-12:20",
           "texto": "2 BAT CIENTÍFIC, 2 BAT HUMANÍSTIC | PREF5",
           "aula": "PREF5"
@@ -741,12 +729,6 @@ window.PROFESORADO_SOURCE={
           "dia": "Martes",
           "franja": "08:15-09:10",
           "texto": "FUNCIONES DIRECTIVAS (L)",
-          "aula": ""
-        },
-        {
-          "dia": "Martes",
-          "franja": "09:10-10:05",
-          "texto": "EQUIPO DIRECTIVO",
           "aula": ""
         },
         {
@@ -805,18 +787,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Viernes",
-          "franja": "10:05-11:00",
-          "texto": "EQUIPO DIRECTIVO",
-          "aula": ""
-        },
-        {
-          "dia": "Viernes",
-          "franja": "11:25-12:20",
-          "texto": "SERVICIOS SOCIALES",
-          "aula": ""
-        },
-        {
-          "dia": "Viernes",
           "franja": "13:15-14:10",
           "texto": "A05",
           "aula": "A05"
@@ -835,12 +805,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Lunes",
-          "franja": "10:05-11:00",
-          "texto": "CONVIVENCIA",
-          "aula": ""
-        },
-        {
-          "dia": "Lunes",
           "franja": "11:25-12:20",
           "texto": "FUNCIONES DIRECTIVAS (L)",
           "aula": ""
@@ -849,12 +813,6 @@ window.PROFESORADO_SOURCE={
           "dia": "Martes",
           "franja": "08:15-09:10",
           "texto": "FUNCIONES DIRECTIVAS (L)",
-          "aula": ""
-        },
-        {
-          "dia": "Martes",
-          "franja": "09:10-10:05",
-          "texto": "EQUIPO DIRECTIVO",
           "aula": ""
         },
         {
@@ -879,12 +837,6 @@ window.PROFESORADO_SOURCE={
           "dia": "Miércoles",
           "franja": "09:10-10:05",
           "texto": "TUTORIA 2n CICLE BAT",
-          "aula": ""
-        },
-        {
-          "dia": "Miércoles",
-          "franja": "11:25-12:20",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
           "aula": ""
         },
         {
@@ -916,18 +868,6 @@ window.PROFESORADO_SOURCE={
           "franja": "08:15-09:10",
           "texto": "Tutoría | 2 ESO PAC | A11",
           "aula": "A11"
-        },
-        {
-          "dia": "Viernes",
-          "franja": "10:05-11:00",
-          "texto": "EQUIPO DIRECTIVO",
-          "aula": ""
-        },
-        {
-          "dia": "Viernes",
-          "franja": "11:25-12:20",
-          "texto": "SERVICIOS SOCIALES",
-          "aula": ""
         }
       ],
       "guardias": []
@@ -970,12 +910,6 @@ window.PROFESORADO_SOURCE={
           "franja": "09:10-10:05",
           "texto": "Lengua Castellana y | 1 BAT HUMANÍSTIC | PREF2",
           "aula": "PREF2"
-        },
-        {
-          "dia": "Martes",
-          "franja": "10:05-11:00",
-          "texto": "PLAN LECTOR",
-          "aula": ""
         },
         {
           "dia": "Martes",
@@ -1082,12 +1016,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Lunes",
-          "franja": "10:05-11:00",
-          "texto": "CONVIVENCIA",
-          "aula": ""
-        },
-        {
-          "dia": "Lunes",
           "franja": "13:15-14:10",
           "texto": "A23",
           "aula": "A23"
@@ -1139,12 +1067,6 @@ window.PROFESORADO_SOURCE={
           "franja": "10:05-11:00",
           "texto": "Religión | 4 ESO C, 4 ESO D | A07",
           "aula": "A07"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "11:25-12:20",
-          "texto": "MEDIACIÓN",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -1377,12 +1299,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Jueves",
-          "franja": "12:20-13:15",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
-        },
-        {
-          "dia": "Jueves",
           "franja": "13:15-14:10",
           "texto": "A27 MÚSICA | A27 MÚSICA",
           "aula": "A27 MÚSICA"
@@ -1492,12 +1408,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Miércoles",
-          "franja": "11:25-12:20",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
-        },
-        {
-          "dia": "Miércoles",
           "franja": "12:20-13:15",
           "texto": "2 ESO E | A05",
           "aula": "A05"
@@ -1596,14 +1506,14 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "13:15-14:10",
-          "texto": "E18 2nFPALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "E18 2nFPALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Martes",
           "franja": "09:10-10:05",
-          "texto": "Operaciones básicas | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "Operaciones básicas | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Martes",
@@ -1626,8 +1536,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Miércoles",
           "franja": "11:25-12:20",
-          "texto": "2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Miércoles",
@@ -1761,12 +1671,6 @@ window.PROFESORADO_SOURCE={
           "franja": "09:10-10:05",
           "texto": "Matemáticas I | 1 BAT CIENTÍFIC, 1BACG | PREF2",
           "aula": "PREF2"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "10:05-11:00",
-          "texto": "BEAISA",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -2208,12 +2112,6 @@ window.PROFESORADO_SOURCE={
           "franja": "09:10-10:05",
           "texto": "Geografía e Historia | 1ESOD | A04",
           "aula": "A04"
-        },
-        {
-          "dia": "Viernes",
-          "franja": "10:05-11:00",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Viernes",
@@ -2842,12 +2740,6 @@ window.PROFESORADO_SOURCE={
           "franja": "08:15-09:10",
           "texto": "Tecnología y Digital | 1ESOD | Tecnología y Digital",
           "aula": "Tecnología y Digital"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "09:10-10:05",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -3691,12 +3583,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Lunes",
-          "franja": "09:10-10:05",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
-        },
-        {
-          "dia": "Lunes",
           "franja": "10:05-11:00",
           "texto": "Operaciones auxiliar | 1 CFB ALIM | ALIM",
           "aula": "ALIM"
@@ -3704,8 +3590,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "11:25-12:20",
-          "texto": "2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Martes",
@@ -3716,26 +3602,20 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Martes",
           "franja": "12:20-13:15",
-          "texto": "2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Miércoles",
           "franja": "08:15-09:10",
-          "texto": "Limpieza y mantenimi | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "Limpieza y mantenimi | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Miércoles",
           "franja": "09:10-10:05",
           "texto": "Operaciones auxiliar | 1 CFB ALIM | ALIM",
           "aula": "ALIM"
-        },
-        {
-          "dia": "Miércoles",
-          "franja": "10:05-11:00",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Miércoles",
@@ -3746,14 +3626,14 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Jueves",
           "franja": "12:20-13:15",
-          "texto": "2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Viernes",
           "franja": "08:15-09:10",
-          "texto": "Tutoría Segundo | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "Tutoría Segundo | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Viernes",
@@ -3770,8 +3650,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Viernes",
           "franja": "13:15-14:10",
-          "texto": "E18 2nFPALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "E18 2nFPALIM | E18",
+          "aula": "E18"
         }
       ],
       "guardias": [
@@ -3794,20 +3674,8 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Lunes",
-          "franja": "10:05-11:00",
-          "texto": "CONVIVENCIA",
-          "aula": ""
-        },
-        {
-          "dia": "Lunes",
           "franja": "12:20-13:15",
           "texto": "FUNCIONES DIRECTIVAS (L)",
-          "aula": ""
-        },
-        {
-          "dia": "Martes",
-          "franja": "09:10-10:05",
-          "texto": "EQUIPO DIRECTIVO",
           "aula": ""
         },
         {
@@ -3851,24 +3719,6 @@ window.PROFESORADO_SOURCE={
           "franja": "10:05-11:00",
           "texto": "Ámbito Práctico | 3 ESO PDC | E11 INFO",
           "aula": "E11 INFO"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "11:25-12:20",
-          "texto": "MEDIACIÓN",
-          "aula": ""
-        },
-        {
-          "dia": "Viernes",
-          "franja": "10:05-11:00",
-          "texto": "EQUIPO DIRECTIVO",
-          "aula": ""
-        },
-        {
-          "dia": "Viernes",
-          "franja": "11:25-12:20",
-          "texto": "SERVICIOS SOCIALES",
-          "aula": ""
         }
       ],
       "guardias": []
@@ -3992,12 +3842,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Viernes",
-          "franja": "12:20-13:15",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
-        },
-        {
-          "dia": "Viernes",
           "franja": "13:15-14:10",
           "texto": "A04",
           "aula": "A04"
@@ -4074,12 +3918,6 @@ window.PROFESORADO_SOURCE={
           "franja": "09:10-10:05",
           "texto": "Educación Plástica, | 4 ESO A, 4 ESO B, 4 ESO C, 4 ESO D | E23 PLASTICA",
           "aula": "E23 PLASTICA"
-        },
-        {
-          "dia": "Miércoles",
-          "franja": "10:05-11:00",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Miércoles",
@@ -4243,12 +4081,6 @@ window.PROFESORADO_SOURCE={
           "franja": "10:05-11:00",
           "texto": "Matemáticas | 2 ESO C | A13",
           "aula": "A13"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "11:25-12:20",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -4524,12 +4356,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Jueves",
-          "franja": "09:10-10:05",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
-        },
-        {
-          "dia": "Jueves",
           "franja": "10:05-11:00",
           "texto": "Geografía e Historia | 4 ESO B | A17",
           "aula": "A17"
@@ -4586,8 +4412,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "09:10-10:05",
-          "texto": "Lengua Extranjera | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Lengua Extranjera | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Lunes",
@@ -4739,12 +4565,6 @@ window.PROFESORADO_SOURCE={
           "franja": "09:10-10:05",
           "texto": "Lengua Extranjera | 4 ESO B | A16",
           "aula": "A16"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "10:05-11:00",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -5055,18 +4875,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Martes",
-          "franja": "10:05-11:00",
-          "texto": "PLAN LECTOR",
-          "aula": ""
-        },
-        {
-          "dia": "Martes",
-          "franja": "11:25-12:20",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
-        },
-        {
-          "dia": "Martes",
           "franja": "12:20-13:15",
           "texto": "1 BAT CIENTÍFIC, 1BACG, 1 BAT HUMA | E25 PDC",
           "aula": "E25 PDC"
@@ -5100,18 +4908,6 @@ window.PROFESORADO_SOURCE={
           "franja": "09:10-10:05",
           "texto": "Ámbito Lingüístico y | 3 ESO PDC | E25 PDC",
           "aula": "E25 PDC"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "10:05-11:00",
-          "texto": "BEAISA",
-          "aula": ""
-        },
-        {
-          "dia": "Jueves",
-          "franja": "11:25-12:20",
-          "texto": "MEDIACIÓN",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -5261,8 +5057,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "13:15-14:10",
-          "texto": "A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "A09",
+          "aula": "A09"
         },
         {
           "dia": "Martes",
@@ -5273,8 +5069,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Martes",
           "franja": "09:10-10:05",
-          "texto": "Montaje y mantenimie | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Montaje y mantenimie | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Martes",
@@ -5285,8 +5081,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Martes",
           "franja": "12:20-13:15",
-          "texto": "1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Miércoles",
@@ -5297,26 +5093,26 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Miércoles",
           "franja": "11:25-12:20",
-          "texto": "1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Miércoles",
           "franja": "13:15-14:10",
-          "texto": "A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "A09",
+          "aula": "A09"
         },
         {
           "dia": "Jueves",
           "franja": "08:15-09:10",
-          "texto": "Montaje y mantenimie | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Montaje y mantenimie | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Jueves",
           "franja": "09:10-10:05",
-          "texto": "Tutoría Primero | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Tutoría Primero | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Jueves",
@@ -5327,20 +5123,14 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Viernes",
           "franja": "10:05-11:00",
-          "texto": "Montaje y mantenimie | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
-        },
-        {
-          "dia": "Viernes",
-          "franja": "11:25-12:20",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
+          "texto": "Montaje y mantenimie | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Viernes",
           "franja": "12:20-13:15",
-          "texto": "1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Viernes",
@@ -5491,8 +5281,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "08:15-09:10",
-          "texto": "Ofimática y archivo | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Ofimática y archivo | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Lunes",
@@ -5503,20 +5293,20 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "10:05-11:00",
-          "texto": "Ofimática y archivo | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Ofimática y archivo | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Martes",
           "franja": "10:05-11:00",
-          "texto": "Ofimática y archivo | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Ofimática y archivo | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Martes",
           "franja": "11:25-12:20",
-          "texto": "1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Martes",
@@ -5527,14 +5317,14 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Martes",
           "franja": "13:15-14:10",
-          "texto": "A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "A09",
+          "aula": "A09"
         },
         {
           "dia": "Miércoles",
           "franja": "10:05-11:00",
-          "texto": "Ofimática y archivo | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Ofimática y archivo | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Miércoles",
@@ -5557,14 +5347,14 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Jueves",
           "franja": "11:25-12:20",
-          "texto": "1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Jueves",
           "franja": "13:15-14:10",
-          "texto": "A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "A09",
+          "aula": "A09"
         },
         {
           "dia": "Viernes",
@@ -5575,8 +5365,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Viernes",
           "franja": "09:10-10:05",
-          "texto": "Ofimática y archivo | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Ofimática y archivo | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Viernes",
@@ -5653,12 +5443,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Martes",
-          "franja": "09:10-10:05",
-          "texto": "EQUIPO DIRECTIVO",
-          "aula": ""
-        },
-        {
-          "dia": "Martes",
           "franja": "11:25-12:20",
           "texto": "FUNCIONES DIRECTIVAS (L)",
           "aula": ""
@@ -5691,12 +5475,6 @@ window.PROFESORADO_SOURCE={
           "dia": "Jueves",
           "franja": "11:25-12:20",
           "texto": "FUNCIONES DIRECTIVAS (L)",
-          "aula": ""
-        },
-        {
-          "dia": "Viernes",
-          "franja": "10:05-11:00",
-          "texto": "EQUIPO DIRECTIVO",
           "aula": ""
         },
         {
@@ -5782,12 +5560,6 @@ window.PROFESORADO_SOURCE={
           "franja": "10:05-11:00",
           "texto": "Lenguaje y Práctica | 1 BAT CIENTÍFIC, 1BACG, 1 BAT HUMA | A27 MÚSICA",
           "aula": "A27 MÚSICA"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "11:25-12:20",
-          "texto": "MEDIACIÓN",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -5892,12 +5664,6 @@ window.PROFESORADO_SOURCE={
           "aula": ""
         },
         {
-          "dia": "Miércoles",
-          "franja": "11:25-12:20",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
-        },
-        {
           "dia": "Jueves",
           "franja": "08:15-09:10",
           "texto": "Lengua extranjera II | 2 BAT CIENTÍFIC, 2 BAT HUMANÍSTIC | A26",
@@ -5978,12 +5744,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Lunes",
-          "franja": "11:25-12:20",
-          "texto": "QUALITAS",
-          "aula": ""
-        },
-        {
-          "dia": "Lunes",
           "franja": "12:20-13:15",
           "texto": "ERASMUS",
           "aula": ""
@@ -6029,12 +5789,6 @@ window.PROFESORADO_SOURCE={
           "franja": "08:15-09:10",
           "texto": "Ámbito Práctico | 4 ESO PDC | E21 TECNOLOGIA",
           "aula": "E21 TECNOLOGIA"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "09:10-10:05",
-          "texto": "QUALITAS2",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -6143,12 +5897,6 @@ window.PROFESORADO_SOURCE={
           "franja": "09:10-10:05",
           "texto": "Física y Química | 4 ESO A | E15 LAB FQ",
           "aula": "E15 LAB FQ"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "10:05-11:00",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -6286,8 +6034,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Martes",
           "franja": "08:15-09:10",
-          "texto": "Ámbito Científico | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Ámbito Científico | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Martes",
@@ -6346,8 +6094,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Jueves",
           "franja": "10:05-11:00",
-          "texto": "Ámbito Científico | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Ámbito Científico | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Jueves",
@@ -6358,8 +6106,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Viernes",
           "franja": "08:15-09:10",
-          "texto": "Ámbito Científico | 1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "Ámbito Científico | 1 CFB INF | A09",
+          "aula": "A09"
         },
         {
           "dia": "Viernes",
@@ -6376,8 +6124,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Viernes",
           "franja": "11:25-12:20",
-          "texto": "1 CFB INF | A091rFPINF",
-          "aula": "A091rFPINF"
+          "texto": "1 CFB INF | A09",
+          "aula": "A09"
         }
       ],
       "guardias": [
@@ -6691,20 +6439,14 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "08:15-09:10",
-          "texto": "PROJECTE INTERMODULAR 2FPB | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "PROJECTE INTERMODULAR 2FPB | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Lunes",
           "franja": "09:10-10:05",
           "texto": "Tutoría Primero | 1 CFB ALIM | ALIM",
           "aula": "ALIM"
-        },
-        {
-          "dia": "Lunes",
-          "franja": "10:05-11:00",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Lunes",
@@ -6751,8 +6493,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Miércoles",
           "franja": "12:20-13:15",
-          "texto": "2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Jueves",
@@ -6950,12 +6692,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Martes",
-          "franja": "09:10-10:05",
-          "texto": "EQUIPO DIRECTIVO",
-          "aula": ""
-        },
-        {
-          "dia": "Martes",
           "franja": "10:05-11:00",
           "texto": "Economía, emprendimi | 1BACG, 1 BAT HUMANÍSTIC | E13 FRANCÉS",
           "aula": "E13 FRANCÉS"
@@ -7012,12 +6748,6 @@ window.PROFESORADO_SOURCE={
           "dia": "Jueves",
           "franja": "11:25-12:20",
           "texto": "FUNCIONES DIRECTIVAS (L)",
-          "aula": ""
-        },
-        {
-          "dia": "Viernes",
-          "franja": "10:05-11:00",
-          "texto": "EQUIPO DIRECTIVO",
           "aula": ""
         },
         {
@@ -7408,12 +7138,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Jueves",
-          "franja": "11:25-12:20",
-          "texto": "MEDIACIÓN",
-          "aula": ""
-        },
-        {
-          "dia": "Jueves",
           "franja": "12:20-13:15",
           "texto": "GUARDIA",
           "aula": ""
@@ -7498,12 +7222,6 @@ window.PROFESORADO_SOURCE={
           "aula": ""
         },
         {
-          "dia": "Martes",
-          "franja": "11:25-12:20",
-          "texto": "REUNIÓN CICLO/ETAPA",
-          "aula": ""
-        },
-        {
           "dia": "Miércoles",
           "franja": "08:15-09:10",
           "texto": "PROYECTO INTERMODULAR 2GM | 2 CFB INF | A15",
@@ -7537,12 +7255,6 @@ window.PROFESORADO_SOURCE={
           "dia": "Viernes",
           "franja": "08:15-09:10",
           "texto": "GUARDIA",
-          "aula": ""
-        },
-        {
-          "dia": "Viernes",
-          "franja": "09:10-10:05",
-          "texto": "REUNIÓN CICLO/ETAPA",
           "aula": ""
         },
         {
@@ -7801,12 +7513,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Jueves",
-          "franja": "09:10-10:05",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
-        },
-        {
-          "dia": "Jueves",
           "franja": "10:05-11:00",
           "texto": "Valenciano: Lengua | 1ESOD | A04",
           "aula": "A04"
@@ -7875,8 +7581,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "12:20-13:15",
-          "texto": "2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Lunes",
@@ -8308,12 +8014,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Lunes",
-          "franja": "10:05-11:00",
-          "texto": "CONVIVENCIA",
-          "aula": ""
-        },
-        {
-          "dia": "Lunes",
           "franja": "11:25-12:20",
           "texto": "2 BAT CIENTÍFIC, 2 BAT HUMANÍSTIC | E16 LLATGREC",
           "aula": "E16 LLATGREC"
@@ -8460,8 +8160,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "09:10-10:05",
-          "texto": "Ámbito Lingüístico y | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "Ámbito Lingüístico y | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Lunes",
@@ -8526,8 +8226,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Miércoles",
           "franja": "13:15-14:10",
-          "texto": "E18 2nFPALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "E18 2nFPALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Jueves",
@@ -8544,8 +8244,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Jueves",
           "franja": "10:05-11:00",
-          "texto": "Ámbito Lingüístico y | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "Ámbito Lingüístico y | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Viernes",
@@ -8562,8 +8262,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Viernes",
           "franja": "12:20-13:15",
-          "texto": "2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Viernes",
@@ -8761,12 +8461,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Martes",
-          "franja": "10:05-11:00",
-          "texto": "PLAN LECTOR",
-          "aula": ""
-        },
-        {
-          "dia": "Martes",
           "franja": "11:25-12:20",
           "texto": "4 ESO D | E15 LAB FQ",
           "aula": "E15 LAB FQ"
@@ -8794,12 +8488,6 @@ window.PROFESORADO_SOURCE={
           "franja": "13:15-14:10",
           "texto": "A07",
           "aula": "A07"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "10:05-11:00",
-          "texto": "BEAISA",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -9167,31 +8855,25 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "08:15-09:10",
-          "texto": "IMX",
-          "aula": ""
+          "texto": "IMX | 2 CFB INF | A15",
+          "aula": "A15"
         },
         {
           "dia": "Lunes",
-          "franja": "10:05-11:00",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
+          "franja": "09:10-10:05",
+          "texto": "IMX | 2 CFB INF | A15",
+          "aula": "A15"
         },
         {
           "dia": "Lunes",
           "franja": "11:25-12:20",
-          "texto": "2 CFB INF | A15",
+          "texto": "IMX | 2 CFB INF | A15",
           "aula": "A15"
         },
         {
           "dia": "Martes",
-          "franja": "10:05-11:00",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
-        },
-        {
-          "dia": "Martes",
           "franja": "12:20-13:15",
-          "texto": "2 CFB INF | A15",
+          "texto": "IMX | 2 CFB INF | A15",
           "aula": "A15"
         },
         {
@@ -9221,7 +8903,7 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Jueves",
           "franja": "12:20-13:15",
-          "texto": "2 CFB INF | A15",
+          "texto": "IMX | 2 CFB INF | A15",
           "aula": "A15"
         },
         {
@@ -9326,12 +9008,6 @@ window.PROFESORADO_SOURCE={
           "franja": "09:10-10:05",
           "texto": "Física y Química | 2 ESO A | A10",
           "aula": "A10"
-        },
-        {
-          "dia": "Miércoles",
-          "franja": "10:05-11:00",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Miércoles",
@@ -9464,12 +9140,6 @@ window.PROFESORADO_SOURCE={
           "franja": "09:10-10:05",
           "texto": "Biología y Geología | 3 ESO D | A24",
           "aula": "A24"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "11:25-12:20",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -9621,12 +9291,6 @@ window.PROFESORADO_SOURCE={
           "franja": "08:15-09:10",
           "texto": "Música | 2 ESO A | A27 MÚSICA",
           "aula": "A27 MÚSICA"
-        },
-        {
-          "dia": "Jueves",
-          "franja": "09:10-10:05",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Jueves",
@@ -9993,12 +9657,6 @@ window.PROFESORADO_SOURCE={
         },
         {
           "dia": "Martes",
-          "franja": "09:10-10:05",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
-        },
-        {
-          "dia": "Martes",
           "franja": "10:05-11:00",
           "texto": "LECTIVAS AUTORIZADAS",
           "aula": ""
@@ -10115,8 +9773,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Lunes",
           "franja": "10:05-11:00",
-          "texto": "Ámbito Científico | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "Ámbito Científico | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Lunes",
@@ -10139,8 +9797,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Martes",
           "franja": "08:15-09:10",
-          "texto": "Ámbito Científico | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "Ámbito Científico | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Martes",
@@ -10151,8 +9809,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Martes",
           "franja": "10:05-11:00",
-          "texto": "Ámbito Científico | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "Ámbito Científico | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Miércoles",
@@ -10181,8 +9839,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Jueves",
           "franja": "08:15-09:10",
-          "texto": "Ámbito Científico | 2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "Ámbito Científico | 2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Jueves",
@@ -10217,8 +9875,8 @@ window.PROFESORADO_SOURCE={
         {
           "dia": "Viernes",
           "franja": "11:25-12:20",
-          "texto": "2 CFB ALIM | E18 2nFPALIM",
-          "aula": "E18 2nFPALIM"
+          "texto": "2 CFB ALIM | E18",
+          "aula": "E18"
         },
         {
           "dia": "Viernes",
@@ -10460,12 +10118,6 @@ window.PROFESORADO_SOURCE={
           "dia": "Miércoles",
           "franja": "10:05-11:00",
           "texto": "GUARDIA",
-          "aula": ""
-        },
-        {
-          "dia": "Miércoles",
-          "franja": "11:25-12:20",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
           "aula": ""
         },
         {
@@ -10794,12 +10446,6 @@ window.PROFESORADO_SOURCE={
           "franja": "10:05-11:00",
           "texto": "Música | 1ESOB | A27 MÚSICA",
           "aula": "A27 MÚSICA"
-        },
-        {
-          "dia": "Martes",
-          "franja": "11:25-12:20",
-          "texto": "2º HORA TUTORÍA INDIVIDUALIZADA",
-          "aula": ""
         },
         {
           "dia": "Martes",

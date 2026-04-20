@@ -1742,7 +1742,9 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   text-align: center;
 }
 .teacher-access-recent {
-  display: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
 }
 .teacher-access-recent[hidden] {
   display: none !important;
@@ -2165,17 +2167,47 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .btn { text-align: center; }
   .admin-bar, .teacher-bar { gap: .6rem; }
   .admin-bar.show {
-    position: sticky;
-    top: .75rem;
-    z-index: 35;
-    box-shadow: 0 12px 26px rgba(31,41,55,0.10);
+    position: static;
+    top: auto;
+    z-index: auto;
+    box-shadow: none;
+    padding: .85rem .95rem;
+  }
+  .admin-bar-head,
+  .admin-actions,
+  .admin-actions-secondary { width: 100%; }
+  .substitution-item,
+  .future-absence-item {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .substitution-item-actions {
+    width: 100%;
+    justify-content: flex-start;
+    align-items: stretch;
+  }
+  .substitution-item-actions .btn-substitution {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .practicas-config-head,
+  .future-absence-item-head,
+  .future-absence-group-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .practicas-config-legend,
+  .practicas-config-slots,
+  .future-absence-item-meta {
+    width: 100%;
+  }
+  .practicas-config-legend {
+    justify-content: flex-start;
   }
   .admin-overview-grid { grid-template-columns: 1fr; }
   .superadmin-toolbar-actions { grid-template-columns: 1fr; }
   .superadmin-layout { gap: .8rem; }
   .admin-tag, .teacher-tag, .save-ts, .teacher-name { width: 100%; }
-  .admin-bar-head { width: 100%; }
-  .admin-actions { width: 100%; }
   .admin-bar .btn-add,
   .teacher-bar .btn-teacher { flex: 1 1 calc(50% - .3rem); width: auto; }
   .modal { max-height: 100vh; border-radius: 0; }

@@ -4,7 +4,13 @@ const path = require('path');
 const { DB_PATH, getDatabase } = require('../db');
 
 const BACKUP_DIR = path.join(__dirname, '..', '..', 'BD', 'backups');
-const APP_STATE_KEYS_TO_CLEAR = ['school_week_key', 'teacher_substitutions', 'teacher_future_absences'];
+const APP_STATE_KEYS_TO_CLEAR = [
+  'school_week_key',
+  'teacher_substitutions',
+  'teacher_future_absences',
+  'teacher_practicas_guardias',
+  'teacher_practicas_guardias_tramos'
+];
 
 function formatStamp() {
   return new Intl.DateTimeFormat('sv-SE', {
@@ -100,7 +106,7 @@ async function main() {
   console.log('Curso operativo reiniciado correctamente.');
   console.log(`- Backup archivado en: ${archivePath}`);
   console.log(`- Base de datos: ${DB_PATH}`);
-  console.log('Siguiente paso recomendado: actualizar json_profes/profesorado_horarios_guardias_limpio.json y ejecutar npm run annual:build');
+  console.log('Siguiente paso recomendado: regenerar la fuente anual con npm run annual:build (usa por defecto json_profes/profesorado_horarios_guardias_con_guardias_updated.json; para otras fuentes, pasa --source <ruta>)');
 }
 
 main().catch(error => {

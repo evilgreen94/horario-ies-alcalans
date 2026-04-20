@@ -135,12 +135,177 @@ const PROFES_PLANTILLA=PROFESORADO_DATA.profesPlantilla;
 const PROFESORES_BASE=PROFESORADO_DATA.profesoresBase;
 const HORARIO_GUARDIAS=PROFESORADO_DATA.guardiasPorHora;
 const ALL_PROFESORES=[...new Set([...PROFES_PLANTILLA,...Object.keys(PROFESORES_BASE)])].sort((a,b)=>a.localeCompare(b,'es'));
-const TEACHER_MOOD_OPTIONS=[
-  {id:'contento',emoji:'😊',label:'Contento',tone:'warm',welcome:'Hoy vienes con buena cara.',copy:'Hoy voy con buen ánimo y ganas de tirar del día.'},
-  {id:'cansado',emoji:'😴',label:'Cansado',tone:'soft',welcome:'Día de ir con calma y café cerca.',copy:'Necesito café y que la tercera hora me trate con cariño.'},
-  {id:'enfadado',emoji:'😤',label:'Enfadado',tone:'strong',welcome:'Respiramos hondo y seguimos.',copy:'Mejor respirar hondo antes de que empiece el festival.'},
-  {id:'triste',emoji:'😔',label:'Triste',tone:'soft',welcome:'Hoy toca cuidarse un poco más.',copy:'Hoy toca ir pasito a pasito y con un poco más de mimo.'},
-  {id:'guino',emoji:'😉',label:'Guiño gracioso',tone:'playful',welcome:'Modo ironía elegante activado.',copy:'Modo supervivencia elegante activado. Que sea leve.'}
+const TEACHER_MOOD_OPTIONS = [
+  {
+    id: 'contento',
+    emoji: '😊',
+    label: 'Contento',
+    tone: 'warm',
+    welcome: 'Hoy vienes con buena cara.',
+    messages: [
+      'Buen ánimo, buena letra y que no falle el café.',
+      'Hoy vas con chispa y se nota desde primera hora.',
+      'Pinta a jornada de llevarla con una sonrisa decente.',
+      'Con este ánimo, hasta la guardia parece amable.',
+      'Hoy puedes con el grupo difícil… y con el fácil también.',
+      'Día perfecto para que todo fluya, o al menos lo parezca.',
+      'Hoy hay energía de sobra para sacar adelante la mañana.',
+      'Se nota que hoy vienes con el aula de tu parte.'
+    ]
+  },
+  {
+    id: 'cansado',
+    emoji: '😴',
+    label: 'Cansado',
+    tone: 'soft',
+    welcome: 'Día de ir con calma y café cerca.',
+    messages: [
+      'Hoy toca sobrevivir con dignidad y alguna taza extra.',
+      'Modo ahorro de energía, pero seguimos en pie.',
+      'Conviene que la tercera hora no pida heroicidades.',
+      'Si hoy no brillas, al menos que no explote nada.',
+      'Día de tirar de experiencia más que de entusiasmo.',
+      'Reducimos expectativas, mantenemos el tipo.',
+      'Hoy con llegar al recreo medio entero ya se considera éxito.',
+      'Jornada de resistencia tranquila y oficio docente.'
+    ]
+  },
+  {
+    id: 'enfadado',
+    emoji: '😤',
+    label: 'Enfadado',
+    tone: 'strong',
+    welcome: 'Respiramos hondo y seguimos.',
+    messages: [
+      'Mejor contar hasta diez antes de abrir ciertos correos.',
+      'Hoy viene bien una respiración larga entre clase y clase.',
+      'Que el día no pruebe demasiado la paciencia, por favor.',
+      'Si algo puede esperar, que espere.',
+      'Hoy la diplomacia es tu mejor herramienta.',
+      'No todo merece respuesta inmediata.',
+      'Conviene elegir muy bien qué batalla merece la pena.',
+      'Hoy toca firmeza sin regalar energía de más.'
+    ]
+  },
+  {
+    id: 'triste',
+    emoji: '😔',
+    label: 'Triste',
+    tone: 'soft',
+    welcome: 'Hoy toca cuidarse un poco más.',
+    messages: [
+      'Vamos pasito a pasito y sin pedir más de la cuenta.',
+      'Día de llevarlo con mimo y algo de aire entre horas.',
+      'Hoy conviene tratarse con un poco más de suavidad.',
+      'Cumplir ya es suficiente hoy.',
+      'Permítete ir más lento.',
+      'Lo importante hoy es llegar, no destacar.',
+      'A veces sostener el día ya es bastante.',
+      'Hoy toca bajar un poco el ritmo y protegerse.'
+    ]
+  },
+  {
+    id: 'guino',
+    emoji: '😉',
+    label: 'Guiño gracioso',
+    tone: 'playful',
+    welcome: 'Modo ironía elegante activado.',
+    messages: [
+      'Hoy toca sacar oficio, humor fino y seguir adelante.',
+      'Modo supervivencia elegante activado. Que sea leve.',
+      'Si el día se pone raro, al menos que nos pille con estilo.',
+      'Sonríe, que nadie sepa el caos que hay detrás.',
+      'Hoy improvisamos… pero con dignidad.',
+      'Todo bajo control… más o menos.',
+      'Que no falte café, tablas y una mirada cómplice.',
+      'Hoy se enseña, se resuelve y se disimula estupendamente.'
+    ]
+  },
+  {
+    id: 'saturado',
+    emoji: '🤯',
+    label: 'Saturado',
+    tone: 'neutral',
+    welcome: 'Demasiadas cosas en la cabeza.',
+    messages: [
+      'Prioriza: no todo es urgente aunque lo parezca.',
+      'Hoy toca ir bloque a bloque.',
+      'Si sobrevives al correo, ya es victoria.',
+      'Paso corto, vista al frente.',
+      'Una cosa cada vez. Literalmente.',
+      'Entre reuniones, tutorías y clases, respira.',
+      'Hoy conviene no abrir más frentes de los necesarios.',
+      'Haz primero lo que más despeje la mañana.'
+    ]
+  },
+  {
+    id: 'motivado',
+    emoji: '🔥',
+    label: 'Motivado',
+    tone: 'energetic',
+    welcome: 'Hoy vienes con ganas de liarla, pero bien.',
+    messages: [
+      'Día perfecto para probar algo nuevo en clase.',
+      'Hoy puedes marcar la diferencia en el aula.',
+      'Ese grupo hoy te lo ganas.',
+      'Aprovecha la inercia, no siempre pasa.',
+      'Hoy hay energía de proyecto interesante.',
+      'Buen día para innovar sin pedir permiso al aburrimiento.',
+      'Hoy se nota vocación y oficio a partes iguales.',
+      'Pinta a clase de las que dejan huella.'
+    ]
+  },
+  {
+    id: 'automatico',
+    emoji: '🧊',
+    label: 'Modo automático',
+    tone: 'neutral',
+    welcome: 'Hoy se tira de oficio.',
+    messages: [
+      'Sin emociones, pero con eficacia.',
+      'Hoy funciona el piloto automático.',
+      'Cumplir el guion ya es suficiente.',
+      'Ni brillante ni desastroso: correcto.',
+      'Día de rutina bien ejecutada.',
+      'Hoy manda la estructura más que la inspiración.',
+      'Clase preparada, café listo y adelante.',
+      'No hace falta épica para sacar el día.'
+    ]
+  },
+  {
+    id: 'caotico',
+    emoji: '🌪️',
+    label: 'Caótico',
+    tone: 'playful',
+    welcome: 'Hoy pinta a día movido.',
+    messages: [
+      'A ver qué sorpresa trae cada hora.',
+      'Planifica, pero con flexibilidad máxima.',
+      'Hoy el horario es orientativo.',
+      'Si algo sale según lo previsto, celébralo.',
+      'Día de adaptación continua.',
+      'Entre cambios, avisos y carreras, mantén el rumbo.',
+      'Hoy toca improvisar con elegancia docente.',
+      'Que el caos no te quite el compás.'
+    ]
+  },
+  {
+    id: 'tranquilo',
+    emoji: '😌',
+    label: 'Tranquilo',
+    tone: 'warm',
+    welcome: 'Día equilibrado por delante.',
+    messages: [
+      'Sin prisa, pero sin pausa.',
+      'Hoy todo debería ir razonablemente bien.',
+      'Día para trabajar con calma y cabeza.',
+      'Aprovecha la estabilidad.',
+      'Buen día para avanzar sin ruido.',
+      'Hoy el aula invita a trabajar con serenidad.',
+      'Cuando todo está en su sitio, se nota.',
+      'Jornada amable para enseñar sin sobresaltos.'
+    ]
+  }
 ];
 let isAdmin=false,day=0,editId=null;
 let isSuperAdmin=false;
@@ -242,6 +407,13 @@ function getTeacherMoodForDate(nombre,dateKey){
 }
 function getTeacherMoodForToday(nombre){
   return getTeacherMoodForDate(nombre,getCurrentDateIso());
+}
+function getTeacherMoodMessage(nombre,dateKey,moodOption){
+  const messages=Array.isArray(moodOption?.messages)?moodOption.messages.filter(Boolean):[];
+  if(!messages.length) return '';
+  const seed=`${cleanText(nombre)}|${cleanText(dateKey)}|${cleanText(moodOption.id)}`;
+  const hash=[...seed].reduce((acc,char)=>acc+char.charCodeAt(0),0);
+  return messages[hash%messages.length];
 }
 function saveTeacherMood(nombre,moodId,dateKey){
   const option=getTeacherMoodOption(moodId);
@@ -362,11 +534,15 @@ function formatHistoryAbsence(row){
   if(row.guardia) partes.push(`Guardia: ${getVisibleTeacherName(row.guardia)}`);
   return partes.join(' ? ');
 }
-function buildUndoState(targetDay){
-  return {
+function buildUndoState(targetDay,options={}){
+  const state={
     data:cloneJson(data),
     day:typeof targetDay==='number'?targetDay:day
   };
+  if(options.includeOrden){
+    state.orden=cloneJson(ordenGuardias);
+  }
+  return state;
 }
 function addHistoryEntry(title,detail,type,options){
   historialCambios.unshift({
@@ -395,6 +571,44 @@ function formatHistoryTimestamp(value){
 }
 function getLastUndoableHistoryEntry(){
   return historialCambios.find(entry=>entry?.undoState&&entry.type!=='undo')||null;
+}
+function getOpenWorkflowOverlayIds(){
+  return ['overlay','teacherOverlay','teacherAccessOverlay','historyOverlay','substitutionOverlay','practicasGuardiasOverlay','futureAbsenceAdminOverlay']
+    .filter(id=>document.getElementById(id)?.classList.contains('open'));
+}
+function closeWorkflowOverlays(ids){
+  (ids||getOpenWorkflowOverlayIds()).forEach(id=>{
+    if(id==='overlay'){
+      editId=null;
+      closeAusenteSuggestions();
+      clearAbsenceFormErrors();
+      closeModal();
+      return;
+    }
+    if(id==='teacherOverlay'){
+      closeTeacherPanel();
+      return;
+    }
+    if(id==='teacherAccessOverlay'){
+      closeTeacherAccess();
+      return;
+    }
+    if(id==='historyOverlay'){
+      closeHistoryModal();
+      return;
+    }
+    if(id==='substitutionOverlay'){
+      closeSubstitutionModal();
+      return;
+    }
+    if(id==='practicasGuardiasOverlay'){
+      closePracticasGuardiasModal();
+      return;
+    }
+    if(id==='futureAbsenceAdminOverlay'){
+      closeFutureAbsenceAdminModal();
+    }
+  });
 }
 function shuffle(arr){const copy=[...arr];for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}return copy;}
 function makeOrdenHora(dia,hora){return shuffle(getProfesHora(dia,hora)).map((nombre,index)=>({nombre,numero:index+1}));}
@@ -627,7 +841,7 @@ function validateTeacherSubstitutionName(nombre,rawValue){
     otherNombre!==nombre&&normalizeTeacherSearch(sustituto)===normalizedValue
   );
   if(aliasConflict){
-    return `Ese nombre ya estÃ¡ asignado como sustituto de ${aliasConflict[0]}.`;
+    return `Ese nombre ya está asignado como sustituto de ${aliasConflict[0]}.`;
   }
 
   return '';
@@ -815,6 +1029,8 @@ let historialCambios=loadHistorial();
 let historyFilter='all';
 let dialogResolver=null;
 let backendSyncInFlight=false;
+let backendSyncPendingAdmin=false;
+let backendSyncPendingTeacher=false;
 let backendHydrated=false;
 let backendPollingInFlight=false;
 let futureAbsenceSyncFlags=new Set();
@@ -1208,8 +1424,26 @@ function renderSuperAdminMonitor(){
     ?superAdminEvents.map(item=>`<div class="superadmin-monitor-log-item"><strong>${escapeHtml(item.type)}</strong> · ${escapeHtml(formatStatusTimestamp(item.ts))}<br>${escapeHtml(item.message)}</div>`).join('')
     :'<div class="superadmin-monitor-log-item">Sin eventos de sincronización registrados todavía.</div>';
 }
+function drainPendingBackendSync(){
+  renderSuperAdminMonitor();
+  if(backendSyncPendingAdmin){
+    backendSyncPendingAdmin=false;
+    syncAdminState();
+    return true;
+  }
+  if(backendSyncPendingTeacher){
+    backendSyncPendingTeacher=false;
+    syncTeacherState();
+    return true;
+  }
+  return false;
+}
 async function syncAdminState(){
-  if(!storage.hasBackend()||backendSyncInFlight) return;
+  if(!storage.hasBackend()) return;
+  if(backendSyncInFlight){
+    backendSyncPendingAdmin=true;
+    return;
+  }
   backendSyncInFlight=true;
   renderSuperAdminMonitor();
   try{
@@ -1231,11 +1465,15 @@ async function syncAdminState(){
     pushSuperAdminEvent('Error sync',`Jefatura: ${String(error?.message||error)}`);
   }finally{
     backendSyncInFlight=false;
-    renderSuperAdminMonitor();
+    drainPendingBackendSync();
   }
 }
 async function syncTeacherState(){
-  if(!storage.hasBackend()||backendSyncInFlight) return;
+  if(!storage.hasBackend()) return;
+  if(backendSyncInFlight){
+    backendSyncPendingTeacher=true;
+    return;
+  }
   backendSyncInFlight=true;
   renderSuperAdminMonitor();
   try{
@@ -1253,11 +1491,17 @@ async function syncTeacherState(){
     pushSuperAdminEvent('Error sync',`Profesorado: ${String(error?.message||error)}`);
   }finally{
     backendSyncInFlight=false;
-    renderSuperAdminMonitor();
+    drainPendingBackendSync();
   }
 }
 async function syncTeacherTaskEntry(overrideKey,overrideRow,tareaKey,tareaRow){
   if(!storage.hasBackend()) return {ok:true,localOnly:true};
+  if(backendSyncInFlight){
+    backendSyncPendingTeacher=true;
+    return {ok:true,queued:true};
+  }
+  backendSyncInFlight=true;
+  renderSuperAdminMonitor();
   try{
     const requests=[];
     if(overrideRow){
@@ -1293,9 +1537,13 @@ async function syncTeacherTaskEntry(overrideKey,overrideRow,tareaKey,tareaRow){
     return {ok:true};
   }catch(error){
     console.warn('Teacher task backend sync failed',error);
+    backendSyncPendingTeacher=true;
     setSuperAdminError('Fallo en la sincronización de tarea de profesorado.');
     pushSuperAdminEvent('Error sync',`Profesorado: ${String(error?.message||error)}`);
     return {ok:true,localOnly:true,syncError:true};
+  }finally{
+    backendSyncInFlight=false;
+    drainPendingBackendSync();
   }
 }
 async function hydrateTeacherSubstitutions(){
@@ -1526,7 +1774,7 @@ async function applyApprovedFutureAbsencesForCurrentWeek(){
       data.push({dia:weekInfo.dayIndex,hora:horaItem,ausente:item.profesor,guardia:'',aula:getAulaProfesor(item.profesor,weekInfo.dayIndex,horaItem)||'',faena:false,obs:'',id:nid++});
       stateChanged=true;
     });
-    appliedSummaries.push(`${getVisibleTeacherName(item.profesor)||item.profesor} Â· ${item.date} Â· ${horasLectivas.map(formatHoraLabel).join(', ')}`);
+    appliedSummaries.push(`${getVisibleTeacherName(item.profesor)||item.profesor} · ${item.date} · ${horasLectivas.map(formatHoraLabel).join(', ')}`);
     item.status='applied';
     item.appliedAt=new Date().toISOString();
     approvalsChanged=true;
@@ -2110,7 +2358,7 @@ function renderWeekLabel(){
   if(teacherWeekLabel) teacherWeekLabel.textContent=formatWeekRangeLabel(getTeacherSelectedWeekKey(),teacherWeekOffset);
   const saveTs=document.getElementById('saveTs');
   if(saveTs&&!isCurrentWeekOffset(weekOffset)){
-    saveTs.textContent='Vista de planificaciÃ³n. La ediciÃ³n sigue reservada a la semana actual.';
+    saveTs.textContent='Vista de planificación. La edición sigue reservada a la semana actual.';
   }
 }
 function renderPills(){document.getElementById('dNombre').textContent=DIAS[day];document.getElementById('dayPills').innerHTML=DIAS.map((d,i)=>`<button class="day-pill${i===day?' active':''}" onclick="setDay(${i})">${d}</button>`).join('');renderWeekLabel();}
@@ -2164,14 +2412,44 @@ function toggleGuardiaCard(button){
   button.parentElement.classList.toggle('is-open');
 }
 function setDay(i){day=i;renderPills();renderGuardiaBoard();renderTable();}
-function changeWeekOffset(delta){
+async function changeWeekOffset(delta){
+  const openPanels=getOpenWorkflowOverlayIds();
+  if(openPanels.length){
+    const confirmed=await askConfirm(
+      'Cambiar de semana',
+      'Tienes paneles o formularios abiertos. Al cambiar de semana se cerrarán y verás la nueva vista.',
+      'Cambiar de semana'
+    );
+    if(!confirmed) return;
+    closeWorkflowOverlays(openPanels);
+  }
   weekOffset=Math.max(-1,Math.min(3,weekOffset+delta));
   renderPills();
   updateAdminControls();
   renderGuardiaBoard();
   renderTable();
 }
-function sortearGuardiasDia(){for(let hora=1;hora<=9;hora++){ordenGuardias[day][hora]=makeOrdenHora(day,hora);}persistOrden(ordenGuardias);renderGuardiaBoard();renderTable();}
+async function sortearGuardiasDia(){
+  if(!isAdmin||!isCurrentWeekOffset(weekOffset)){
+    showToast('Solo puedes sortear la semana actual desde Jefatura.','info');
+    return;
+  }
+  const undoState=buildUndoState(day,{includeOrden:true});
+  const confirmed=await askConfirm(
+    'Confirmar sorteo',
+    `Se generará un nuevo orden para ${DIAS[day]}. El orden anterior quedará guardado en historial para poder deshacerlo.`,
+    'Sortear y guardar'
+  );
+  if(!confirmed) return;
+  for(let hora=1;hora<=9;hora++){
+    ordenGuardias[day][hora]=makeOrdenHora(day,hora);
+  }
+  persistOrden(ordenGuardias);
+  addHistoryEntry('Sorteo del día',`Nuevo orden generado para ${DIAS[day]}.`,'edit',{undoState});
+  renderHistoryList();
+  renderGuardiaBoard();
+  renderTable();
+}
 function buildDailyReportText(){
   const rows=data.filter(g=>g.dia===day).sort((a,b)=>a.hora-b.hora);
   const fecha=formatNowParts().date.toLocaleDateString('es-ES');
@@ -2237,11 +2515,11 @@ function buildDailyReportHtml(){
           <div class="meta-card"><span class="meta-k">Aula</span><span class="meta-v">${escapeHtml(aula)}</span></div>
           <div class="meta-card"><span class="meta-k">Tarea</span><span class="meta-v">${faenaInfo.faena?'Disponible':'No registrada'}</span></div>
           <div class="meta-card"><span class="meta-k">Biblioteca</span><span class="meta-v">${escapeHtml(biblioteca)}</span></div>
-          <div class="meta-card"><span class="meta-k">BaÃ±os</span><span class="meta-v">${escapeHtml(banos)}</span></div>
+          <div class="meta-card"><span class="meta-k">Baños</span><span class="meta-v">${escapeHtml(banos)}</span></div>
         </div>
         ${faenaInfo.obs?`<div class="task-box"><div class="task-title">Indicaciones para el grupo</div><div class="task-text">${escapeHtml(faenaInfo.obs)}</div></div>`:''}
       </article>`;
-  }).join(''):`<p class="empty empty-left">No hay ausencias registradas para este dÃ­a.</p>`;
+  }).join(''):`<p class="empty empty-left">No hay ausencias registradas para este día.</p>`;
   return `<!DOCTYPE html>
   <html lang="es">
   <head>
@@ -2290,13 +2568,13 @@ function buildDailyReportHtml(){
     <main class="sheet">
       <div class="topbar">
         <div>
-          <div class="title-kicker">IES Alcalans Â· Guardias</div>
-          <h1>Informe diario Â· ${escapeHtml(DIAS[day])}</h1>
-          <div class="subtitle">Fecha de generaciÃ³n: ${escapeHtml(fecha)}</div>
+          <div class="title-kicker">IES Alcalans · Guardias</div>
+          <h1>Informe diario · ${escapeHtml(DIAS[day])}</h1>
+          <div class="subtitle">Fecha de generación: ${escapeHtml(fecha)}</div>
         </div>
       </div>
       <section class="summary">
-        <article class="summary-card"><span class="summary-k">Ausencias</span><span class="summary-v">${totalAusencias}</span><span class="summary-note">Registros del dÃ­a</span></article>
+        <article class="summary-card"><span class="summary-k">Ausencias</span><span class="summary-v">${totalAusencias}</span><span class="summary-note">Registros del día</span></article>
         <article class="summary-card"><span class="summary-k">Coberturas</span><span class="summary-v">${totalCubiertas}</span><span class="summary-note">Asignadas o previstas</span></article>
         <article class="summary-card"><span class="summary-k">Con tarea</span><span class="summary-v">${totalConTarea}</span><span class="summary-note">Faena disponible</span></article>
       </section>
@@ -2316,7 +2594,7 @@ function buildWeeklyReportHtml(){
       .filter(row=>row.dia===diaIndex)
       .sort((a,b)=>a.hora-b.hora||String(a.ausente||'').localeCompare(String(b.ausente||''),'es'));
     if(!rows.length){
-      return `<section class="day-block"><div class="day-head"><h2>${escapeHtml(diaNombre)}</h2><span class="day-count">Sin incidencias</span></div><p class="empty empty-left">No hay ausencias registradas para este dÃ­a.</p></section>`;
+      return `<section class="day-block"><div class="day-head"><h2>${escapeHtml(diaNombre)}</h2><span class="day-count">Sin incidencias</span></div><p class="empty empty-left">No hay ausencias registradas para este día.</p></section>`;
     }
     const grouped=new Map();
     rows.forEach(row=>{
@@ -2387,16 +2665,16 @@ function buildWeeklyReportHtml(){
     <main class="sheet">
       <section class="hero">
         <div>
-          <div class="hero-kicker">IES Alcalans Â· Guardias</div>
+          <div class="hero-kicker">IES Alcalans · Guardias</div>
           <h1>Informe semanal de guardias</h1>
-          <div class="hero-meta">Fecha de generaciÃ³n: ${escapeHtml(fecha)}</div>
+          <div class="hero-meta">Fecha de generación: ${escapeHtml(fecha)}</div>
         </div>
       </section>
       <section class="summary">
         <article class="summary-card"><span class="summary-k">Ausencias</span><span class="summary-v">${totalAusencias}</span><span class="summary-note">Registros semanales</span></article>
         <article class="summary-card"><span class="summary-k">Coberturas</span><span class="summary-v">${totalCoberturas}</span><span class="summary-note">Guardias asignadas</span></article>
         <article class="summary-card"><span class="summary-k">Con tarea</span><span class="summary-v">${totalConTarea}</span><span class="summary-note">Faena disponible</span></article>
-        <article class="summary-card"><span class="summary-k">DÃ­as activos</span><span class="summary-v">${diasConIncidencia}</span><span class="summary-note">Con incidencias registradas</span></article>
+        <article class="summary-card"><span class="summary-k">Días activos</span><span class="summary-v">${diasConIncidencia}</span><span class="summary-note">Con incidencias registradas</span></article>
       </section>
       ${daySections}
     </main>
@@ -2532,6 +2810,10 @@ function setHistoryFilter(filter){
 function restoreUndoState(state){
   if(!state) return false;
   data=normalizeStoredRows(cloneJson(state.data||[]));
+  if(state.orden){
+    ordenGuardias=ensureOrden(cloneJson(state.orden));
+    persistOrden(ordenGuardias);
+  }
   reassignAllGuardias();
   persist(data);
   nid=computeNextId(data);
@@ -2778,7 +3060,7 @@ function getFutureAbsenceTemporalMeta(item){
   const targetDate=new Date(`${dateValue}T00:00:00`);
   if(Number.isNaN(todayDate.getTime())||Number.isNaN(targetDate.getTime())) return '';
   const diffDays=Math.round((targetDate.getTime()-todayDate.getTime())/86400000);
-  if(diffDays===1) return 'MaÃ±ana';
+  if(diffDays===1) return 'Mañana';
   if(diffDays>1&&diffDays<=7) return 'Esta semana';
   if(diffDays<0) return 'Pasada';
   return '';
@@ -3537,6 +3819,7 @@ function renderTeacherPanel(){
   const moodDateKey=getCurrentDateIso();
   const moodEntry=getTeacherMoodEntry(teacherName,moodDateKey);
   const moodOption=moodEntry?getTeacherMoodOption(moodEntry.moodId):null;
+  const moodMessage=moodOption?getTeacherMoodMessage(teacherName,moodDateKey,moodOption):'';
   renderWeekLabel();
   syncTeacherIdentity();
   document.getElementById('teacherName').textContent=getVisibleTeacherName(profesor.nombre);
@@ -3585,7 +3868,7 @@ function renderTeacherPanel(){
   document.getElementById('teacherBarName').textContent=`${getVisibleTeacherName(profesor.nombre)} - ${profesor.departamento}`;
   if(moodCard){
     moodCard.innerHTML=moodOption
-      ?`<div class="teacher-mood-copy"><div class="teacher-mood-title">${moodOption.emoji} ${escapeHtml(moodOption.welcome)}</div><div class="teacher-mood-text">Hoy te sientes ${escapeHtml(moodOption.label.toLowerCase())}. ${escapeHtml(moodOption.copy)}</div></div><button class="btn-teacher-panel" type="button" onclick="resetTeacherMood()">Cambiar estado</button>`
+      ?`<div class="teacher-mood-copy"><div class="teacher-mood-title">${moodOption.emoji} ${escapeHtml(moodOption.welcome)}</div><div class="teacher-mood-text">Hoy te sientes ${escapeHtml(moodOption.label.toLowerCase())}. ${escapeHtml(moodMessage)}</div></div><button class="btn-teacher-panel" type="button" onclick="resetTeacherMood()">Cambiar estado</button>`
       :`<div class="teacher-mood-copy"><div class="teacher-mood-title">¿Cómo te sientes hoy?</div><div class="teacher-mood-text">Elige una opción rápida y seguimos. Es solo un guiño del panel para arrancar el día.</div></div><div class="teacher-mood-options">${TEACHER_MOOD_OPTIONS.map(option=>`<button class="teacher-mood-option" type="button" onclick="selectTeacherMood('${option.id}')" aria-label="${escapeHtml(option.label)}"><span class="teacher-mood-option-emoji">${option.emoji}</span><span class="teacher-mood-option-label">${escapeHtml(option.label)}</span></button>`).join('')}</div>`;
     moodCard.className=`teacher-mood-card${moodOption?` is-${moodOption.tone}`:''}`;
   }
@@ -3710,7 +3993,7 @@ function syncTodoDiaMode(){
   guardiaInput.placeholder='La guardia se asigna automaticamente';
   setFieldError('fGuardia','');
 }
-function openModal(id){if(!isCurrentWeekOffset(weekOffset)){showToast('La ediciÃ³n solo estÃ¡ disponible en la semana actual.','info');return;}editId=id||null;const g=id?data.find(x=>x.id===id):null;const aula=g?resolveAulaRegistro(g):'';const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?getVisibleTeacherName(g.ausente):'';document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fAula').value=aula;document.getElementById('fTodoDia').checked=false;document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';populateProfesoresGuardia();syncAulaFromProfesor(!g||!aula);syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
+function openModal(id){if(!isCurrentWeekOffset(weekOffset)){showToast('La edición solo está disponible en la semana actual.','info');return;}editId=id||null;const g=id?data.find(x=>x.id===id):null;const aula=g?resolveAulaRegistro(g):'';const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?getVisibleTeacherName(g.ausente):'';document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fAula').value=aula;document.getElementById('fTodoDia').checked=false;document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';populateProfesoresGuardia();syncAulaFromProfesor(!g||!aula);syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
 function renderAusentePreview(){
   const input=document.getElementById('fAusente');
   const preview=document.getElementById('ausentePreview');

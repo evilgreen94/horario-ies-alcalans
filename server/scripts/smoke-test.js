@@ -99,7 +99,12 @@ async function testAnonymousWriteProtection() {
     ['/api/biblioteca/replace', 'PUT', [], 401],
     ['/api/historial/replace', 'PUT', [], 401],
     ['/api/profesorado/tareas/replace', 'PUT', [], 401],
+    ['/api/profesorado/tareas', 'POST', {}, 401],
+    ['/api/profesorado/tareas/sample-id', 'DELETE', {}, 401],
     ['/api/profesorado/session-overrides/replace', 'PUT', [], 401],
+    ['/api/profesorado/session-overrides', 'POST', {}, 401],
+    ['/api/profesorado/session-overrides/sample-id', 'DELETE', {}, 401],
+    ['/api/profesorado/future-absences', 'POST', {}, 401],
     ['/api/export/restore', 'POST', {}, 401]
   ];
 
