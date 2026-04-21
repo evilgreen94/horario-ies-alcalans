@@ -1864,7 +1864,6 @@ async function deleteTeacherFutureAbsenceEntry(id){
 }
 async function hydrateFromBackend(){
   if(!storage.hasBackend()||backendHydrated) return;
-  if(!isAdmin&&!isSuperAdmin) return;
   backendHydrated=true;
   try{
     const [guardiasResult,historialResult,tareasResult,overridesResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult]=await Promise.allSettled([
@@ -1998,7 +1997,6 @@ function makeBackendSnapshot(){
 }
 async function pollBackendState(){
   if(!storage.hasBackend()||backendPollingInFlight||backendSyncInFlight) return;
-  if(!isAdmin&&!isSuperAdmin) return;
   if(document.hidden||isAnyOverlayOpen()) return;
 
   backendPollingInFlight=true;

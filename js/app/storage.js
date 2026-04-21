@@ -1,7 +1,8 @@
 (function initGuardiasStorage(global){
   const backendBaseUrl = global.GUARDIAS_API_BASE_URL || (global.location.protocol === 'file:' ? 'http://localhost:3000/api' : '/api');
   const searchParams = new URLSearchParams(global.location.search || '');
-  const requestedMode = String(global.GUARDIAS_STORAGE_MODE || searchParams.get('storage') || 'hybrid').trim().toLowerCase();
+  const defaultMode = global.location.protocol === 'file:' ? 'hybrid' : 'backend-only';
+  const requestedMode = String(global.GUARDIAS_STORAGE_MODE || searchParams.get('storage') || defaultMode).trim().toLowerCase();
   const storageMode = requestedMode === 'backend-only' ? 'backend-only' : 'hybrid';
   const localCacheEnabled = storageMode !== 'backend-only';
 

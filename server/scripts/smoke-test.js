@@ -73,12 +73,21 @@ async function testHealth() {
 }
 
 async function testProtectedWithoutAuth() {
+  const publicReadChecks = [
+    ['/api/guardias', 200],
+    ['/api/biblioteca', 200],
+    ['/api/historial', 200],
+    ['/api/profesorado/tareas', 200],
+    ['/api/profesorado/session-overrides', 200]
+  ];
+
+  for (const [pathname, expected] of publicReadChecks) {
+    const { response, body } = await request(pathname);
+    assert(response.status === expected, `${pathname} expected ${expected}, got ${response.status}`);
+    assert(Array.isArray(body), `${pathname} expected array body`);
+  }
+
   const checks = [
-    ['/api/guardias', 401],
-    ['/api/biblioteca', 401],
-    ['/api/historial', 401],
-    ['/api/profesorado/tareas', 401],
-    ['/api/profesorado/session-overrides', 401],
     ['/api/export/snapshot.json', 401],
     ['/api/export/database.sqlite', 401],
     ['/api/report/daily.pdf?day=0', 401]
@@ -89,7 +98,7 @@ async function testProtectedWithoutAuth() {
     assert(response.status === expected, `${pathname} expected ${expected}, got ${response.status}`);
   }
 
-  return 'protected routes reject anonymous access';
+  return 'public reads allowed; protected routes reject anonymous access';
 }
 
 async function testAnonymousWriteProtection() {

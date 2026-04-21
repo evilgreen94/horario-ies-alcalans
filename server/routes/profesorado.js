@@ -18,7 +18,7 @@ const PRACTICAS_GUARDIAS_STATE_KEY = 'teacher_practicas_guardias';
 const PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY = 'teacher_practicas_guardias_tramos';
 const FUTURE_ABSENCES_STATE_KEY = 'teacher_future_absences';
 
-router.get('/tareas', requireRole('admin'), async (_req, res, next) => {
+router.get('/tareas', async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const rows = await db.all('SELECT * FROM tareas_profesorado ORDER BY profesor, dia, hora');
@@ -90,7 +90,7 @@ router.delete('/tareas/:id', requireRole('admin'), async (req, res, next) => {
   }
 });
 
-router.get('/session-overrides', requireRole('admin'), async (_req, res, next) => {
+router.get('/session-overrides', async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const rows = await db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora');
@@ -193,7 +193,7 @@ router.put('/substitutions/replace', requireRole('admin'), async (req, res, next
   }
 });
 
-router.get('/practicas-guardias', requireRole('admin'), async (_req, res, next) => {
+router.get('/practicas-guardias', async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const row = await db.get('SELECT value FROM app_state WHERE key = ?', [PRACTICAS_GUARDIAS_STATE_KEY]);
@@ -220,7 +220,7 @@ router.put('/practicas-guardias/replace', requireRole('admin'), async (req, res,
   }
 });
 
-router.get('/practicas-guardias-tramos', requireRole('admin'), async (_req, res, next) => {
+router.get('/practicas-guardias-tramos', async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const row = await db.get('SELECT value FROM app_state WHERE key = ?', [PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY]);

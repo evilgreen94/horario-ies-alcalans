@@ -11,7 +11,7 @@ function notFound(message) {
   return error;
 }
 
-router.get('/', requireRole('admin'), async (_req, res, next) => {
+router.get('/', async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const rows = await db.all('SELECT * FROM ausencias ORDER BY dia, hora, id');
