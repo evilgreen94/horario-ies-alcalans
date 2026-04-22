@@ -56,7 +56,17 @@
       if (response.status === 401 && path !== '/auth/login') {
         global.dispatchEvent(new CustomEvent('guardias-auth-invalid'));
       }
-      throw new Error(`Request failed: ${response.status}`);
+      let detail = '';
+      try {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const body = await response.json();
+          detail = body?.error || body?.message || '';
+        } else {
+          detail = await response.text();
+        }
+      } catch (_error) {}
+      throw new Error(`Request failed: ${response.status}${detail ? ` - ${detail}` : ''}`);
     }
 
     if (response.status === 204) return null;
@@ -145,6 +155,27 @@
     deleteSessionOverrideEntry(id){
       return request(`/profesorado/session-overrides/${encodeURIComponent(id)}`, {
         method: 'DELETE'
+      });
+    },
+    fetchAlumnosFueraAula(){
+      return request('/profesorado/alumnos-fuera-aula');
+    },
+    saveAlumnosFueraAulaEntry(row){
+      return request('/profesorado/alumnos-fuera-aula', {
+        method: 'POST',
+        body: JSON.stringify(row)
+      });
+    },
+    registrarSalidaAlumno(row){
+      return request('/profesorado/alumnos-fuera-aula/salida', {
+        method: 'POST',
+        body: JSON.stringify(row)
+      });
+    },
+    registrarRetornoAlumno(row){
+      return request('/profesorado/alumnos-fuera-aula/retorno', {
+        method: 'POST',
+        body: JSON.stringify(row)
       });
     },
     fetchTeacherSubstitutions(){

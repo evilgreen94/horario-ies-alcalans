@@ -1,8 +1,8 @@
 # Horario IES Alcalans
 
-AplicaciÃ³n interna para gestionar ausencias del profesorado, reparto de guardias, sustituciones, tareas dejadas por el docente ausente e informes PDF.
+Aplicación interna para gestionar ausencias del profesorado, reparto de guardias, sustituciones, tareas dejadas por el docente ausente e informes PDF.
 
-El proyecto estÃ¡ pensado para uso en red local del centro. El estado actual ya cubre la operativa diaria de Jefatura, un panel especÃ­fico de Profesorado y un panel tÃ©cnico de Superadmin.
+El proyecto está pensado para uso en red local del centro. El estado actual ya cubre la operativa diaria de Jefatura, un panel específico de Profesorado y un panel técnico de Superadmin.
 
 ## Estado actual
 
@@ -17,19 +17,19 @@ El proyecto estÃ¡ pensado para uso en red local del centro. El estado actual y
 
 ### Jefatura
 
-- Alta, ediciÃ³n y borrado de ausencias por dÃ­a y hora
-- Reparto automÃ¡tico de guardias
-- LiberaciÃ³n automÃ¡tica de reservas de biblioteca y baÃ±os si hacen falta para cubrir
-- GestiÃ³n de sustituciones temporales
-- ValidaciÃ³n o rechazo de faltas futuras comunicadas por profesorado
-- GeneraciÃ³n de `Informe diario` y `Informe semanal`
+- Alta, edición y borrado de ausencias por día y hora
+- Reparto automático de guardias
+- Liberación automática de reservas de biblioteca y baños si hacen falta para cubrir
+- Gestión de sustituciones temporales
+- Validación o rechazo de faltas futuras comunicadas por profesorado
+- Generación de `Informe diario` y `Informe semanal`
 
 ### Profesorado
 
 - Acceso por selector de profesor
-- Vista del horario del dÃ­a
-- EdiciÃ³n de tarea dejada para una sesiÃ³n
-- VisualizaciÃ³n de la faena dejada cuando le toca cubrir una guardia
+- Vista del horario del día
+- Edición de tarea dejada para una sesión
+- Visualización de la faena dejada cuando le toca cubrir una guardia
 - Aviso de faltas futuras por fecha y horas lectivas concretas
 - Consulta del estado de sus avisos: `Pendiente`, `Validada`, `Rechazada`, `Aplicada`
 
@@ -37,9 +37,9 @@ El proyecto estÃ¡ pensado para uso en red local del centro. El estado actual y
 
 - Acceso separado por URL
 - Login independiente del modo Jefatura
-- Panel tÃ©cnico orientado a mantenimiento
-- ExportaciÃ³n y restauraciÃ³n
-- Monitor/log tÃ©cnico de cambios y sincronizaciÃ³n
+- Panel técnico orientado a mantenimiento
+- Exportación y restauración
+- Monitor/log técnico de cambios y sincronización
 
 ## Estructura relevante
 
@@ -89,7 +89,9 @@ horario-ies-alcalans/
 
 ## Arranque local
 
-### OpciÃ³n PowerShell
+La forma recomendada es arrancar desde la carpeta raíz del proyecto usando PowerShell.
+
+### Opción PowerShell
 
 ```powershell
 cd "C:\Users\usuario\Documents\GitHub\horario-ies-alcalans"
@@ -97,7 +99,9 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\start-local.ps1
 ```
 
-### OpciÃ³n CMD
+Si prefieres no cambiar la política de ejecución, abre una sesión nueva de PowerShell y ejecuta solo el script.
+
+### Opción CMD
 
 ```bat
 cd /d "C:\Users\usuario\Documents\GitHub\horario-ies-alcalans"
@@ -118,7 +122,7 @@ http://localhost:3000/?panel=superadmin
 
 ## Variables de entorno
 
-La plantilla base estÃ¡ en [`.env.example`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\.env.example).
+La plantilla base está en [`.env.example`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\.env.example).
 
 ### Obligatoria
 
@@ -146,7 +150,7 @@ GUARDIAS_SUPERADMIN_PASSWORD=<clave-superadmin-inicial>
 
 ### `admin`
 
-- GestiÃ³n operativa diaria
+- Gestión operativa diaria
 - Ausencias
 - Guardias
 - Sustituciones
@@ -155,14 +159,14 @@ GUARDIAS_SUPERADMIN_PASSWORD=<clave-superadmin-inicial>
 
 ### `superadmin`
 
-- Mantenimiento tÃ©cnico
-- ExportaciÃ³n y restauraciÃ³n
+- Mantenimiento técnico
+- Exportación y restauración
 - Monitor de estado
 - No comparte interfaz operativa con Jefatura
 
 ## Base de datos
 
-La aplicaciÃ³n usa por defecto:
+La aplicación usa por defecto:
 
 - [`BD/guardias.sqlite`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\BD\guardias.sqlite)
 
@@ -170,7 +174,7 @@ Si quieres mover el proyecto entre equipos sin servidor central, debes copiar es
 
 ## Despliegue en servidor local
 
-Para pasar esto a un servidor local del centro no hace falta rehacer la aplicaciÃ³n. Lo necesario es:
+Para pasar esto a un servidor local del centro no hace falta rehacer la aplicación. Lo necesario es:
 
 1. Un equipo fijo en la red local con `Node.js`
 2. Una ruta estable para la base SQLite
@@ -179,7 +183,7 @@ Para pasar esto a un servidor local del centro no hace falta rehacer la aplicaci
    - `GUARDIAS_DB_PATH`
    - `PORT`
 4. Arrancar el servicio de forma persistente
-5. Si se quiere algo mÃ¡s serio, poner un proxy delante (`Nginx` o equivalente)
+5. Si se quiere algo más serio, poner un proxy delante (`Nginx` o equivalente)
 
 ### Paquetes recomendados en Linux Server
 
@@ -199,18 +203,18 @@ sudo apt update
 sudo apt install -y git nginx sqlite3 ufw curl
 ```
 
-### RecomendaciÃ³n prÃ¡ctica
+### Recomendación práctica
 
 - Mantener `SQLite` por ahora
 - Exponer solo en red interna
-- Usar un Ãºnico equipo como servidor
-- Hacer copia periÃ³dica de `guardias.sqlite`
+- Usar un único equipo como servidor
+- Hacer copia periódica de `guardias.sqlite`
 
 ### Datos actuales del servidor
 
 - IP interna prevista: `172.28.244.178`
 - Usuario operativo actual: `superadmin`
-- La contraseÃ±a no debe guardarse en este repositorio; conviene mantenerla en un documento local seguro o en el sistema de credenciales del centro
+- La contraseña no debe guardarse en este repositorio; conviene mantenerla en un documento local seguro o en el sistema de credenciales del centro
 
 ### Migración prevista al servidor
 
@@ -232,14 +236,14 @@ Orden recomendado:
 7. Activar backups automáticos
 8. Abrir acceso solo en red interna
 
-### QuÃ© no hace falta todavÃ­a
+### Qué no hace falta todavía
 
 - No hace falta cambiar de base de datos
 - No hace falta framework frontend
-- No hace falta internet pÃºblica
+- No hace falta internet pública
 - No hace falta separar frontend y backend
 
-## Comprobaciones Ãºtiles
+## Comprobaciones útiles
 
 ### Healthcheck
 
@@ -253,7 +257,7 @@ Respuesta esperada:
 {"ok":true}
 ```
 
-### VerificaciÃ³n de sintaxis
+### Verificación de sintaxis
 
 ```powershell
 node --check js/app/guardias.js
@@ -268,23 +272,23 @@ npm.cmd run smoke
 
 ## Pruebas futuras
 
-### Prueba de carga / estrÃ©s
+### Prueba de carga / estrés
 
-Cuando la aplicaciÃ³n estÃ© montada en el equipo definitivo del centro, conviene hacer una prueba de carga para estimar:
+Cuando la aplicación esté montada en el equipo definitivo del centro, conviene hacer una prueba de carga para estimar:
 
-1. CuÃ¡ntos usuarios pueden consultar la web a la vez
-2. CuÃ¡ntos pueden operar simultÃ¡neamente sin degradaciÃ³n apreciable
-3. QuÃ© impacto tienen las escrituras concurrentes y la generaciÃ³n de PDF
+1. Cuántos usuarios pueden consultar la web a la vez
+2. Cuántos pueden operar simultáneamente sin degradación apreciable
+3. Qué impacto tienen las escrituras concurrentes y la generación de PDF
 
 Escenarios recomendados:
 
 - Consulta simple de panel principal
 - Acceso de profesorado a su panel
-- Alta y ediciÃ³n de ausencias desde Jefatura
-- EnvÃ­o y revisiÃ³n de faltas futuras
-- GeneraciÃ³n de informe diario y semanal
+- Alta y edición de ausencias desde Jefatura
+- Envío y revisión de faltas futuras
+- Generación de informe diario y semanal
 
-MÃ©tricas a registrar:
+Métricas a registrar:
 
 - Latencia media
 - Percentil 95 / 99
@@ -301,11 +305,11 @@ Herramientas libres que encajan bien:
 - `wrk`
 - `hey`
 
-Nota: al usar `SQLite`, el cuello de botella mÃ¡s probable no serÃ¡ la lectura concurrente sino las escrituras simultÃ¡neas y ciertos picos de exportaciÃ³n / informes.
+Nota: al usar `SQLite`, el cuello de botella más probable no será la lectura concurrente sino las escrituras simultáneas y ciertos picos de exportación / informes.
 
 ## Notas operativas
 
-- El horario base que consume la app estÃ¡ en [`js/data/profesorado_horarios_guardias.js`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\js\data\profesorado_horarios_guardias.js)
+- El horario base que consume la app está en [`js/data/profesorado_horarios_guardias.js`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\js\data\profesorado_horarios_guardias.js)
 - La fuente anual predeterminada es [`json_profes/profesorado_horarios_guardias_con_guardias_updated.json`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\json_profes\profesorado_horarios_guardias_con_guardias_updated.json)
 - Si hace falta usar otra fuente, se indica de forma explícita con `--source ...` o con `ANNUAL_SOURCE_PATH=...`
 - Si se actualiza la fuente anual, luego hay que regenerar la fuente `.js` que usa la web con:
@@ -314,7 +318,7 @@ Nota: al usar `SQLite`, el cuello de botella mÃ¡s probable no serÃ¡ la lectu
 npm.cmd run annual:build
 ```
 
-## SeparaciÃ³n anual / semanal
+## Separación anual / semanal
 
 ### Datos anuales
 
@@ -339,7 +343,7 @@ Artefacto generado que consume la web:
 ### Datos semanales / operativos
 
 - Ausencias
-- Biblioteca y baÃ±os
+- Biblioteca y baños
 - Tareas dejadas
 - Historial
 - Sustituciones temporales
@@ -372,15 +376,15 @@ Ese reinicio borra datos semanales y temporales, mantiene credenciales y archiva
 
 ## Backup pendiente
 
-### Copia integral automÃ¡tica de la base
+### Copia integral automática de la base
 
-Queda ya preparado en el repo para activarlo despuÃ©s en el servidor Linux.
+Queda ya preparado en el repo para activarlo después en el servidor Linux.
 
-Se ha planificado esta rotaciÃ³n:
+Se ha planificado esta rotación:
 
 1. Copia diaria a las `19:00`
 2. Copia semanal el `domingo a las 23:30`
-3. Copia mensual el `Ãºltimo dÃ­a del mes a las 23:45`
+3. Copia mensual el `último día del mes a las 23:45`
 
 Todas las copias se hacen sobre [`BD/guardias.sqlite`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\BD\guardias.sqlite) y se guardan fuera de la carpeta activa del proyecto, por defecto en:
 
@@ -397,21 +401,21 @@ Estructura prevista:
 `-- monthly/
 ```
 
-RotaciÃ³n por defecto del script:
+Rotación por defecto del script:
 
 - diarias: `14`
 - semanales: `8`
 - mensuales: `12`
 
-### RecomendaciÃ³n prÃ¡ctica
+### Recomendación práctica
 
-- Backup diario automÃ¡tico de la base SQLite
-- Snapshot JSON tÃ©cnico adicional de forma periÃ³dica
-- RestauraciÃ³n documentada y ensayada al menos una vez
+- Backup diario automático de la base SQLite
+- Snapshot JSON técnico adicional de forma periódica
+- Restauración documentada y ensayada al menos una vez
 
-### Nota tÃ©cnica
+### Nota técnica
 
-Como la aplicaciÃ³n usa `SQLite`, la estrategia de copia debe contemplar una copia consistente de la base completa y no depender solo de exportaciones manuales desde la interfaz.
+Como la aplicación usa `SQLite`, la estrategia de copia debe contemplar una copia consistente de la base completa y no depender solo de exportaciones manuales desde la interfaz.
 
 ### Ficheros preparados en el repositorio
 
@@ -423,16 +427,16 @@ Como la aplicaciÃ³n usa `SQLite`, la estrategia de copia debe contemplar una c
 - [`deploy/linux/guardias-backup-monthly.service`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\deploy\linux\guardias-backup-monthly.service)
 - [`deploy/linux/guardias-backup-monthly.timer`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\deploy\linux\guardias-backup-monthly.timer)
 
-### QuÃ© hace el script de backup
+### Qué hace el script de backup
 
 El script:
 
-1. Usa `sqlite3 .backup` si estÃ¡ disponible
-2. Guarda la copia segÃºn el tipo: `daily`, `weekly` o `monthly`
-3. Aplica rotaciÃ³n automÃ¡tica
-4. Puede copiar tambiÃ©n un JSON tÃ©cnico si se activa `JSON_BACKUP_ENABLED=1`
+1. Usa `sqlite3 .backup` si está disponible
+2. Guarda la copia según el tipo: `daily`, `weekly` o `monthly`
+3. Aplica rotación automática
+4. Puede copiar también un JSON técnico si se activa `JSON_BACKUP_ENABLED=1`
 
-### Variables Ãºtiles del script
+### Variables útiles del script
 
 Se pueden ajustar por entorno:
 
@@ -446,9 +450,9 @@ MONTHLY_KEEP=12
 JSON_BACKUP_ENABLED=0
 ```
 
-### ActivaciÃ³n posterior en el servidor
+### Activación posterior en el servidor
 
-Cuando se haga la migraciÃ³n real, los pasos previstos serÃ¡n:
+Cuando se haga la migración real, los pasos previstos serán:
 
 ```bash
 chmod +x /srv/guardias/horario-ies-alcalans/deploy/linux/backup-guardias.sh
@@ -486,9 +490,9 @@ La idea sería que funcione como detalle de acogida y cercanía, no como dato op
 
 ## Siguiente paso recomendado
 
-Si el proyecto pasa a servidor local del centro, lo razonable serÃ­a:
+Si el proyecto pasa a servidor local del centro, lo razonable sería:
 
-1. Fijar la mÃ¡quina servidora
+1. Fijar la máquina servidora
 2. Crear un `.env` estable
 3. Arrancarlo como servicio
-4. Hacer backup automÃ¡tico diario de `guardias.sqlite`
+4. Hacer backup automático diario de `guardias.sqlite`

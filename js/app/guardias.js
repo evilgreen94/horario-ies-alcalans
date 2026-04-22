@@ -12,9 +12,11 @@ const KEY_TEACHER_PRACTICAS_GUARDIAS_TRAMOS='IES_Alcalans_Profesorado_Practicas_
 const KEY_TEACHER_FUTURE_ABSENCES='IES_Alcalans_Profesorado_Faltas_Futuras';
 const KEY_TEACHER_MOODS='IES_Alcalans_Profesorado_Estado_Animo';
 const KEY_SESSION_OVERRIDES='IES_Alcalans_Sesiones_Profesorado';
+const KEY_ALUMNOS_FUERA_AULA='IES_Alcalans_Alumnos_Fuera_Aula';
 const KEY_HISTORIAL='IES_Alcalans_Historial_Cambios';
 const KEY_WEEK='IES_Alcalans_School_Week_Key';
 const KEY_ANNUAL_DATASET='IES_Alcalans_Annual_Dataset_Id';
+const MAX_ALUMNOS_FUERA_AULA=10;
 const RAW_PROFESORADO=(window.PROFESORADO_SOURCE&&Array.isArray(window.PROFESORADO_SOURCE.teachers))?window.PROFESORADO_SOURCE.teachers:[];
 const ANNUAL_DATASET_ID=cleanText(window.PROFESORADO_SOURCE?.datasetId||'legacy');
 const GRUPOS_PROFESORADO={};
@@ -31,6 +33,23 @@ function cleanText(value){return String(value ?? '').replace(/\s+/g,' ').trim();
 function formatNowParts(){
   const now=new Date();
   return {hours:now.getHours(),minutes:now.getMinutes(),date:now};
+}
+function getCurrentSchoolSlot(){
+  const {hours,minutes,date}=formatNowParts();
+  const total=hours*60+minutes;
+  const weekday=date.getDay();
+  if(weekday<1||weekday>5) return null;
+  const found=Object.entries(HORA_MAP).find(([,info])=>{
+    const [start,end]=String(info.rango||'').split('-');
+    const [sh,sm]=start.split(':').map(Number);
+    const [eh,em]=end.split(':').map(Number);
+    if(!Number.isInteger(sh)||!Number.isInteger(sm)||!Number.isInteger(eh)||!Number.isInteger(em)) return false;
+    return total>=sh*60+sm&&total<eh*60+em;
+  });
+  if(!found) return null;
+  const hora=Number(found[0]);
+  if(HORAS_PATIO.has(hora)) return null;
+  return {dia:weekday-1,hora};
 }
 function formatDateKey(date){
   const year=date.getFullYear();
@@ -477,6 +496,30 @@ function loadTeacherMoods(){return storage.readJson(KEY_TEACHER_MOODS,{});}
 function persistTeacherMoods(rows){storage.writeJson(KEY_TEACHER_MOODS,rows&&typeof rows==='object'?rows:{});}
 function loadSessionOverrides(){return storage.readJson(KEY_SESSION_OVERRIDES,{});}
 function persistSessionOverrides(d){storage.writeJson(KEY_SESSION_OVERRIDES,d);}
+function makeAlumnosFueraKey(nombre,dia,hora){return `${nombre}|${dia}|${hora}`;}
+function normalizeAlumnosFueraRow(row){
+  const profesor=cleanText(row?.profesor);
+  const dia=Number(row?.dia);
+  const hora=Number(row?.hora);
+  const cantidad=Math.max(0,Number(row?.cantidad)||0);
+  if(!getProfesor(profesor)||!Number.isInteger(dia)||dia<0||dia>4||!Number.isInteger(hora)||hora<1||hora>9||HORAS_PATIO.has(hora)) return null;
+  return {
+    profesor,
+    dia,
+    hora,
+    cantidad,
+    lastExitAt:cleanText(row?.lastExitAt||row?.last_exit_at),
+    lastReturnAt:cleanText(row?.lastReturnAt||row?.last_return_at),
+    updatedAt:cleanText(row?.updatedAt||row?.updated_at)
+  };
+}
+function loadAlumnosFueraAula(){
+  const rows=storage.readJson(KEY_ALUMNOS_FUERA_AULA,[]);
+  return Object.fromEntries((Array.isArray(rows)?rows:[]).map(normalizeAlumnosFueraRow).filter(Boolean).map(row=>[makeAlumnosFueraKey(row.profesor,row.dia,row.hora),row]));
+}
+function persistAlumnosFueraAula(rows){
+  storage.writeJson(KEY_ALUMNOS_FUERA_AULA,Object.values(rows||{}).map(normalizeAlumnosFueraRow).filter(Boolean));
+}
 function loadHistorial(){return storage.readJson(KEY_HISTORIAL,[]);}
 function persistHistorial(d){storage.writeJson(KEY_HISTORIAL,d);}
 function loadWeekKey(){return storage.readText(KEY_WEEK,'');}
@@ -484,6 +527,7 @@ function persistWeekKey(value){storage.writeText(KEY_WEEK,value||'');}
 function loadAnnualDatasetId(){return storage.readText(KEY_ANNUAL_DATASET,'');}
 function persistAnnualDatasetId(value){storage.writeText(KEY_ANNUAL_DATASET,value||'');}
 function resetAnnualLocalStateIfNeeded(){
+  if(storage.isBackendOnly()) return false;
   const storedDatasetId=loadAnnualDatasetId();
   if(storedDatasetId===ANNUAL_DATASET_ID){
     return false;
@@ -497,6 +541,7 @@ function resetAnnualLocalStateIfNeeded(){
     KEY_TEACHER_SUBSTITUTIONS,
     KEY_TEACHER_FUTURE_ABSENCES,
     KEY_SESSION_OVERRIDES,
+    KEY_ALUMNOS_FUERA_AULA,
     KEY_HISTORIAL,
     KEY_WEEK
   ].forEach(key=>storage.writeText(key,''));
@@ -504,6 +549,7 @@ function resetAnnualLocalStateIfNeeded(){
   return true;
 }
 function resetWeeklyLocalStateIfNeeded(){
+  if(storage.isBackendOnly()) return false;
   const currentWeekKey=getCurrentSchoolWeekKey();
   const storedWeekKey=loadWeekKey();
   if(storedWeekKey===currentWeekKey){
@@ -514,6 +560,7 @@ function resetWeeklyLocalStateIfNeeded(){
   storage.writeText(KEY_TAREAS,'');
   storage.writeText(KEY_HISTORIAL,'');
   storage.writeText(KEY_SESSION_OVERRIDES,'');
+  storage.writeText(KEY_ALUMNOS_FUERA_AULA,'');
   persistWeekKey(currentWeekKey);
   return true;
 }
@@ -525,6 +572,60 @@ function formatHoraLabel(hora){
 }
 function formatDiaHora(dia,hora){
   return `${DIAS[dia]||'Dia'} \u00b7 ${formatHoraLabel(hora)}`;
+}
+function formatTimeShort(value){
+  if(!value) return '';
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+}
+function getAlumnosFueraRows(){
+  return Object.values(alumnosFueraAula).map(normalizeAlumnosFueraRow).filter(Boolean);
+}
+function getAlumnosFueraTotal(dia,hora){
+  return getAlumnosFueraRows()
+    .filter(row=>row.dia===dia&&row.hora===hora)
+    .reduce((sum,row)=>sum+Math.max(0,Number(row.cantidad)||0),0);
+}
+function getAlumnosFueraTeacherRow(nombre,dia,hora){
+  return alumnosFueraAula[makeAlumnosFueraKey(nombre,dia,hora)]||null;
+}
+function getAlumnosFueraSummary(){
+  const slot=getCurrentSchoolSlot();
+  const currentTotal=slot?getAlumnosFueraTotal(slot.dia,slot.hora):0;
+  const pending=getAlumnosFueraRows()
+    .filter(row=>row.cantidad>0&&(!slot||row.dia!==slot.dia||row.hora!==slot.hora))
+    .sort((a,b)=>a.dia-b.dia||a.hora-b.hora||a.profesor.localeCompare(b.profesor,'es'));
+  return {
+    max:MAX_ALUMNOS_FUERA_AULA,
+    current:{slot,total:currentTotal},
+    pending
+  };
+}
+function getPasilloLevelClass(total){
+  const value=Number(total)||0;
+  if(value>=8) return 'is-danger';
+  if(value>=5) return 'is-warn';
+  return 'is-ok';
+}
+function getAlumnosFueraAdminRows(){
+  return getAlumnosFueraRows()
+    .filter(row=>row.cantidad>0||row.lastExitAt||row.lastReturnAt)
+    .sort((a,b)=>a.dia-b.dia||a.hora-b.hora||String(b.lastExitAt||b.updatedAt||'').localeCompare(String(a.lastExitAt||a.updatedAt||''))||a.profesor.localeCompare(b.profesor,'es'));
+}
+async function hydrateAlumnosFueraAula(){
+  if(!storage.hasBackend()) return false;
+  try{
+    const rows=await storage.fetchAlumnosFueraAula();
+    const list=Array.isArray(rows)?rows:rows?.rows;
+    if(!Array.isArray(list)) return false;
+    alumnosFueraAula=Object.fromEntries(list.map(normalizeAlumnosFueraRow).filter(Boolean).map(row=>[makeAlumnosFueraKey(row.profesor,row.dia,row.hora),row]));
+    persistAlumnosFueraAula(alumnosFueraAula);
+    return true;
+  }catch(error){
+    console.warn('Alumnos fuera hydration failed',error);
+    return false;
+  }
 }
 function formatHistoryAbsence(row){
   if(!row) return '';
@@ -1021,6 +1122,7 @@ function getTeacherAssignedAbsences(nombre,dia,hora){
 resetAnnualLocalStateIfNeeded();
 resetWeeklyLocalStateIfNeeded();
 let sessionOverrides=loadSessionOverrides();
+let alumnosFueraAula=loadAlumnosFueraAula();
 let data=normalizeStoredRows(load());
 let nid=data.reduce((m,g)=>Math.max(m,g.id),0)+1;
 let ordenGuardias=loadOrden();
@@ -1092,6 +1194,18 @@ function serializeSessionOverrides(){
     aula:row.aula||''
   }));
 }
+function serializeAlumnosFueraAula(){
+  return Object.values(alumnosFueraAula).map(row=>({
+    id:makeAlumnosFueraKey(row.profesor,row.dia,row.hora),
+    profesor:row.profesor,
+    dia:row.dia,
+    hora:row.hora,
+    cantidad:Math.max(0,Number(row.cantidad)||0),
+    lastExitAt:row.lastExitAt||'',
+    lastReturnAt:row.lastReturnAt||'',
+    updatedAt:row.updatedAt||''
+  }));
+}
 function serializeTeacherSubstitutions(){
   return Object.entries(teacherSubstitutions).map(([profesor,sustituto])=>({profesor,sustituto}));
 }
@@ -1131,17 +1245,46 @@ function getAdminDayInsight(rows){
   const withoutTask=rows.filter(row=>!row.futurePlanned&&!resolveFaena(row).faena);
   const pendingFuture=rows.filter(row=>row.futurePlanned&&row.futureStatus==='pending');
   const covered=rows.filter(row=>(row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,rowsSource));
-  return {uncovered,withoutTask,pendingFuture,covered};
+  const corredor=getAlumnosFueraSummary();
+  return {uncovered,withoutTask,pendingFuture,covered,corredor};
 }
 function setAdminTableFilter(filter){
   adminTableFilter=filter||'all';
   renderAdminWorkspace();
   renderTable();
 }
+function renderAdminPasilloList(){
+  const pasilloList=document.getElementById('adminPasilloList');
+  if(!pasilloList) return;
+  const pasilloRows=getAlumnosFueraAdminRows();
+  pasilloList.innerHTML=pasilloRows.length
+    ?pasilloRows.map(row=>`
+      <article class="admin-pasillo-item${row.cantidad>0?' is-pending':''}">
+        <div>
+          <div class="admin-pasillo-k">Tramo</div>
+          <div class="admin-pasillo-v">${escapeHtml(formatDiaHora(row.dia,row.hora))}</div>
+        </div>
+        <div>
+          <div class="admin-pasillo-k">Profesor</div>
+          <div class="admin-pasillo-v">${escapeHtml(getVisibleTeacherName(row.profesor))}</div>
+        </div>
+        <div>
+          <div class="admin-pasillo-k">Pendientes</div>
+          <div class="admin-pasillo-v">${row.cantidad}</div>
+        </div>
+        <div>
+          <div class="admin-pasillo-k">Registro</div>
+          <div class="admin-pasillo-meta">${row.lastExitAt?`Salida ${escapeHtml(formatTimeShort(row.lastExitAt))}`:'Sin salida registrada'}${row.lastReturnAt?` · Vuelta ${escapeHtml(formatTimeShort(row.lastReturnAt))}`:''}</div>
+        </div>
+      </article>
+    `).join('')
+    :'<div class="admin-activity-empty">No hay salidas registradas en el pasillo.</div>';
+}
 function renderAdminWorkspace(){
   const overviewGrid=document.getElementById('adminOverviewGrid');
   const filterChips=document.getElementById('adminFilterChips');
   const activityList=document.getElementById('adminActivityList');
+  const pasilloList=document.getElementById('adminPasilloList');
   if(!overviewGrid||!filterChips||!activityList) return;
   const rows=getSelectedRowsForDay(day);
   const insight=getAdminDayInsight(rows);
@@ -1165,10 +1308,10 @@ function renderAdminWorkspace(){
       className:insight.pendingFuture.length?'admin-overview-card admin-overview-card-warn':'admin-overview-card'
     },
     {
-      label:'Coberturas listas',
-      value:insight.covered.length,
-      note:`${rows.length} ausencias en total para ${DIAS[day]}.`,
-      className:'admin-overview-card'
+      label:'Pasillo',
+      value:`${insight.corredor.current.total}/${insight.corredor.max}`,
+      note:insight.corredor.pending.length?`${insight.corredor.pending.length} registros pendientes de confirmar retorno.`:(insight.corredor.current.slot?`Control activo en ${formatHoraLabel(insight.corredor.current.slot.hora)}.`:'Sin tramo lectivo activo.'),
+      className:insight.corredor.current.total>=insight.corredor.max?'admin-overview-card admin-overview-card-danger':(insight.corredor.pending.length?'admin-overview-card admin-overview-card-warn':'admin-overview-card')
     }
   ].map(card=>`<article class="${card.className}"><div class="admin-overview-label">${card.label}</div><div class="admin-overview-value">${card.value}</div><div class="admin-overview-note">${card.note}</div></article>`).join('');
   const filterOptions=[
@@ -1179,10 +1322,14 @@ function renderAdminWorkspace(){
     {id:'pending',label:'Pendientes',count:insight.pendingFuture.length}
   ];
   filterChips.innerHTML=filterOptions.map(item=>`<button class="admin-filter-chip${adminTableFilter===item.id?' active':''}" type="button" onclick="setAdminTableFilter('${item.id}')">${item.label}<span class="admin-filter-chip-count">${item.count}</span></button>`).join('');
-  const recentEntries=historialCambios.slice(0,3);
-  activityList.innerHTML=recentEntries.length
+  const pendingCorredor=insight.corredor.pending.slice(0,4);
+  const recentEntries=historialCambios.slice(0,Math.max(0,3-pendingCorredor.length));
+  activityList.innerHTML=pendingCorredor.length
+    ?pendingCorredor.map(row=>`<article class="admin-activity-item admin-activity-warning"><div class="admin-activity-title">${escapeHtml(getVisibleTeacherName(row.profesor))}: ${row.cantidad} pendiente${row.cantidad===1?'':'s'} de volver</div><div class="admin-activity-meta">${escapeHtml(formatDiaHora(row.dia,row.hora))}${row.lastExitAt?` Â· salida ${escapeHtml(formatTimeShort(row.lastExitAt))}`:''}</div></article>`).join('')
+    :recentEntries.length
     ?recentEntries.map(entry=>`<article class="admin-activity-item"><div class="admin-activity-title">${escapeHtml(entry.title||'Cambio')}</div><div class="admin-activity-meta">${escapeHtml(formatHistoryTimestamp(entry.ts))} · ${escapeHtml(entry.detail||'Sin detalle adicional.')}</div></article>`).join('')
     :'<div class="admin-activity-empty">Todavía no hay cambios recientes en la jornada actual.</div>';
+  renderAdminPasilloList();
 }
 function formatBytes(value){
   const bytes=Number(value)||0;
@@ -1546,6 +1693,77 @@ async function syncTeacherTaskEntry(overrideKey,overrideRow,tareaKey,tareaRow){
     drainPendingBackendSync();
   }
 }
+async function syncAlumnosFueraAulaEntry(profesor,dia,hora,delta){
+  const key=makeAlumnosFueraKey(profesor,dia,hora);
+  const previous=getAlumnosFueraTeacherRow(profesor,dia,hora);
+  const currentAmount=Math.max(0,Number(previous?.cantidad)||0);
+  const total=getAlumnosFueraTotal(dia,hora);
+  if(delta>0&&!storage.hasBackend()&&total>=MAX_ALUMNOS_FUERA_AULA){
+    showToast('Limite de alumnos fuera alcanzado. No pueden salir mas ahora.','error');
+    renderTeacherPanel();
+    renderTable();
+    return;
+  }
+  const nextAmount=Math.max(0,currentAmount+delta);
+  const nowIso=new Date().toISOString();
+  const nextRow={
+    profesor,
+    dia,
+    hora,
+    cantidad:nextAmount,
+    lastExitAt:delta>0?nowIso:(previous?.lastExitAt||''),
+    lastReturnAt:delta<0?nowIso:(previous?.lastReturnAt||''),
+    updatedAt:nowIso
+  };
+  if(nextAmount>0){
+    alumnosFueraAula[key]=nextRow;
+  }else if(previous){
+    alumnosFueraAula[key]=nextRow;
+  }
+  persistAlumnosFueraAula(alumnosFueraAula);
+  renderTeacherPanel();
+  renderTable();
+  renderAdminWorkspace();
+  if(!storage.hasBackend()){
+    showToast(delta>0?'Salida registrada en local.':'Retorno registrado en local.','success');
+    return;
+  }
+  try{
+    const actionPayload={profesor,dia,hora};
+    const result=delta>0
+      ?await storage.registrarSalidaAlumno(actionPayload)
+      :await storage.registrarRetornoAlumno(actionPayload);
+    if(result?.rows||Array.isArray(result)){
+      const rows=Array.isArray(result)?result:result.rows;
+      rows.map(normalizeAlumnosFueraRow).filter(Boolean).forEach(row=>{
+        alumnosFueraAula[makeAlumnosFueraKey(row.profesor,row.dia,row.hora)]=row;
+      });
+      persistAlumnosFueraAula(alumnosFueraAula);
+    }else if(result?.entry){
+      const saved=normalizeAlumnosFueraRow(result.entry);
+      if(saved) alumnosFueraAula[makeAlumnosFueraKey(saved.profesor,saved.dia,saved.hora)]=saved;
+      persistAlumnosFueraAula(alumnosFueraAula);
+    }
+    renderTeacherPanel();
+    renderTable();
+    renderAdminWorkspace();
+    showToast(delta>0?'Salida registrada.':'Retorno registrado.','success');
+  }catch(error){
+    if(delta>0){
+      await hydrateAlumnosFueraAula();
+      persistAlumnosFueraAula(alumnosFueraAula);
+      renderTeacherPanel();
+      renderTable();
+      renderAdminWorkspace();
+      const message=String(error?.message||'');
+      showToast(message.includes('No se pueden superar')?'No pueden salir mas alumnos ahora.':'No se pudo registrar la salida. Revisa conexion o servidor.','error');
+      console.warn('Alumnos fuera add failed',error);
+      return;
+    }
+    console.warn('Alumnos fuera sync failed',error);
+    showToast('Cambio guardado en local. Pendiente de sincronizar.','info');
+  }
+}
 async function hydrateTeacherSubstitutions(){
   if(!storage.hasBackend()) return;
   try{
@@ -1866,11 +2084,12 @@ async function hydrateFromBackend(){
   if(!storage.hasBackend()||backendHydrated) return;
   backendHydrated=true;
   try{
-    const [guardiasResult,historialResult,tareasResult,overridesResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult]=await Promise.allSettled([
+    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult]=await Promise.allSettled([
       storage.fetchGuardias(),
       storage.fetchHistorial(),
       storage.fetchTareasProfesorado(),
       storage.fetchSessionOverrides(),
+      storage.fetchAlumnosFueraAula(),
       storage.fetchTeacherSubstitutions(),
       storage.fetchTeacherPracticasGuardias(),
       storage.fetchTeacherPracticasGuardiasTramos()
@@ -1879,6 +2098,7 @@ async function hydrateFromBackend(){
     const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
     const tareasRows=tareasResult.status==='fulfilled'?tareasResult.value:null;
     const overridesRows=overridesResult.status==='fulfilled'?overridesResult.value:null;
+    const alumnosFueraRows=alumnosFueraResult.status==='fulfilled'?alumnosFueraResult.value:null;
     const substitutionsRows=substitutionsResult.status==='fulfilled'?substitutionsResult.value:null;
     const practicasGuardiasRows=practicasGuardiasResult.status==='fulfilled'?practicasGuardiasResult.value:null;
     const practicasGuardiasTramosRows=practicasGuardiasTramosResult.status==='fulfilled'?practicasGuardiasTramosResult.value:null;
@@ -1888,6 +2108,7 @@ async function hydrateFromBackend(){
       (Array.isArray(historialRows)&&historialRows.length)||
       (Array.isArray(tareasRows)&&tareasRows.length)||
       (Array.isArray(overridesRows)&&overridesRows.length)||
+      ((Array.isArray(alumnosFueraRows)?alumnosFueraRows:alumnosFueraRows?.rows||[]).length)||
       (Array.isArray(substitutionsRows)&&substitutionsRows.length)||
       (Array.isArray(practicasGuardiasRows)&&practicasGuardiasRows.length)||
       (Array.isArray(practicasGuardiasTramosRows)&&practicasGuardiasTramosRows.length);
@@ -1933,6 +2154,13 @@ async function hydrateFromBackend(){
       );
       persistSessionOverrides(sessionOverrides);
     }
+    {
+      const rows=Array.isArray(alumnosFueraRows)?alumnosFueraRows:alumnosFueraRows?.rows;
+      if(Array.isArray(rows)){
+        alumnosFueraAula=Object.fromEntries(rows.map(normalizeAlumnosFueraRow).filter(Boolean).map(row=>[makeAlumnosFueraKey(row.profesor,row.dia,row.hora),row]));
+        persistAlumnosFueraAula(alumnosFueraAula);
+      }
+    }
     if(Array.isArray(substitutionsRows)){
       teacherSubstitutions=Object.fromEntries(substitutionsRows.map(row=>[row.profesor,row.sustituto]).filter(([profesor,sustituto])=>getProfesor(profesor)&&cleanText(sustituto)));
       persistTeacherSubstitutions(teacherSubstitutions);
@@ -1947,9 +2175,6 @@ async function hydrateFromBackend(){
       persistTeacherPracticasGuardiasTramos(teacherPracticasGuardiasTramos);
     }
     refreshOrdenGuardias();
-
-    reassignAllGuardias();
-    persist(data);
     lastBackendSnapshot=makeBackendSnapshot();
     superAdminStatus.lastHydrateAt=new Date().toISOString();
     clearSuperAdminError();
@@ -1981,6 +2206,7 @@ function makeBackendSnapshot(){
     biblioteca:serializeBibliotecaAssignments(),
     tareas:serializeTeacherTasks(),
     overrides:serializeSessionOverrides(),
+    alumnosFuera:serializeAlumnosFueraAula(),
     substitutions:serializeTeacherSubstitutions(),
     practicasGuardias:serializeTeacherPracticasGuardias(),
     practicasGuardiasTramos:serializeTeacherPracticasGuardiasTramos(),
@@ -2003,11 +2229,12 @@ async function pollBackendState(){
   renderSuperAdminMonitor();
   try{
     const previousSnapshot=makeBackendSnapshot();
-    const [guardiasResult,historialResult,tareasResult,overridesResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult]=await Promise.allSettled([
+    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult]=await Promise.allSettled([
       storage.fetchGuardias(),
       storage.fetchHistorial(),
       storage.fetchTareasProfesorado(),
       storage.fetchSessionOverrides(),
+      storage.fetchAlumnosFueraAula(),
       storage.fetchTeacherSubstitutions(),
       storage.fetchTeacherPracticasGuardias(),
       storage.fetchTeacherPracticasGuardiasTramos()
@@ -2016,6 +2243,7 @@ async function pollBackendState(){
     const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
     const tareasRows=tareasResult.status==='fulfilled'?tareasResult.value:null;
     const overridesRows=overridesResult.status==='fulfilled'?overridesResult.value:null;
+    const alumnosFueraRows=alumnosFueraResult.status==='fulfilled'?alumnosFueraResult.value:null;
     const substitutionsRows=substitutionsResult.status==='fulfilled'?substitutionsResult.value:null;
     const practicasGuardiasRows=practicasGuardiasResult.status==='fulfilled'?practicasGuardiasResult.value:null;
     const practicasGuardiasTramosRows=practicasGuardiasTramosResult.status==='fulfilled'?practicasGuardiasTramosResult.value:null;
@@ -2061,6 +2289,13 @@ async function pollBackendState(){
       );
       persistSessionOverrides(sessionOverrides);
     }
+    {
+      const rows=Array.isArray(alumnosFueraRows)?alumnosFueraRows:alumnosFueraRows?.rows;
+      if(Array.isArray(rows)){
+        alumnosFueraAula=Object.fromEntries(rows.map(normalizeAlumnosFueraRow).filter(Boolean).map(row=>[makeAlumnosFueraKey(row.profesor,row.dia,row.hora),row]));
+        persistAlumnosFueraAula(alumnosFueraAula);
+      }
+    }
     if(Array.isArray(substitutionsRows)){
       teacherSubstitutions=Object.fromEntries(substitutionsRows.map(row=>[row.profesor,row.sustituto]).filter(([profesor,sustituto])=>getProfesor(profesor)&&cleanText(sustituto)));
       persistTeacherSubstitutions(teacherSubstitutions);
@@ -2075,9 +2310,6 @@ async function pollBackendState(){
       persistTeacherPracticasGuardiasTramos(teacherPracticasGuardiasTramos);
     }
     refreshOrdenGuardias();
-
-    reassignAllGuardias();
-    persist(data);
     lastBackendSnapshot=makeBackendSnapshot();
     superAdminStatus.lastPollAt=new Date().toISOString();
     clearSuperAdminError();
@@ -2312,6 +2544,7 @@ async function initializeApp(){
   await hydrateTeacherSubstitutions();
   await hydrateTeacherPracticasGuardias();
   await hydrateTeacherFutureAbsences();
+  await hydrateAlumnosFueraAula();
   await hydrateFromBackend();
 }
 async function changeRolePasswordFlow(role){
@@ -3484,7 +3717,16 @@ function renderTable(){
   document.getElementById('sAus').textContent=aus;
   document.getElementById('sAsig').textContent=asig;
   document.getElementById('sSin').textContent=Math.max(aus-asig,0);
-  document.getElementById('sFaena').textContent=rows.filter(g=>!g.futurePlanned&&resolveFaena(g).faena).length;
+  const corredorStat=document.getElementById('sCorredor');
+  if(corredorStat){
+    const corredor=getAlumnosFueraSummary();
+    corredorStat.textContent=`${corredor.current.total} / ${corredor.max}`;
+    const statCard=corredorStat.closest('.stat');
+    if(statCard){
+      statCard.classList.remove('stat-pasillo-ok','stat-pasillo-warn','stat-pasillo-danger');
+      statCard.classList.add(`stat-pasillo-${getPasilloLevelClass(corredor.current.total).replace('is-','')}`);
+    }
+  }
   renderAdminWorkspace();
 }
 async function toggleAdmin(){
@@ -3726,15 +3968,6 @@ function changeTeacherWeekOffset(delta){
   teacherWeekOffset=Math.max(-1,Math.min(3,teacherWeekOffset+delta));
   renderTeacherPanel();
 }
-function toggleTeacherSessionPanel(dia,hora){
-  const panel=document.getElementById(`teacherSessionPanel-${dia}-${hora}`);
-  const button=document.getElementById(`teacherSessionToggle-${dia}-${hora}`);
-  if(!panel||!button) return;
-  const hiddenNext=!panel.hidden;
-  panel.hidden=hiddenNext;
-  button.textContent=hiddenNext?'Abrir bloque':'Ocultar bloque';
-  button.setAttribute('aria-expanded',hiddenNext?'false':'true');
-}
 function focusTeacherDutyHour(hora){
   const card=document.querySelector(`[data-teacher-hour="${hora}"]`);
   if(!card) return;
@@ -3755,6 +3988,20 @@ function resetTeacherMood(){
   if(!teacherName) return;
   clearTeacherMood(teacherName,getCurrentDateIso());
   renderTeacherPanel();
+}
+function changeAlumnosFueraAula(dia,hora,delta){
+  if(!isTeacherCurrentWeek()){
+    showToast('Solo puedes registrar salidas en la semana actual.','info');
+    return;
+  }
+  const slot=getCurrentSchoolSlot();
+  if(!slot||slot.dia!==dia||slot.hora!==hora){
+    showToast('Solo se puede registrar alumnado fuera durante la hora activa.','info');
+    return;
+  }
+  const profesor=getProfesor(teacherName);
+  if(!profesor) return;
+  syncAlumnosFueraAulaEntry(teacherName,dia,hora,delta);
 }
 async function saveTeacherTask(dia,hora,exitAfter){
   if(!isTeacherCurrentWeek()){
@@ -3826,6 +4073,8 @@ function renderTeacherPanel(){
   const horas=Object.keys(sesiones).map(Number).sort((a,b)=>a-b);
   const currentTeacherWeek=isTeacherCurrentWeek();
   const teacherRowsForDay=getTeacherWeekRowsForDay(teacherDay);
+  const corredor=getAlumnosFueraSummary();
+  const activeSlot=corredor.current.slot;
   const overview=document.getElementById('teacherOverview');
   const totalConTarea=currentTeacherWeek?horas.filter(hora=>{const tarea=getTareaProfesor(teacherName,teacherDay,hora);return !!(tarea?.dejada||tarea?.tarea);}).length:0;
   const dutyAssignments=teacherRowsForDay
@@ -3839,7 +4088,8 @@ function renderTeacherPanel(){
   const pendingFutureCount=futureOwnRows.filter(item=>(item.status||'pending')==='pending').length;
   const nextFutureAbsence=futureOwnRows.find(item=>['pending','approved','applied'].includes(item.status||'pending'))||null;
   const nextDuty=dutyAssignments.slice().sort((a,b)=>a.hora-b.hora)[0]||null;
-  document.getElementById('teacherSummary').textContent=`${DIAS[teacherDay]} \u00b7 ${horas.length} sesiones \u00b7 ${totalConTarea} con tarea \u00b7 ${dutyAssignments.length} coberturas${currentTeacherWeek?'':` \u00b7 semana futura`}`;
+  const teacherSummaryEl=document.getElementById('teacherSummary');
+  if(teacherSummaryEl) teacherSummaryEl.textContent=`${DIAS[teacherDay]} \u00b7 ${horas.length} sesiones \u00b7 ${totalConTarea} con tarea \u00b7 ${dutyAssignments.length} coberturas${currentTeacherWeek?'':` \u00b7 semana futura`}`;
   const dutyAlert=document.getElementById('teacherDutyAlert');
   if(dutyAlert){
     if(dutyAssignments.length){
@@ -3872,6 +4122,11 @@ function renderTeacherPanel(){
   }
   document.getElementById('teacherDayPills').innerHTML=DIAS.map((nombreDia,index)=>`<button class="${index===teacherDay?'active':''}" onclick="setTeacherDay(${index})">${nombreDia}</button>`).join('');
   if(overview){
+    const activeTeacherRow=activeSlot?getAlumnosFueraTeacherRow(teacherName,activeSlot.dia,activeSlot.hora):null;
+    const activeTeacherCount=Math.max(0,Number(activeTeacherRow?.cantidad)||0);
+    const activeTotal=corredor.current.total;
+    const activeCanAdd=!!activeSlot&&currentTeacherWeek&&activeTotal<MAX_ALUMNOS_FUERA_AULA;
+    const activeCanRemove=!!activeSlot&&currentTeacherWeek&&activeTeacherCount>0;
     overview.innerHTML=`
       <article class="teacher-overview-card">
         <div class="teacher-overview-label">Hoy tengo clase</div>
@@ -3885,11 +4140,15 @@ function renderTeacherPanel(){
         <div class="teacher-overview-copy">${nextDuty?`Próxima cobertura: ${escapeHtml(getVisibleTeacherName(nextDuty.ausente))} · ${escapeHtml(formatHoraLabel(nextDuty.hora))}`:'No tienes coberturas asignadas en este día.'}</div>
         <button class="btn-teacher-panel teacher-overview-action" type="button" ${nextDuty?'':'disabled'} onclick="${nextDuty?`focusTeacherDutyHour(${nextDuty.hora})`:''}">${nextDuty?'Ir a mi guardia':'Sin guardias'}</button>
       </article>
-      <article class="teacher-overview-card">
-        <div class="teacher-overview-label">Próximas faltas</div>
-        <div class="teacher-overview-value">${futureOwnRows.length}</div>
-        <div class="teacher-overview-copy">${nextFutureAbsence?`${escapeHtml(formatFutureAbsenceDateLabel(nextFutureAbsence.date))} · ${escapeHtml(formatHourListLabel(getFutureAbsenceHoursForEntry(nextFutureAbsence)))}`:'No tienes avisos pendientes.'}${pendingFutureCount?` Pendientes: ${pendingFutureCount}.`:''}</div>
-        <button class="btn-teacher-panel teacher-overview-action teacher-overview-action-primary" type="button" onclick="openTeacherFutureAbsenceModal()">Avisar falta futura</button>
+      <article class="teacher-overview-card teacher-overview-card-corridor ${getPasilloLevelClass(activeTotal)}${activeSlot?' is-active':''}${activeTotal>=MAX_ALUMNOS_FUERA_AULA?' is-full':''}">
+        <div class="teacher-overview-label">En el pasillo ahora</div>
+        <div class="teacher-overview-value">${corredor.current.total}/${corredor.max}</div>
+        <div class="teacher-overview-copy">${activeSlot?`Tramo activo: ${escapeHtml(formatHoraLabel(activeSlot.hora))}.`:'Sin tramo lectivo activo.'}${corredor.pending.length?` Pendientes anteriores: ${corredor.pending.length}.`:''}${pendingFutureCount?` Faltas pendientes: ${pendingFutureCount}.`:''}</div>
+        <div class="teacher-corridor-stepper teacher-corridor-stepper-main">
+          <button type="button" onclick="changeAlumnosFueraAula(${activeSlot?.dia ?? teacherDay},${activeSlot?.hora ?? 0},-1)" ${activeCanRemove?'':'disabled'}>-</button>
+          <strong>${activeTeacherCount}</strong>
+          <button type="button" onclick="changeAlumnosFueraAula(${activeSlot?.dia ?? teacherDay},${activeSlot?.hora ?? 0},1)" ${activeCanAdd?'':'disabled'}>+</button>
+        </div>
       </article>
     `;
   }
@@ -3907,7 +4166,7 @@ function renderTeacherPanel(){
     const detalleVisible=grupo||sesion.detalle||'Sin detalle adicional';
     const guardiaTasks=sesion.tipo==='guardia'?dutyAssignments.filter(item=>item.hora===hora):[];
     const dutyBadge=guardiaTasks.length?`<span class="badge teacher-duty-badge">${currentTeacherWeek?'Te toca cubrir':'Cobertura prevista'}</span>`:''; 
-    const openByDefault=checked||!!texto||guardiaTasks.length;
+    const openByDefault=(!!activeSlot&&activeSlot.dia===teacherDay&&activeSlot.hora===hora)||checked||!!texto||guardiaTasks.length;
     const guardiaTasksMarkup=guardiaTasks.length?`<div class="teacher-guardia-tasks">${guardiaTasks.map(item=>`
       <article class="teacher-guardia-task">
         <div class="teacher-guardia-task-head">
@@ -3919,8 +4178,8 @@ function renderTeacherPanel(){
       </article>
     `).join('')}</div>`:'';
     const sessionKindLabel=sesion.tipo==='guardia'?'Guardia':sesion.materia||sesion.tipo;
-    return `<div class="teacher-session${guardiaTasks.length?' teacher-session-duty':''}" data-teacher-hour="${hora}">
-      <div class="teacher-session-head">
+    return `<details class="teacher-session${guardiaTasks.length?' teacher-session-duty':''}" data-teacher-hour="${hora}" ${openByDefault?'open':''}>
+      <summary class="teacher-session-head">
         <div class="teacher-session-summary">
           <div class="teacher-session-slot">${HORA_MAP[hora].label} hora</div>
           <div class="teacher-session-title">${sessionKindLabel}</div>
@@ -3933,15 +4192,15 @@ function renderTeacherPanel(){
             <span class="badge ${checked?'b-ok':'b-nok'}">${checked?'Con tarea':'Sin tarea'}</span>
             <span class="badge b-biblio">${aula}</span>
           </div>
-          <button class="teacher-edit-toggle" id="teacherSessionToggle-${teacherDay}-${hora}" type="button" onclick="toggleTeacherSessionPanel(${teacherDay},${hora})" aria-expanded="${openByDefault?'true':'false'}">${openByDefault?'Ocultar bloque':'Abrir bloque'}</button>
         </div>
-      </div>
+      </summary>
+      <div class="teacher-session-content">
       <div class="teacher-session-quick">
         <div class="teacher-quick-item"><span class="teacher-quick-label">Grupo</span><span class="teacher-quick-value">${escapeHtml(grupo||'Sin grupo')}</span></div>
         <div class="teacher-quick-item"><span class="teacher-quick-label">Aula</span><span class="teacher-quick-value">${escapeHtml(aula)}</span></div>
         <div class="teacher-quick-item"><span class="teacher-quick-label">Tarea</span><span class="teacher-quick-value">${checked?(texto?escapeHtml(texto.slice(0,72)+(texto.length>72?'...':'')):'Marcada para el grupo'):'No has dejado tarea todavía'}</span></div>
       </div>
-      <div class="teacher-session-panel" id="teacherSessionPanel-${teacherDay}-${hora}" ${openByDefault?'':'hidden'}>
+      <div class="teacher-session-panel" id="teacherSessionPanel-${teacherDay}-${hora}">
         <div class="fg">
           <label>Tarea para este grupo</label>
           <textarea id="taskText-${teacherDay}-${hora}" placeholder="${currentTeacherWeek?'Indica que debe hacer el grupo':'Las tareas solo se registran en la semana actual'}" ${currentTeacherWeek?'':'readonly'}>${texto}</textarea>
@@ -3980,7 +4239,8 @@ function renderTeacherPanel(){
         <button class="teacher-save-exit" type="button" onclick="saveTeacherTask(${teacherDay},${hora},true)">Guardar y cerrar</button>`:`<div class="teacher-meta">Vista de planificación. La edición se habilita en la semana actual.</div>`}
       </div>
       </div>
-    </div>`;
+      </div>
+    </details>`;
   }).join('');
 }
 function syncTodoDiaMode(){
@@ -4447,7 +4707,9 @@ function safeInitStep(fn,name){
 safeInitStep(populateProfesoresAusencias,'populateProfesoresAusencias');
 safeInitStep(populateProfesoresGuardia,'populateProfesoresGuardia');
 safeInitStep(syncGuardiaPreview,'syncGuardiaPreview');
-safeInitStep(()=>{reassignAllGuardias();persist(data);},'reassignAllGuardias');
+if(!storage.isBackendOnly()){
+  safeInitStep(()=>{reassignAllGuardias();persist(data);},'reassignAllGuardias');
+}
 safeInitStep(renderPills,'renderPills');
 safeInitStep(renderGuardiaBoard,'renderGuardiaBoard');
 safeInitStep(renderTable,'renderTable');
@@ -4459,7 +4721,15 @@ safeInitStep(renderTeacherFutureAbsenceOwnList,'renderTeacherFutureAbsenceOwnLis
 safeInitStep(syncTeacherIdentity,'syncTeacherIdentity');
 safeInitStep(refreshAccessUi,'refreshAccessUi');
 safeInitStep(()=>{initializeApp().catch(error=>console.error('Init step failed: initializeApp',error));},'initializeApp');
-window.setInterval(()=>{hydrateTeacherFutureAbsences();pollBackendState();},BACKEND_POLL_INTERVAL_MS);
+let lastRenderedSchoolSlotKey=JSON.stringify(getCurrentSchoolSlot());
+window.setInterval(()=>{
+  const nextKey=JSON.stringify(getCurrentSchoolSlot());
+  if(nextKey===lastRenderedSchoolSlotKey) return;
+  lastRenderedSchoolSlotKey=nextKey;
+  renderTable();
+  if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
+},60000);
+window.setInterval(()=>{hydrateTeacherFutureAbsences();hydrateAlumnosFueraAula().then(changed=>{if(changed){renderTable();if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();}});pollBackendState();},BACKEND_POLL_INTERVAL_MS);
 window.setInterval(()=>{
   if(isSuperAdmin){
     refreshSuperAdminOps(false);

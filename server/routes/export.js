@@ -93,6 +93,21 @@ function sanitizeRestoreHistorial(row) {
   };
 }
 
+function sanitizeRestoreAlumnosFueraAula(row) {
+  const input = ensureObject(row, 'Registro de alumnos fuera del aula');
+  const updatedAt = input.updatedAt ?? input.updated_at;
+  return {
+    id: ensureOptionalId(input.id, 'id'),
+    profesor: ensureRequiredString(input.profesor, 'profesor'),
+    dia: normalizeInteger(input.dia, 'dia', 0, 4),
+    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    cantidad: normalizeInteger(input.cantidad, 'cantidad', 0, 10),
+    lastExitAt: normalizeString(input.lastExitAt ?? input.last_exit_at),
+    lastReturnAt: normalizeString(input.lastReturnAt ?? input.last_return_at),
+    updatedAt: updatedAt ? ensureTimestamp(updatedAt, 'updatedAt') : new Date().toISOString()
+  };
+}
+
 function sanitizeBackupPayload(payload) {
   const input = ensureObject(payload, 'Backup');
   if (input.exportedAt) {
@@ -106,6 +121,7 @@ function sanitizeBackupPayload(payload) {
     sessionOverrides: ensureBackupSection(input, 'sessionOverrides', 'sessionOverrides').map(sanitizeSessionOverride),
     substitutions: ensureBackupSection(input, 'substitutions', 'substitutions').map(sanitizeTeacherSubstitution),
     futureAbsences: ensureBackupSection(input, 'futureAbsences', 'futureAbsences').map(sanitizeTeacherFutureAbsence),
+    alumnosFueraAula: ensureOptionalBackupSection(input, 'alumnosFueraAula', 'alumnosFueraAula', sanitizeRestoreAlumnosFueraAula),
     schoolWeekKey: normalizeString(input.schoolWeekKey),
     teacherSubstitutions: ensureOptionalBackupSection(input, 'teacherSubstitutions', 'teacherSubstitutions', sanitizeTeacherSubstitution),
     teacherPracticasGuardias: ensureOptionalBackupSection(input, 'teacherPracticasGuardias', 'teacherPracticasGuardias', sanitizeTeacherPracticeGuardia),
@@ -133,6 +149,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       biblioteca,
       historial,
       tareasProfesorado,
+      alumnosFueraAula,
       sessionOverrides,
       appStateRows,
       substitutionsState,
@@ -143,6 +160,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       db.all('SELECT dia, hora, profesor FROM biblioteca_guardias ORDER BY dia, hora'),
       db.all('SELECT * FROM historial ORDER BY ts DESC'),
       db.all('SELECT * FROM tareas_profesorado ORDER BY profesor, dia, hora'),
+      db.all('SELECT * FROM alumnos_fuera_aula ORDER BY dia, hora, profesor, id'),
       db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora'),
       db.all(
         'SELECT key, value FROM app_state WHERE key IN (?, ?, ?) ORDER BY key',
@@ -179,6 +197,16 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
         dejada: !!row.dejada,
         tarea: row.tarea || ''
       })),
+      alumnosFueraAula: alumnosFueraAula.map(row => ({
+        id: row.id,
+        profesor: row.profesor,
+        dia: row.dia,
+        hora: row.hora,
+        cantidad: row.cantidad,
+        lastExitAt: row.last_exit_at || '',
+        lastReturnAt: row.last_return_at || '',
+        updatedAt: row.updated_at || ''
+      })),
       sessionOverrides,
       substitutions: Array.isArray(substitutions) ? substitutions : [],
       futureAbsences: Array.isArray(futureAbsences) ? futureAbsences : [],
@@ -208,10 +236,11 @@ router.get('/info', requireRole('superadmin'), async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const dbStat = fs.statSync(DB_PATH);
-    const [ausenciasRow, historialRow, tareasRow, overridesRow, appStateRows] = await Promise.all([
+    const [ausenciasRow, historialRow, tareasRow, alumnosFueraAulaRow, overridesRow, appStateRows] = await Promise.all([
       db.get('SELECT COUNT(*) AS total FROM ausencias'),
       db.get('SELECT COUNT(*) AS total FROM historial'),
       db.get('SELECT COUNT(*) AS total FROM tareas_profesorado'),
+      db.get('SELECT COUNT(*) AS total FROM alumnos_fuera_aula'),
       db.get('SELECT COUNT(*) AS total FROM session_overrides'),
       db.all(
         'SELECT key, LENGTH(value) AS size, updated_at FROM app_state WHERE key IN (?, ?, ?) ORDER BY key',
@@ -240,6 +269,7 @@ router.get('/info', requireRole('superadmin'), async (_req, res, next) => {
         guardias: ausenciasRow?.total || 0,
         historial: historialRow?.total || 0,
         tareasProfesorado: tareasRow?.total || 0,
+        alumnosFueraAula: alumnosFueraAulaRow?.total || 0,
         sessionOverrides: overridesRow?.total || 0,
         appState: appStateRows.map(row => ({
           key: row.key,
@@ -266,6 +296,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       biblioteca,
       historial,
       tareasProfesorado,
+      alumnosFueraAula,
       sessionOverrides,
       substitutions,
       futureAbsences,
@@ -283,6 +314,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       await db.exec('DELETE FROM biblioteca_guardias');
       await db.exec('DELETE FROM historial');
       await db.exec('DELETE FROM tareas_profesorado');
+      await db.exec('DELETE FROM alumnos_fuera_aula');
       await db.exec('DELETE FROM session_overrides');
       await db.run(
         'DELETE FROM app_state WHERE key IN (?, ?, ?, ?, ?)',
@@ -346,6 +378,23 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         );
       }
 
+      for (const row of alumnosFueraAula) {
+        await db.run(
+          `INSERT INTO alumnos_fuera_aula (id, profesor, dia, hora, cantidad, last_exit_at, last_return_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            row.id,
+            row.profesor,
+            row.dia,
+            row.hora,
+            row.cantidad,
+            row.lastExitAt,
+            row.lastReturnAt,
+            row.updatedAt
+          ]
+        );
+      }
+
       for (const row of sessionOverrides) {
         await db.run(
           `INSERT INTO session_overrides (id, profesor, dia, hora, materia, grupo, detalle, aula, updated_at)
@@ -400,18 +449,19 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       throw error;
     }
 
-    res.json({
-      ok: true,
-      restoredAt: new Date().toISOString(),
-      counts: {
-        guardias: guardias.length,
-        biblioteca: biblioteca.length,
-        historial: historial.length,
-        tareasProfesorado: tareasProfesorado.length,
-        sessionOverrides: sessionOverrides.length,
-        substitutions: effectiveSubstitutions.length,
-        futureAbsences: futureAbsences.length,
-        teacherSubstitutions: effectiveSubstitutions.length,
+      res.json({
+        ok: true,
+        restoredAt: new Date().toISOString(),
+        counts: {
+          guardias: guardias.length,
+          biblioteca: biblioteca.length,
+          historial: historial.length,
+          tareasProfesorado: tareasProfesorado.length,
+          alumnosFueraAula: alumnosFueraAula.length,
+          sessionOverrides: sessionOverrides.length,
+          substitutions: effectiveSubstitutions.length,
+          futureAbsences: futureAbsences.length,
+          teacherSubstitutions: effectiveSubstitutions.length,
         teacherPracticasGuardias: teacherPracticasGuardias.length,
         teacherPracticasGuardiasTramos: teacherPracticasGuardiasTramos.length
       }

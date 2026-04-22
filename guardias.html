@@ -38,7 +38,7 @@
     <div class="stat"><div class="stat-l">Ausencias hoy</div><div class="stat-n c-red" id="sAus">0</div></div>
     <div class="stat"><div class="stat-l">Guardias asignadas</div><div class="stat-n c-green" id="sAsig">0</div></div>
     <div class="stat"><div class="stat-l">Sin cubrir</div><div class="stat-n c-yellow" id="sSin">0</div></div>
-    <div class="stat"><div class="stat-l">Han dejado faena</div><div class="stat-n c-blue" id="sFaena">0</div></div>
+    <div class="stat"><div class="stat-l">En el pasillo ahora</div><div class="stat-n c-blue" id="sCorredor">0 / 10</div></div>
   </div>
   <section class="guardia-board">
     <div class="guardia-board-head">
@@ -93,6 +93,15 @@
           </div>
         </div>
         <div class="admin-activity-list" id="adminActivityList"></div>
+      </section>
+      <section class="admin-panel admin-panel-pasillo">
+        <div class="admin-section-head">
+          <div>
+            <div class="admin-section-title">Registro del pasillo</div>
+            <div class="admin-section-copy">Profesorado que ha dejado salir alumnado y estado de retorno por tramo.</div>
+          </div>
+        </div>
+        <div class="admin-pasillo-list" id="adminPasilloList"></div>
       </section>
     </div>
   </div>
@@ -153,7 +162,6 @@
     <span class="teacher-tag">Modo Profesorado</span>
     <button class="btn-teacher" onclick="openTeacherPanel()">Mis tareas</button>
     <button class="btn-teacher" onclick="changeTeacherUser()">Cambiar usuario</button>
-    <button class="btn-teacher" onclick="closeTeacherPanel()">Cerrar panel</button>
     <span class="teacher-name" id="teacherBarName">Profesorado</span>
   </div>
   <div class="tbl-wrap">
@@ -272,14 +280,9 @@
         <div class="teacher-identity-notice" id="teacherIdentityNotice"></div>
       </div>
       <div class="teacher-head-side">
-        <div class="teacher-summary-card">
-          <div class="teacher-summary-label">Resumen del d&iacute;a</div>
-          <div class="teacher-meta" id="teacherSummary">Sesiones del d&iacute;a</div>
-        </div>
         <div class="teacher-duty-alert" id="teacherDutyAlert" hidden></div>
         <div class="teacher-panel-actions">
           <button class="btn-teacher-panel" type="button" onclick="openTeacherFutureAbsenceModal()">Avisar falta futura</button>
-          <button class="btn-teacher-panel" type="button" onclick="closeTeacherPanel()">Cerrar panel</button>
         </div>
         <div class="teacher-mood-card" id="teacherMoodCard"></div>
       </div>

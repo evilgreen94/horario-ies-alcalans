@@ -71,9 +71,54 @@ async function initializeDatabase() {
   const db = await getDatabase();
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
   await db.exec(schema);
+  await ensureAlumnosFueraAulaConstraints(db);
   await seedDefaultCredentials(db);
   await ensureWeeklyResetIfNeeded(db);
   return db;
+}
+
+async function ensureAlumnosFueraAulaConstraints(db) {
+  const table = await db.get("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'alumnos_fuera_aula'");
+  if (!table) return;
+
+  const duplicateGroups = await db.all(
+    `SELECT profesor, dia, hora, COUNT(*) AS total
+     FROM alumnos_fuera_aula
+     GROUP BY profesor, dia, hora
+     HAVING total > 1`
+  );
+
+  for (const group of duplicateGroups) {
+    const rows = await db.all(
+      `SELECT *
+       FROM alumnos_fuera_aula
+       WHERE profesor = ? AND dia = ? AND hora = ?
+       ORDER BY id`,
+      [group.profesor, group.dia, group.hora]
+    );
+    if (!rows.length) continue;
+    const keep = rows[0];
+    const cantidad = Math.min(10, rows.reduce((sum, row) => sum + Number(row.cantidad || 0), 0));
+    const lastExitAt = rows.map(row => row.last_exit_at || '').sort().filter(Boolean).pop() || '';
+    const lastReturnAt = rows.map(row => row.last_return_at || '').sort().filter(Boolean).pop() || '';
+    const removeIds = rows.slice(1).map(row => row.id);
+
+    await db.run(
+      `UPDATE alumnos_fuera_aula
+       SET cantidad = ?, last_exit_at = ?, last_return_at = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [cantidad, lastExitAt, lastReturnAt, keep.id]
+    );
+
+    for (const id of removeIds) {
+      await db.run('DELETE FROM alumnos_fuera_aula WHERE id = ?', [id]);
+    }
+  }
+
+  await db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_alumnos_fuera_aula_profesor_dia_hora
+     ON alumnos_fuera_aula (profesor, dia, hora)`
+  );
 }
 
 function getMadridNow() {
@@ -125,6 +170,7 @@ async function ensureWeeklyResetIfNeeded(dbInstance) {
     await db.exec('DELETE FROM biblioteca_guardias');
     await db.exec('DELETE FROM historial');
     await db.exec('DELETE FROM tareas_profesorado');
+    await db.exec('DELETE FROM alumnos_fuera_aula');
     await db.exec('DELETE FROM session_overrides');
     await db.run(
       `UPDATE app_state

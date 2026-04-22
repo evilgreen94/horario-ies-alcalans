@@ -107,6 +107,22 @@ function sanitizeTareaProfesorado(row) {
   };
 }
 
+function sanitizeAlumnosFueraAula(row) {
+  const input = ensureObject(row, 'Registro de alumnos fuera del aula');
+  const cantidad = normalizeInteger(input.cantidad ?? input.cantidad_actual, 'cantidad', 0, 10);
+  const lastExitAt = input.lastExitAt ?? input.last_exit_at;
+  const lastReturnAt = input.lastReturnAt ?? input.last_return_at;
+  return {
+    id: ensureOptionalId(input.id, 'id'),
+    profesor: ensureRequiredString(input.profesor, 'profesor'),
+    dia: normalizeInteger(input.dia, 'dia', 0, 4),
+    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    cantidad,
+    lastExitAt: lastExitAt ? ensureTimestamp(lastExitAt, 'lastExitAt') : '',
+    lastReturnAt: lastReturnAt ? ensureTimestamp(lastReturnAt, 'lastReturnAt') : ''
+  };
+}
+
 function sanitizeSessionOverride(row) {
   const input = ensureObject(row, 'Override de sesi\u00f3n');
   return {
@@ -176,6 +192,7 @@ module.exports = {
   normalizeBoolean,
   normalizeInteger,
   normalizeString,
+  sanitizeAlumnosFueraAula,
   sanitizeAusencia,
   sanitizeBiblioteca,
   sanitizeTeacherFutureAbsence,

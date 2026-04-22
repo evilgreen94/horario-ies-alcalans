@@ -40,6 +40,18 @@ CREATE TABLE IF NOT EXISTS tareas_profesorado (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS alumnos_fuera_aula (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  profesor TEXT NOT NULL,
+  dia INTEGER NOT NULL,
+  hora INTEGER NOT NULL,
+  cantidad INTEGER NOT NULL DEFAULT 0 CHECK(cantidad >= 0 AND cantidad <= 10),
+  last_exit_at TEXT DEFAULT '',
+  last_return_at TEXT DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(profesor, dia, hora)
+);
+
 CREATE TABLE IF NOT EXISTS session_overrides (
   id TEXT PRIMARY KEY,
   profesor TEXT NOT NULL,
