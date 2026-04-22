@@ -83,8 +83,9 @@ horario-ies-alcalans/
 
 ## Requisitos
 
-- `Node.js`
+- `Node.js 18+` o `Node.js 20`
 - `npm`
+- `sqlite3` para copias consistentes de la base SQLite
 - Windows PowerShell o `cmd`
 
 ## Arranque local
@@ -134,7 +135,7 @@ GUARDIAS_SESSION_SECRET=<secreto-largo-y-estable>
 
 ```text
 PORT=3000
-GUARDIAS_DB_PATH=BD/guardias.sqlite
+GUARDIAS_DB_PATH=/srv/guardias/horario-ies-alcalans/BD/guardias.sqlite
 GUARDIAS_TRUST_PROXY=1
 GUARDIAS_CORS_ORIGINS=
 ```
@@ -200,7 +201,7 @@ Ejemplo en Ubuntu / Debian:
 
 ```bash
 sudo apt update
-sudo apt install -y git nginx sqlite3 ufw curl
+sudo apt install -y git nodejs npm sqlite3 nginx ufw curl
 ```
 
 ### Recomendación práctica
@@ -420,6 +421,7 @@ Como la aplicación usa `SQLite`, la estrategia de copia debe contemplar una cop
 ### Ficheros preparados en el repositorio
 
 - [`deploy/linux/backup-guardias.sh`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\deploy\linux\backup-guardias.sh)
+- [`deploy/linux/guardias.service`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\deploy\linux\guardias.service)
 - [`deploy/linux/guardias-backup-daily.service`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\deploy\linux\guardias-backup-daily.service)
 - [`deploy/linux/guardias-backup-daily.timer`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\deploy\linux\guardias-backup-daily.timer)
 - [`deploy/linux/guardias-backup-weekly.service`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\deploy\linux\guardias-backup-weekly.service)
@@ -487,6 +489,67 @@ Antes del lanzamiento conviene valorar una mejora ligera y opcional en el acceso
    - no se persiste en absoluto
 
 La idea sería que funcione como detalle de acogida y cercanía, no como dato operativo crítico.
+
+## Despliegue Linux
+
+Ruta canónica del proyecto:
+
+```text
+/srv/guardias/horario-ies-alcalans
+```
+
+Ruta canónica de SQLite:
+
+```text
+/srv/guardias/horario-ies-alcalans/BD/guardias.sqlite
+```
+
+El arranque recomendado en Linux es:
+
+1. Instalar `Node.js 18+` o `Node.js 20`, `npm` y `sqlite3`
+2. Copiar el proyecto a `/srv/guardias/horario-ies-alcalans`
+3. Crear `/srv/guardias/horario-ies-alcalans/.env` con:
+   - `PORT=3000`
+   - `GUARDIAS_SESSION_SECRET=...`
+   - `GUARDIAS_DB_PATH=/srv/guardias/horario-ies-alcalans/BD/guardias.sqlite`
+   - `GUARDIAS_TRUST_PROXY=1`
+   - `GUARDIAS_CORS_ORIGINS=`
+   - `GUARDIAS_ADMIN_PASSWORD=...` solo si la base es nueva
+   - `GUARDIAS_SUPERADMIN_PASSWORD=...` solo si la base es nueva
+4. Instalar dependencias con `npm install`
+5. Activar el servicio principal con [`deploy/linux/guardias.service`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\deploy\linux\guardias.service)
+6. Comprobar el estado con:
+
+```bash
+cd /srv/guardias/horario-ies-alcalans
+npm run smoke
+```
+
+7. Verificar el healthcheck:
+
+```text
+http://localhost:3000/api/health
+```
+
+8. Copiar y activar los temporizadores de backup de [`deploy/linux`](C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\deploy\linux)
+9. Mantener copias de la base en `/var/backups/guardias`
+
+Activación sugerida en el servidor:
+
+```bash
+cd /srv/guardias/horario-ies-alcalans
+sudo cp deploy/linux/guardias.service /etc/systemd/system/
+sudo chmod +x deploy/linux/backup-guardias.sh
+sudo cp deploy/linux/guardias-backup-*.service /etc/systemd/system/
+sudo cp deploy/linux/guardias-backup-*.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now guardias.service
+sudo systemctl enable --now guardias-backup-daily.timer
+sudo systemctl enable --now guardias-backup-weekly.timer
+sudo systemctl enable --now guardias-backup-monthly.timer
+```
+
+`backup-guardias.sh` exige `sqlite3` y usa `sqlite3 .backup`; no hay ruta alternativa por `cp`.
 
 ## Siguiente paso recomendado
 

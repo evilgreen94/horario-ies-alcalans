@@ -32,6 +32,35 @@ function notFound(message) {
   return error;
 }
 
+function forbidden(message) {
+  const error = new Error(message);
+  error.status = 403;
+  return error;
+}
+
+function getExpectedOrigin(req) {
+  return `${req.protocol}://${req.get('host')}`;
+}
+
+function hasSameOriginHeader(req) {
+  const expectedOrigin = getExpectedOrigin(req);
+  const origin = String(req.get('origin') || '').trim();
+  if (origin) return origin === expectedOrigin;
+
+  const referer = String(req.get('referer') || '').trim();
+  if (!referer) return false;
+  try {
+    return new URL(referer).origin === expectedOrigin;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function requireSameOriginWrite(req, _res, next) {
+  if (hasSameOriginHeader(req)) return next();
+  next(forbidden('Escritura rechazada: origen no permitido.'));
+}
+
 function serializeAlumnosFueraAulaRow(row) {
   return {
     id: row.id,
@@ -275,7 +304,7 @@ router.get('/alumnos-fuera-aula/pendientes', async (_req, res, next) => {
   }
 });
 
-router.post('/alumnos-fuera-aula/salida', async (req, res, next) => {
+router.post('/alumnos-fuera-aula/salida', requireSameOriginWrite, async (req, res, next) => {
   try {
     const inputRow = sanitizeAlumnosFueraAula({ ...req.body, cantidad: 0 });
     const db = await getDatabase();
@@ -285,7 +314,7 @@ router.post('/alumnos-fuera-aula/salida', async (req, res, next) => {
   }
 });
 
-router.post('/alumnos-fuera-aula/retorno', async (req, res, next) => {
+router.post('/alumnos-fuera-aula/retorno', requireSameOriginWrite, async (req, res, next) => {
   try {
     const inputRow = sanitizeAlumnosFueraAula({ ...req.body, cantidad: 0 });
     const db = await getDatabase();
@@ -328,7 +357,7 @@ router.put('/alumnos-fuera-aula/replace', requireRole('admin'), async (req, res,
   }
 });
 
-router.post('/alumnos-fuera-aula', async (req, res, next) => {
+router.post('/alumnos-fuera-aula', requireSameOriginWrite, async (req, res, next) => {
   try {
     const inputRow = sanitizeAlumnosFueraAula(req.body);
     const db = await getDatabase();

@@ -4,5 +4,7 @@ Description=Backup mensual de Guardias IES Alcalans
 [Service]
 Type=oneshot
 WorkingDirectory=/srv/guardias/horario-ies-alcalans
+Environment=PROJECT_ROOT=/srv/guardias/horario-ies-alcalans
+Environment=GUARDIAS_DB_PATH=/srv/guardias/horario-ies-alcalans/BD/guardias.sqlite
 Environment=BACKUP_ROOT=/var/backups/guardias
 ExecStart=/usr/bin/env bash ./deploy/linux/backup-guardias.sh monthly

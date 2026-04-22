@@ -1,0 +1,21 @@
+[Unit]
+Description=Guardias IES Alcalans
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/guardias/horario-ies-alcalans
+EnvironmentFile=/srv/guardias/horario-ies-alcalans/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=60
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/srv/guardias/horario-ies-alcalans /var/backups/guardias
+
+[Install]
+WantedBy=multi-user.target

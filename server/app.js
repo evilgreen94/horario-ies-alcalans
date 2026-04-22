@@ -58,6 +58,28 @@ function createCorsOptions() {
   };
 }
 
+function isBlockedStaticRequest(req) {
+  if (!['GET', 'HEAD'].includes(req.method)) return false;
+  const pathname = decodeURIComponent((req.path || '').replace(/\\/g, '/'));
+  const lowerPath = pathname.toLowerCase();
+  const firstSegment = lowerPath.split('/').filter(Boolean)[0] || '';
+  if (!firstSegment) return false;
+  if (firstSegment.startsWith('.')) return true;
+  if (['server', 'deploy', 'bd', 'json_profes', 'node_modules'].includes(firstSegment)) return true;
+  return [
+    '/package.json',
+    '/package-lock.json',
+    '/readme.md',
+    '/start-local.ps1',
+    '/start-local.cmd',
+    '/.env',
+    '/.env.example',
+    '/.env.local.ps1',
+    '/.env.local.cmd',
+    '/.gitignore'
+  ].includes(lowerPath);
+}
+
 getSessionSecret();
 configureTrustProxy(TRUST_PROXY);
 
@@ -73,7 +95,16 @@ app.use('/api', async (_req, _res, next) => {
     next(error);
   }
 });
-app.use(express.static(path.join(__dirname, '..')));
+app.use((req, res, next) => {
+  if (isBlockedStaticRequest(req)) {
+    return res.status(404).end();
+  }
+  next();
+});
+app.use(express.static(path.join(__dirname, '..'), {
+  dotfiles: 'deny',
+  index: false
+}));
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });

@@ -32,6 +32,11 @@ if [[ ! -f "$DB_PATH" ]]; then
   exit 1
 fi
 
+if ! command -v sqlite3 >/dev/null 2>&1; then
+  echo "sqlite3 es obligatorio para ejecutar backups consistentes" >&2
+  exit 1
+fi
+
 case "$KIND" in
   daily)
     TARGET_DIR="$BACKUP_ROOT/daily"
@@ -52,11 +57,7 @@ esac
 
 TMP_FILE="$TARGET_FILE.tmp"
 
-if command -v sqlite3 >/dev/null 2>&1; then
-  sqlite3 "$DB_PATH" ".backup '$TMP_FILE'"
-else
-  cp "$DB_PATH" "$TMP_FILE"
-fi
+sqlite3 "$DB_PATH" ".backup '$TMP_FILE'"
 
 mv -f "$TMP_FILE" "$TARGET_FILE"
 chmod 600 "$TARGET_FILE"

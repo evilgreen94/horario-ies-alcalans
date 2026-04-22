@@ -78,7 +78,8 @@ async function testProtectedWithoutAuth() {
     ['/api/biblioteca', 200],
     ['/api/historial', 200],
     ['/api/profesorado/tareas', 200],
-    ['/api/profesorado/session-overrides', 200]
+    ['/api/profesorado/session-overrides', 200],
+    ['/api/profesorado/alumnos-fuera-aula', 200]
   ];
 
   for (const [pathname, expected] of publicReadChecks) {
@@ -99,6 +100,29 @@ async function testProtectedWithoutAuth() {
   }
 
   return 'public reads allowed; protected routes reject anonymous access';
+}
+
+async function testAnonymousAlumnosFueraAulaWriteProtection() {
+  const payload = {
+    profesor: 'SMOKE_ANON_WRITE',
+    dia: 0,
+    hora: 1
+  };
+
+  const endpoints = [
+    '/api/profesorado/alumnos-fuera-aula/salida',
+    '/api/profesorado/alumnos-fuera-aula/retorno'
+  ];
+
+  for (const pathname of endpoints) {
+    const { response } = await request(pathname, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    assert(response.status === 403, `${pathname} without origin expected 403, got ${response.status}`);
+  }
+
+  return 'anonymous alumnos-fuera-aula writes blocked without origin';
 }
 
 async function testAnonymousWriteProtection() {
@@ -201,6 +225,7 @@ async function main() {
   const results = [];
   results.push(await testHealth());
   results.push(await testProtectedWithoutAuth());
+  results.push(await testAnonymousAlumnosFueraAulaWriteProtection());
   results.push(await testAnonymousWriteProtection());
   results.push(await testAdminFlow());
   results.push(await testSuperadminFlow());
