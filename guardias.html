@@ -264,16 +264,11 @@
         <label>Profesor ausente</label>
         <div class="input-with-action">
           <input type="text" id="fAusente" placeholder="Selecciona o busca un profesor" autocomplete="off" aria-autocomplete="list" aria-controls="ausenteSuggestions">
-          <button class="btn-inline-clear" type="button" onclick="clearAusenteSelection()">Cambiar</button>
+          <button class="btn-inline-save" type="button" onclick="save()">Guardar</button>
         </div>
         <div class="absence-suggestions" id="ausenteSuggestions" hidden></div>
         <div class="absence-preview" id="ausentePreview">Empieza a escribir para localizar al profesor.</div>
         <div class="field-error" id="fAusenteError"></div>
-      </div>
-      <div class="fg">
-        <label>Aula / Lugar</label>
-        <input type="text" id="fAula" placeholder="Ej: 2oA - Aula 12">
-        <div class="field-error" id="fAulaError"></div>
       </div>
     </div>
 
@@ -324,13 +319,12 @@
       <div class="teacher-head-main">
         <div class="teacher-session-title" id="teacherName">Profesorado</div>
         <div class="teacher-meta" id="teacherMeta">Horario del profesorado</div>
-        <div class="teacher-user" id="teacherUser"></div>
-        <div class="teacher-identity-notice" id="teacherIdentityNotice"></div>
       </div>
       <div class="teacher-head-side">
         <div class="teacher-duty-alert" id="teacherDutyAlert" hidden></div>
         <div class="teacher-panel-actions">
           <button class="btn-teacher-panel" type="button" onclick="openTeacherFutureAbsenceModal()">Avisar falta futura</button>
+          <button class="btn-teacher-panel" type="button" onclick="changeTeacherUser()">Cambiar profesor</button>
         </div>
         <div class="teacher-mood-card" id="teacherMoodCard"></div>
       </div>

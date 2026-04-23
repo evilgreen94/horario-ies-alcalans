@@ -373,15 +373,9 @@ function syncTeacherIdentity(){
   const teacherNameEl=document.getElementById('teacherName');
   const teacherMetaEl=document.getElementById('teacherMeta');
   const teacherBarNameEl=document.getElementById('teacherBarName');
-  const teacherUserEl=document.getElementById('teacherUser');
-  const teacherIdentityNoticeEl=document.getElementById('teacherIdentityNotice');
   if(teacherNameEl) teacherNameEl.textContent=nombre;
   if(teacherMetaEl) teacherMetaEl.textContent=`${nombreCompleto} - ${detalle}${substitutionMeta?` - ${substitutionMeta}`:''}`;
   if(teacherBarNameEl) teacherBarNameEl.textContent=`${nombre} - ${detalle}`;
-  if(teacherUserEl) teacherUserEl.textContent=profesor?`Trabajando como ${nombre} · ${makeTeacherUsername(nombre)}`:'';
-  if(teacherIdentityNoticeEl){
-    teacherIdentityNoticeEl.innerHTML=profesor?`<div class="teacher-identity-copy"><div class="teacher-identity-title">Comprueba siempre este nombre antes de guardar cambios</div><div class="teacher-identity-meta">Ahora mismo estás operando como ${escapeHtml(nombreCompleto)}.</div></div><button class="btn-teacher-panel" type="button" onclick="changeTeacherUser()">Cambiar profesor</button>`:'';
-  }
 }
 function clearTeacherIdentityConfirmation(){
   teacherIdentityConfirmedFor='';
@@ -4518,7 +4512,7 @@ function syncTodoDiaMode(){
   guardiaInput.placeholder='La guardia se asigna automaticamente';
   setFieldError('fGuardia','');
 }
-function openModal(id){if(!isCurrentWeekOffset(weekOffset)){showToast('La edición solo está disponible en la semana actual.','info');return;}editId=id||null;const g=id?data.find(x=>x.id===id):null;const aula=g?resolveAulaRegistro(g):'';const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?getVisibleTeacherName(g.ausente):'';document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fAula').value=aula;document.getElementById('fTodoDia').checked=false;document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';populateProfesoresGuardia();syncAulaFromProfesor(!g||!aula);syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
+function openModal(id){if(!isCurrentWeekOffset(weekOffset)){showToast('La edición solo está disponible en la semana actual.','info');return;}editId=id||null;const g=id?data.find(x=>x.id===id):null;const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;document.getElementById('fAusente').value=g?getVisibleTeacherName(g.ausente):'';document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fTodoDia').checked=false;document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';populateProfesoresGuardia();syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
 function renderAusentePreview(){
   const input=document.getElementById('fAusente');
   const preview=document.getElementById('ausentePreview');
@@ -4539,18 +4533,18 @@ function renderAbsenceDecisionBar(){
   if(!panel) return;
   const input=document.getElementById('fAusente');
   if(!input){
-    panel.textContent='Selecciona profesor y hora para ver aula, cobertura prevista y tarea disponible.';
+    panel.textContent='Selecciona profesor y hora para ver la ubicación, la cobertura prevista y la tarea disponible.';
     return;
   }
   const nombre=getProfesorNombreSeleccionado(input.value);
   if(!nombre){
-    panel.textContent='Selecciona profesor y hora para ver aula, cobertura prevista y tarea disponible.';
+    panel.textContent='Selecciona profesor y hora para ver la ubicación, la cobertura prevista y la tarea disponible.';
     return;
   }
   const dia=+document.getElementById('fDia').value;
   const hora=+document.getElementById('fHora').value;
   const todoDia=!!document.getElementById('fTodoDia')?.checked;
-  const aula=getAulaProfesor(nombre,dia,hora)||document.getElementById('fAula')?.value.trim()||'Sin aula';
+  const aula=getAulaProfesor(nombre,dia,hora)||'Sin aula';
   const guardia=getGuardiaSugerida(dia,hora,1);
   const formObs=document.getElementById('fObs')?.value.trim()||'';
   const formFaena=!!document.getElementById('fFaena')?.checked||!!formObs;
@@ -4559,7 +4553,7 @@ function renderAbsenceDecisionBar(){
   const extras=[];
   if(todoDia) extras.push(`Se aplicar\u00e1 a ${horasLectivas.length} ${horasLectivas.length===1?'sesi\u00f3n lectiva':'sesiones lectivas'}`);
   if(tarea.faena&&tarea.obs) extras.push(`Tarea: ${escapeHtml((tarea.obs||'').slice(0,90)+((tarea.obs||'').length>90?'...':''))}`);
-  panel.innerHTML=`<strong>Aula:</strong> ${escapeHtml(aula)} | <strong>Guardia prevista:</strong> ${escapeHtml(guardia?getVisibleTeacherName(guardia):'Sin cobertura')} | <strong>Tarea:</strong> ${tarea.faena?'Disponible':'No registrada'}${extras.length?` | ${extras.join(' ? ')}`:''}`;
+  panel.innerHTML=`<strong>Ubicación:</strong> ${escapeHtml(aula)} | <strong>Guardia prevista:</strong> ${escapeHtml(guardia?getVisibleTeacherName(guardia):'Sin cobertura')} | <strong>Tarea:</strong> ${tarea.faena?'Disponible':'No registrada'}${extras.length?` | ${extras.join(' ? ')}`:''}`;
 }function closeModal(){document.getElementById('overlay').classList.remove('open');}
 function bgClose(e){if(e.target.id==='overlay')closeModal();}
 function populateProfesoresAusencias(){
@@ -4608,7 +4602,6 @@ function selectAusenteSuggestion(nombre){
   if(!input) return;
   input.value=getVisibleTeacherName(nombre);
   absenceActiveIndex=absenceMatches.findIndex(item=>item===nombre);
-  syncAulaFromProfesor(true);
   syncGuardiaPreview();
   renderAusentePreview();
   renderAbsenceDecisionBar();
@@ -4616,7 +4609,6 @@ function selectAusenteSuggestion(nombre){
 }
 function handleAusenteInput(){
   absenceActiveIndex=-1;
-  syncAulaFromProfesor(false);
   syncGuardiaPreview();
   renderAusentePreview();
   renderAbsenceDecisionBar();
@@ -4651,14 +4643,6 @@ function handleAusenteKeydown(event){
     closeAusenteSuggestions();
   }
 }
-function syncAulaFromProfesor(force){
-  const dia=+document.getElementById('fDia').value;
-  const hora=+document.getElementById('fHora').value;
-  const ausente=getProfesorNombreSeleccionado(document.getElementById('fAusente').value);
-  const aulaInput=document.getElementById('fAula');
-  const aulaReal=ausente?getAulaProfesor(ausente,dia,hora):'';
-  if(force||!aulaInput.value.trim()) aulaInput.value=aulaReal;
-}
 function setFieldError(fieldId,message){
   const input=document.getElementById(fieldId);
   const error=document.getElementById(`${fieldId}Error`);
@@ -4666,7 +4650,7 @@ function setFieldError(fieldId,message){
   if(error) error.textContent=message||'';
 }
 function clearAbsenceFormErrors(){
-  ['fDia','fHora','fAusente','fGuardia','fAula'].forEach(fieldId=>setFieldError(fieldId,''));
+  ['fDia','fHora','fAusente','fGuardia'].forEach(fieldId=>setFieldError(fieldId,''));
 }
 function findDuplicateAbsence(dia,hora,ausente){
   return data.find(item=>item.dia===dia&&item.hora===hora&&item.ausente===ausente&&item.id!==editId) || null;
@@ -4676,7 +4660,6 @@ function validateAbsenceForm(){
   const hora=+document.getElementById('fHora').value;
   const todoDia=document.getElementById('fTodoDia').checked;
   const ausenteInput=document.getElementById('fAusente');
-  const aulaInput=document.getElementById('fAula');
   const ausente=getProfesorNombreSeleccionado(ausenteInput.value);
   clearAbsenceFormErrors();
   if(!ausente){
@@ -4695,24 +4678,10 @@ function validateAbsenceForm(){
     }
     return {valid:true,ausente,guardia:'',todoDia:true,horasLectivas};
   }
-  if(!aulaInput.value.trim() && !getAulaProfesor(ausente,dia,hora)){
-    setFieldError('fAula','Indica el aula o lugar de la ausencia.');
-    return {valid:false,focus:aulaInput};
-  }
   return {valid:true,ausente,guardia:'',todoDia:false,horasLectivas:[hora]};
 }
-function clearAusenteSelection(){
-  const ausenteInput=document.getElementById('fAusente');
-  const aulaInput=document.getElementById('fAula');
-  if(!ausenteInput||!aulaInput) return;
-  ausenteInput.value='';
-  aulaInput.value='';
-  absenceActiveIndex=-1;
-  clearAbsenceFormErrors();
-  renderAusentePreview();
-  renderAbsenceDecisionBar();
-  closeAusenteSuggestions();
-  ausenteInput.focus();
+function resolveAbsenceAulaForSave(ausente,dia,hora,existingRow=null){
+  return getAulaProfesor(ausente,dia,hora)||resolveAulaRegistro(existingRow)||cleanText(existingRow?.aula)||'';
 }
 function populateProfesoresGuardia(){
   const fDia=document.getElementById('fDia');
@@ -4757,7 +4726,6 @@ function save(){
   const todoDia=validation.todoDia;
   const obs=document.getElementById('fObs').value.trim();
   const faena=!!document.getElementById('fFaena').checked||!!obs;
-  const aulaManual=document.getElementById('fAula').value.trim();
   const horasObjetivo=validation.horasLectivas;
   const previousRow=editId?data.find(g=>g.id===editId):null;
   const undoState=buildUndoState(dia);
@@ -4766,7 +4734,7 @@ function save(){
   document.getElementById('fGuardia').value='';
 
   if(editId&&!todoDia){
-    const aulaReal=getAulaProfesor(ausente,dia,hora)||aulaManual;
+    const aulaReal=resolveAbsenceAulaForSave(ausente,dia,hora,previousRow);
     const taskState=getAbsenceTaskState(ausente,dia,hora,faena,obs);
     const i=data.findIndex(g=>g.id===editId);
     data[i]={dia,hora,ausente,guardia:'',aula:aulaReal,faena:taskState.faena,obs:taskState.obs,id:editId};
@@ -4780,9 +4748,9 @@ function save(){
       data=data.filter(g=>g.id!==editId);
     }
     horasObjetivo.forEach(horaItem=>{
-      const aulaReal=getAulaProfesor(ausente,dia,horaItem)||aulaManual;
       const taskState=getAbsenceTaskState(ausente,dia,horaItem,faena,obs);
       const existing=data.find(g=>g.dia===dia&&g.hora===horaItem&&g.ausente===ausente);
+      const aulaReal=resolveAbsenceAulaForSave(ausente,dia,horaItem,existing);
       const entry={dia,hora:horaItem,ausente,guardia:'',aula:aulaReal,faena:taskState.faena,obs:taskState.obs};
       if(existing){
         Object.assign(existing,entry);
@@ -4825,10 +4793,8 @@ async function del(){
 }
 document.getElementById('fDia').addEventListener('change',()=>{populateProfesoresGuardia();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);setFieldError('fDia','');});
 document.getElementById('fHora').addEventListener('change',()=>{populateProfesoresGuardia();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);setFieldError('fHora','');});
-document.getElementById('fDia').addEventListener('change',()=>syncAulaFromProfesor(true));
-document.getElementById('fHora').addEventListener('change',()=>syncAulaFromProfesor(true));
 document.getElementById('fTodoDia').addEventListener('change',()=>{syncTodoDiaMode();syncGuardiaPreview();renderAbsenceDecisionBar();});
-document.getElementById('fAusente').addEventListener('change',()=>{syncAulaFromProfesor(true);syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);setFieldError('fAusente','');});
+document.getElementById('fAusente').addEventListener('change',()=>{syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);setFieldError('fAusente','');});
 document.getElementById('fAusente').addEventListener('input',handleAusenteInput);
 document.getElementById('fAusente').addEventListener('focus',()=>renderAusenteSuggestions(true));
 document.getElementById('fAusente').addEventListener('click',()=>renderAusenteSuggestions(true));
@@ -4836,7 +4802,6 @@ document.getElementById('fAusente').addEventListener('keydown',handleAusenteKeyd
 document.getElementById('fAusente').addEventListener('blur',()=>window.setTimeout(closeAusenteSuggestions,120));
 document.getElementById('fGuardia').addEventListener('input',()=>setFieldError('fGuardia',''));
 document.getElementById('fGuardia').addEventListener('change',()=>setFieldError('fGuardia',''));
-document.getElementById('fAula').addEventListener('input',()=>{setFieldError('fAula','');renderAbsenceDecisionBar();});
 const ausenteSuggestions=document.getElementById('ausenteSuggestions');
 if(ausenteSuggestions){
   ausenteSuggestions.addEventListener('pointerdown',event=>{

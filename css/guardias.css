@@ -1284,13 +1284,13 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
 .fg input.is-invalid, .fg select.is-invalid, .fg textarea.is-invalid { border-color: rgba(217,83,79,0.75); box-shadow: 0 0 0 3px rgba(217,83,79,0.12); }
 .field-error { min-height: 18px; margin-top: 6px; font-size: .74rem; font-weight: 700; color: var(--red); }
 .input-with-action { display: grid; grid-template-columns: 1fr auto; gap: .6rem; align-items: center; }
-.btn-inline-clear {
+.btn-inline-save {
   border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-family: var(--font-b);
+  background: linear-gradient(135deg, #d9a11d, #efc75a);
+  color: #000;
+  font-family: var(--font-h);
   font-size: .8rem;
-  font-weight: 700;
+  font-weight: 800;
   padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
@@ -1695,7 +1695,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
 }
 .teacher-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 1.2fr);
   gap: 1rem;
   margin-bottom: 1rem;
   padding: 1rem;
@@ -1791,7 +1791,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   margin-top: .7rem;
   display: grid;
   gap: .75rem;
-  padding: .85rem .95rem;
+  padding: 1rem 1.05rem;
   border-radius: 12px;
   border: 1px solid rgba(61,116,197,0.14);
   background: rgba(255,255,255,0.9);
@@ -1827,21 +1827,24 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   line-height: 1.4;
 }
 .teacher-mood-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .55rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .7rem;
+  width: 100%;
 }
 .teacher-mood-option {
   display: inline-flex;
   align-items: center;
-  gap: .45rem;
-  padding: .55rem .72rem;
-  border-radius: 8px;
+  gap: .55rem;
+  width: 100%;
+  min-height: 52px;
+  padding: .75rem .9rem;
+  border-radius: 10px;
   border: 1px solid rgba(61,116,197,0.16);
   background: #fff;
   color: var(--text);
-  font-size: .78rem;
-  font-weight: 700;
+  font-size: .82rem;
+  font-weight: 800;
   cursor: pointer;
 }
 .teacher-mood-option:hover {
@@ -1849,11 +1852,12 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   border-color: rgba(61,116,197,0.28);
 }
 .teacher-mood-option-emoji {
-  font-size: 1rem;
+  font-size: .88rem;
   line-height: 1;
+  flex-shrink: 0;
 }
 .teacher-mood-option-label {
-  white-space: nowrap;
+  white-space: normal;
 }
 .chip-mood {
   position: relative;
@@ -2496,6 +2500,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .teacher-identity-notice { flex-direction: column; align-items: stretch; }
   .teacher-panel-actions { justify-content: stretch; }
   .teacher-panel-actions .btn-teacher-panel { flex: 1 1 100%; }
+  .teacher-mood-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .absence-suggestions { max-height: min(30vh, 220px); }
   .absence-preview,
   .absence-decision-bar { font-size: .79rem; }
@@ -2892,6 +2897,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .teacher-summary-label { text-align: left; }
   .teacher-panel-actions { width: 100%; justify-content: center; }
   .btn-teacher-panel { width: 100%; text-align: center; }
+  .teacher-mood-options { grid-template-columns: 1fr; }
   .teacher-session-edit { width: 100%; }
   .teacher-save, .teacher-save-exit { display: block; width: min(280px, 100%); margin-right: auto; margin-left: auto; text-align: center; }
   .teacher-day-pills button { width: 100%; text-align: center; }
