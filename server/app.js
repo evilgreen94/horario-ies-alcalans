@@ -122,6 +122,10 @@ app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'guardias.html'));
 });
 
+app.get('/tv', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'guardias.html'));
+});
+
 app.use((error, _req, res, _next) => {
   console.error(error);
   res.status(error.status || 500).json({

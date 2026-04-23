@@ -352,9 +352,17 @@ let teacherWeekOffset=0;
 let adminTableFilter='all';
 const demo=[];
 const APP_URL_PARAMS=new URLSearchParams(window.location.search||'');
+const APP_PATHNAME=(window.location.pathname||'').toLowerCase();
+const TV_MODE=APP_URL_PARAMS.get('view')==='tv'||APP_PATHNAME.endsWith('/tv');
 const SUPERADMIN_ENABLED=APP_URL_PARAMS.get('panel')==='superadmin';
 let superAdminRoutePrompted=false;
+document.body.classList.toggle('tv-mode',TV_MODE);
 document.body.classList.toggle('superadmin-route',SUPERADMIN_ENABLED);
+function syncAppModeClasses(){
+  document.body.classList.toggle('admin-active',isAdmin);
+  document.body.classList.toggle('teacher-active',!!teacherName);
+  document.body.classList.toggle('teacher-panel-open',!!document.getElementById('teacherOverlay')?.classList.contains('open'));
+}
 const LEGACY_DEMO_NAMES=new Set(['Garcia Lopez, Ana','Perez Sanchez, Luis','Torres Vidal, Marta','Romero Diaz, Javier','Navarro Gil, Carmen','Castro Reyes, David','Blanco Munoz, Rosa','Serrano Lara, Miguel']);
 function syncTeacherIdentity(){
   const profesor=getProfesor(teacherName);
@@ -608,6 +616,21 @@ function getPasilloLevelClass(total){
   if(value>=5) return 'is-warn';
   return 'is-ok';
 }
+function renderTvHeaderCorridor(){
+  const corridorChip=document.getElementById('tvHeaderCorridor');
+  const corridorValue=document.getElementById('tvHeaderCorridorValue');
+  if(!corridorChip||!corridorValue) return;
+  const corredor=getAlumnosFueraSummary();
+  corridorValue.textContent=`${corredor.current.total}/${corredor.max}`;
+  corridorChip.classList.remove('tv-header-corridor-ok','tv-header-corridor-warn','tv-header-corridor-danger');
+  const level=getPasilloLevelClass(corredor.current.total).replace('is-','');
+  corridorChip.classList.add(`tv-header-corridor-${level}`);
+}
+function syncTvExitLink(){
+  const exitLink=document.getElementById('tvExitBtn');
+  if(!exitLink) return;
+  exitLink.setAttribute('href',getMainRouteUrl());
+}
 function getAlumnosFueraAdminRows(){
   return getAlumnosFueraRows()
     .filter(row=>row.cantidad>0||row.lastExitAt||row.lastReturnAt)
@@ -752,7 +775,11 @@ function seededShuffle(list,seed){
   return copy;
 }
 function getSpecialAssignments(dia,hora,rowsSource=data){
-  const orderedNames=seededShuffle(getOrdenHora(dia,hora).map(item=>item.nombre),`${new Date().toISOString().slice(0,10)}|${dia}|${hora}`);
+  const blockedNames=getDayLongAbsentTeacherSet(dia,rowsSource);
+  const orderedNames=seededShuffle(
+    getOrdenHora(dia,hora).map(item=>item.nombre).filter(nombre=>!blockedNames.has(nombre)),
+    `${new Date().toISOString().slice(0,10)}|${dia}|${hora}`
+  );
   const biblioteca=orderedNames[0]||'';
   const banos=orderedNames.find(nombre=>nombre!==biblioteca)||'';
   const specialCount=(biblioteca?1:0)+(banos?1:0);
@@ -777,6 +804,23 @@ function buildGuardiaCoverageCounter(options={}){
   });
   return counter;
 }
+function isTeacherAbsentAllDay(nombre,dia,rowsSource=data){
+  const lectiveHours=getHorasLectivasProfesorDia(nombre,dia);
+  if(!lectiveHours.length) return false;
+  const absentHours=new Set(
+    (rowsSource||[])
+      .filter(row=>row.dia===dia&&row.ausente===nombre)
+      .map(row=>Number(row.hora))
+      .filter(Number.isInteger)
+  );
+  return lectiveHours.every(hora=>absentHours.has(hora));
+}
+function getDayLongAbsentTeacherSet(dia,rowsSource=data){
+  const teacherNames=[...new Set(
+    Object.keys(HORARIO_GUARDIAS[dia]||{}).flatMap(hora=>getProfesHora(dia,Number(hora)))
+  )];
+  return new Set(teacherNames.filter(nombre=>isTeacherAbsentAllDay(nombre,dia,rowsSource)));
+}
 function getBalancedGuardiaOrder(dia,hora,options={}){
   const {
     excludeNames=[],
@@ -784,8 +828,11 @@ function getBalancedGuardiaOrder(dia,hora,options={}){
     excludeHora=hora,
     dayOnly=dia
   }=options;
-  const blocked=new Set((excludeNames||[]).filter(Boolean));
   const rowsSource=Array.isArray(options.rowsSource)?options.rowsSource:data;
+  const blocked=new Set([
+    ...(excludeNames||[]).filter(Boolean),
+    ...getDayLongAbsentTeacherSet(dia,rowsSource)
+  ]);
   const totalCounter=buildGuardiaCoverageCounter({excludeDia,excludeHora,rowsSource});
   const dayCounter=buildGuardiaCoverageCounter({excludeDia,excludeHora,dayOnly,rowsSource});
   const baseOrder=getOrdenHora(dia,hora)
@@ -861,6 +908,9 @@ function reassignGuardiasForSlot(dia,hora,rowsSource=data){
 }
 function reassignGuardiasForDayHours(dia,horas){
   [...new Set((horas||[]).map(Number).filter(Number.isInteger))].forEach(hora=>reassignGuardiasForSlot(dia,hora));
+}
+function getSchoolDayGuardiaHours(){
+  return Object.keys(HORA_MAP).map(Number).filter(hora=>!HORAS_PATIO.has(hora));
 }
 function reassignAllGuardias(){
   for(let dia=0;dia<5;dia++){
@@ -947,7 +997,10 @@ function validateTeacherSubstitutionName(nombre,rawValue){
 
   return '';
 }
-function getGuardiasDisponibles(dia,hora){return getProfesHora(+dia,+hora);}
+function getGuardiasDisponibles(dia,hora,rowsSource=data){
+  const blocked=getDayLongAbsentTeacherSet(+dia,rowsSource);
+  return getProfesHora(+dia,+hora).filter(nombre=>!blocked.has(nombre));
+}
 function getProfesorNombreSeleccionado(valor){
   const texto=(valor||'').trim();
   if(!texto) return '';
@@ -1138,6 +1191,7 @@ let backendPollingInFlight=false;
 let futureAbsenceSyncFlags=new Set();
 let superAdminEvents=[];
 let lastBackendSnapshot='';
+let realtimeSyncChannel=null;
 let superAdminOpsInfo=null;
 let superAdminOpsLoading=false;
 let superAdminOpsLastFetchAt='';
@@ -1151,6 +1205,8 @@ const superAdminStatus={
 };
 const BACKEND_POLL_INTERVAL_MS=10000;
 const SUPERADMIN_INFO_REFRESH_MS=30000;
+const REALTIME_SYNC_KEY='IES_Alcalans_Realtime_Sync';
+const REALTIME_SYNC_CHANNEL='ies-alcalans-guardias-sync';
 (function(){const wd=new Date().getDay();day=(wd>=1&&wd<=5)?wd-1:0;})();
 teacherRecents=loadTeacherRecents();
 teacherSubstitutions=loadTeacherSubstitutions();
@@ -1161,6 +1217,7 @@ teacherFutureAbsences=loadTeacherFutureAbsences();
 teacherMoodEntries=loadTeacherMoods();
 teacherName=getProfesorNombreSeleccionado(loadTeacherUser())||'';
 teacherDay=day;
+initRealtimeSync();
 function serializeBibliotecaAssignments(){
   const rows=[];
   for(let dia=0;dia<5;dia++){
@@ -1214,6 +1271,43 @@ function serializeTeacherPracticasGuardias(){
 }
 function serializeTeacherPracticasGuardiasTramos(){
   return teacherPracticasGuardiasTramos.map(row=>({profesor:row.profesor,dia:row.dia,hora:row.hora}));
+}
+function handleRealtimeSyncSignal(payload){
+  if(!storage.hasBackend()) return;
+  const source=cleanText(payload?.source);
+  if(source==='self') return;
+  pollBackendState(true);
+}
+function notifyRealtimeSync(type){
+  const payload={type:cleanText(type)||'update',ts:Date.now(),source:'self'};
+  try{
+    if('BroadcastChannel' in window){
+      if(!realtimeSyncChannel) realtimeSyncChannel=new BroadcastChannel(REALTIME_SYNC_CHANNEL);
+      realtimeSyncChannel.postMessage(payload);
+    }
+  }catch(error){
+    console.warn('Realtime sync broadcast failed',error);
+  }
+  try{
+    window.localStorage.setItem(REALTIME_SYNC_KEY,JSON.stringify({...payload,source:'storage'}));
+  }catch(_error){}
+}
+function initRealtimeSync(){
+  if(!storage.hasBackend()) return;
+  try{
+    if('BroadcastChannel' in window){
+      realtimeSyncChannel=new BroadcastChannel(REALTIME_SYNC_CHANNEL);
+      realtimeSyncChannel.addEventListener('message',event=>handleRealtimeSyncSignal(event.data));
+    }
+  }catch(error){
+    console.warn('Realtime sync channel init failed',error);
+  }
+  window.addEventListener('storage',event=>{
+    if(event.key!==REALTIME_SYNC_KEY||!event.newValue) return;
+    try{
+      handleRealtimeSyncSignal(JSON.parse(event.newValue));
+    }catch(_error){}
+  });
 }
 function formatStatusTimestamp(value){
   if(!value) return 'Sin registro';
@@ -1606,6 +1700,7 @@ async function syncAdminState(){
     superAdminStatus.lastAdminSyncAt=new Date().toISOString();
     clearSuperAdminError();
     pushSuperAdminEvent('Admin sync','Guardias, biblioteca, historial, sustituciones y ajustes de practicas sincronizados con backend.');
+    notifyRealtimeSync('admin-sync');
   }catch(error){
     console.warn('Backend sync failed',error);
     setSuperAdminError('Fallo en la sincronización de Jefatura.');
@@ -1947,6 +2042,163 @@ function getSelectedRowsForDay(targetDay){
 function getTeacherWeekRowsForDay(targetDay){
   return getRowsForWeekOffset(teacherWeekOffset).filter(row=>row.dia===targetDay).sort((a,b)=>a.hora-b.hora);
 }
+function getTvRouteUrl(){
+  if(window.location.protocol==='file:') return 'guardias.html?view=tv';
+  const url=new URL(window.location.href);
+  url.searchParams.set('view','tv');
+  url.pathname='/';
+  return `${url.pathname}${url.search}`;
+}
+function getMainRouteUrl(){
+  if(window.location.protocol==='file:') return 'guardias.html';
+  const url=new URL(window.location.href);
+  url.searchParams.delete('view');
+  if(url.pathname.toLowerCase().endsWith('/tv')){
+    url.pathname=url.pathname.slice(0,-3)||'/';
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+function openTvPanel(){
+  window.location.href=getTvRouteUrl();
+}
+function closeTvPanel(){
+  window.location.href=getMainRouteUrl();
+}
+function getTodaySchoolDayIndex(){
+  const weekday=formatNowParts().date.getDay();
+  return weekday>=1&&weekday<=5?weekday-1:null;
+}
+function getUpcomingSchoolSlotsForToday(limit=2){
+  const {hours,minutes,date}=formatNowParts();
+  const weekday=date.getDay();
+  if(weekday<1||weekday>5) return [];
+  const total=hours*60+minutes;
+  const upcoming=[];
+  for(const hora of Object.keys(HORA_MAP).map(Number).sort((a,b)=>a-b)){
+    if(HORAS_PATIO.has(hora)) continue;
+    const [start]=String(HORA_MAP[hora].rango||'').split('-');
+    const [sh,sm]=start.split(':').map(Number);
+    if(!Number.isInteger(sh)||!Number.isInteger(sm)) continue;
+    if(total<sh*60+sm){
+      upcoming.push({dia:weekday-1,hora});
+      if(upcoming.length>=limit) break;
+    }
+  }
+  return upcoming;
+}
+function getTvSlotAssignments(slot,rowsSource){
+  if(!slot) return [];
+  const assignedRows=assignGuardiasForRows(rowsSource||[]);
+  const rows=assignedRows
+    .filter(row=>row.dia===slot.dia&&row.hora===slot.hora)
+    .sort((a,b)=>String(getVisibleTeacherName(a.guardia||'')).localeCompare(getVisibleTeacherName(b.guardia||''),'es'));
+  const assignments=rows.map(row=>({
+    teacher:getVisibleTeacherName(row.guardia||'')||'Sin cubrir',
+    location:resolveAulaRegistro(row)||'Sin ubicación',
+    meta:getVisibleTeacherName(row.ausente)?`Cubre a ${getVisibleTeacherName(row.ausente)}`:'',
+    tone:'general'
+  }));
+  const assignedTeachers=new Set(assignments.map(item=>cleanText(item.teacher)).filter(Boolean));
+  const biblioteca=getBibliotecaAsignada(slot.dia,slot.hora,rowsSource);
+  const banos=getBanosAsignado(slot.dia,slot.hora,rowsSource);
+  if(biblioteca && !assignedTeachers.has(cleanText(getVisibleTeacherName(biblioteca)))){
+    assignments.push({
+      teacher:getVisibleTeacherName(biblioteca),
+      location:'Biblioteca',
+      meta:'Puesto de apoyo',
+      tone:'biblioteca'
+    });
+  }
+  if(banos && !assignedTeachers.has(cleanText(getVisibleTeacherName(banos)))){
+    assignments.push({
+      teacher:getVisibleTeacherName(banos),
+      location:'Baños',
+      meta:'Puesto de apoyo',
+      tone:'banos'
+    });
+  }
+  if(assignments.length){
+    return assignments.map(item=>({
+      ...item
+    }));
+  }
+  if(rows.length){
+    return rows.map(row=>({
+      teacher:getVisibleTeacherName(row.guardia||'')||'Sin cubrir',
+      location:resolveAulaRegistro(row)||'Sin ubicación',
+      meta:getVisibleTeacherName(row.ausente)?`Cubre a ${getVisibleTeacherName(row.ausente)}`:'',
+      tone:'general'
+    }));
+  }
+  const fallbackAssignments=[];
+  if(biblioteca){
+    fallbackAssignments.push({
+      teacher:getVisibleTeacherName(biblioteca),
+      location:'Biblioteca',
+      meta:'Puesto de apoyo',
+      tone:'biblioteca'
+    });
+  }
+  if(banos){
+    fallbackAssignments.push({
+      teacher:getVisibleTeacherName(banos),
+      location:'Baños',
+      meta:'Puesto de apoyo',
+      tone:'banos'
+    });
+  }
+  return fallbackAssignments;
+}
+function renderTvSlotPanel(containerId,slot,badgeId,rowsSource,options={}){
+  const container=document.getElementById(containerId);
+  const badge=document.getElementById(badgeId);
+  if(!container||!badge) return;
+  if(!slot){
+    badge.textContent=options.emptyBadge||'Sin tramo lectivo';
+    container.innerHTML=`<div class="tv-empty">${escapeHtml(options.emptyMessage||'No hay un tramo lectivo activo ahora mismo.')}</div>`;
+    return;
+  }
+  badge.textContent=`${HORA_MAP[slot.hora].label} hora · ${HORA_MAP[slot.hora].rango.replace('-', ' - ')}`;
+  const assignments=getTvSlotAssignments(slot,rowsSource);
+  if(!assignments.length){
+    container.innerHTML='<div class="tv-empty">No hay guardias registradas para este tramo.</div>';
+    return;
+  }
+  container.innerHTML=`<div class="tv-cards">${assignments.map(item=>`
+    <article class="tv-card tv-card-${item.tone}">
+      <div class="tv-card-teacher">${escapeHtml(item.teacher)}</div>
+      <div class="tv-card-location">${escapeHtml(item.location)}</div>
+      ${item.meta?`<div class="tv-card-meta">${escapeHtml(item.meta)}</div>`:''}
+    </article>
+  `).join('')}</div>`;
+}
+function renderTvPanel(){
+  const shell=document.getElementById('tvShell');
+  if(!shell) return;
+  const rowsSource=getRowsForWeekOffset(0);
+  const currentSlot=getCurrentSchoolSlot();
+  const upcomingSlots=getUpcomingSchoolSlotsForToday(2);
+  const nextSlot=upcomingSlots[0]||null;
+  const laterSlot=upcomingSlots[1]||null;
+  renderTvSlotPanel('tvCurrentPanel',currentSlot,'tvCurrentSlotBadge',rowsSource,{
+    emptyBadge:'Sin tramo lectivo',
+    emptyMessage:getTodaySchoolDayIndex()==null
+      ?'Hoy no hay jornada lectiva. El panel volverá a activarse en el próximo día de clase.'
+      :'Ahora mismo no hay un tramo lectivo activo.'
+  });
+  renderTvSlotPanel('tvNextPanel',nextSlot,'tvNextSlotBadge',rowsSource,{
+    emptyBadge:'Sin siguiente tramo',
+    emptyMessage:getTodaySchoolDayIndex()==null
+      ?'No hay siguiente tramo programado para hoy.'
+      :'No queda ningún tramo lectivo por delante en la jornada de hoy.'
+  });
+  renderTvSlotPanel('tvLaterPanel',laterSlot,'tvLaterSlotBadge',rowsSource,{
+    emptyBadge:'Sin siguiente tramo',
+    emptyMessage:getTodaySchoolDayIndex()==null
+      ?'No hay más tramos programados para hoy.'
+      :'No queda un tercer tramo visible en la jornada de hoy.'
+  });
+}
 async function updateTeacherFutureAbsenceEntry(entry){
   const normalized=normalizeTeacherFutureAbsence(entry);
   teacherFutureAbsences=sortTeacherFutureAbsences([normalized,...teacherFutureAbsences.filter(item=>item.id!==normalized.id)]);
@@ -2221,9 +2473,9 @@ function makeBackendSnapshot(){
     }))
   });
 }
-async function pollBackendState(){
+async function pollBackendState(force=false){
   if(!storage.hasBackend()||backendPollingInFlight||backendSyncInFlight) return;
-  if(document.hidden||isAnyOverlayOpen()) return;
+  if(!force&&(document.hidden||isAnyOverlayOpen())) return;
 
   backendPollingInFlight=true;
   renderSuperAdminMonitor();
@@ -2371,6 +2623,7 @@ function refreshAccessUi(){
   }
   if(adminBar) adminBar.classList.toggle('show',isAdmin);
   if(superAdminBar) superAdminBar.classList.toggle('show',isSuperAdmin);
+  syncAppModeClasses();
   updateAdminControls();
   renderAdminWorkspace();
   renderSuperAdminMonitor();
@@ -3081,7 +3334,16 @@ function updateClockUi(){
     showToast('Nueva semana lectiva iniciada. El calendario se ha reiniciado.','info');
   }
   applyApprovedFutureAbsencesForCurrentWeek().catch(error=>console.warn('Future absence auto-apply failed',error));
-  document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  const now=new Date();
+  document.getElementById('clock').textContent=now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  const tvHeaderDay=document.getElementById('tvHeaderDay');
+  if(tvHeaderDay){
+    const weekday=now.getDay();
+    tvHeaderDay.textContent=weekday>=1&&weekday<=5?DIAS[weekday-1]:'Hoy';
+  }
+  syncTvExitLink();
+  renderTvHeaderCorridor();
+  renderTvPanel();
   updateAdminControls();
 }
 function openHistoryModal(){
@@ -3727,6 +3989,8 @@ function renderTable(){
       statCard.classList.add(`stat-pasillo-${getPasilloLevelClass(corredor.current.total).replace('is-','')}`);
     }
   }
+  renderTvHeaderCorridor();
+  renderTvPanel();
   renderAdminWorkspace();
 }
 async function toggleAdmin(){
@@ -3941,6 +4205,7 @@ async function loginTeacher(){
   syncTeacherIdentity();
   document.getElementById('teacherOverlay').classList.add('open');
   document.getElementById('teacherBar').classList.add('show');
+  syncAppModeClasses();
   renderTeacherPanel();
 }
 function openTeacherPanelFallback(){
@@ -3950,10 +4215,11 @@ function openTeacherPanelFallback(){
   syncTeacherIdentity();
   document.getElementById('teacherOverlay').classList.add('open');
   document.getElementById('teacherBar').classList.add('show');
+  syncAppModeClasses();
   renderTeacherPanel();
 }
-function openTeacherPanel(){if(!getProfesor(teacherName)){openTeacherAccess();return;}teacherDay=day;teacherWeekOffset=weekOffset;syncTeacherIdentity();document.getElementById('teacherOverlay').classList.add('open');document.getElementById('teacherBar').classList.add('show');renderTeacherPanel();}
-function closeTeacherPanel(){document.getElementById('teacherOverlay').classList.remove('open');}
+function openTeacherPanel(){if(!getProfesor(teacherName)){openTeacherAccess();return;}teacherDay=day;teacherWeekOffset=weekOffset;syncTeacherIdentity();document.getElementById('teacherOverlay').classList.add('open');document.getElementById('teacherBar').classList.add('show');syncAppModeClasses();renderTeacherPanel();}
+function closeTeacherPanel(){document.getElementById('teacherOverlay').classList.remove('open');syncAppModeClasses();}
 function exitTeacherMode(){
   closeTeacherPanel();
   closeTeacherAccess();
@@ -3962,6 +4228,7 @@ function exitTeacherMode(){
   persistTeacherUser('');
   document.getElementById('teacherBar').classList.remove('show');
   syncTeacherIdentity();
+  syncAppModeClasses();
 }
 function setTeacherDay(dia){teacherDay=dia;renderTeacherPanel();}
 function changeTeacherWeekOffset(delta){
@@ -4526,7 +4793,7 @@ function save(){
     if(editId && previousRow && (previousRow.dia!==dia || !horasObjetivo.includes(previousRow.hora))){
       reassignGuardiasForDayHours(previousRow.dia,[previousRow.hora]);
     }
-    reassignGuardiasForDayHours(dia,horasObjetivo);
+    reassignGuardiasForDayHours(dia,todoDia?getSchoolDayGuardiaHours():horasObjetivo);
     if(todoDia){
       addHistoryEntry('Ausencia de d\u00eda completo',`${DIAS[dia]} \u00b7 ${ausente} \u00b7 ${horasObjetivo.map(formatHoraLabel).join(', ')}`,'create',{undoState});
     }else{
@@ -4720,6 +4987,7 @@ safeInitStep(renderFutureAbsenceAdminList,'renderFutureAbsenceAdminList');
 safeInitStep(renderTeacherFutureAbsenceOwnList,'renderTeacherFutureAbsenceOwnList');
 safeInitStep(syncTeacherIdentity,'syncTeacherIdentity');
 safeInitStep(refreshAccessUi,'refreshAccessUi');
+safeInitStep(syncAppModeClasses,'syncAppModeClasses');
 safeInitStep(()=>{initializeApp().catch(error=>console.error('Init step failed: initializeApp',error));},'initializeApp');
 let lastRenderedSchoolSlotKey=JSON.stringify(getCurrentSchoolSlot());
 window.setInterval(()=>{
@@ -4740,7 +5008,7 @@ document.addEventListener('visibilitychange',()=>{
     hydrateTeacherSubstitutions();
     hydrateTeacherPracticasGuardias();
     hydrateTeacherFutureAbsences();
-    pollBackendState();
+    pollBackendState(true);
     if(isSuperAdmin){
       refreshSuperAdminOps(true);
     }

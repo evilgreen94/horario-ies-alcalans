@@ -9,22 +9,70 @@
 </head>
 <body>
 <header>
+  <div class="header-status">
+    <div class="pulse-badge"><div class="pulse-dot"></div>En directo</div>
+  </div>
   <div class="header-center">
-    <div class="logo">
-      <a class="logo-link" href="https://portal.edu.gva.es/iesalcalans/es/" target="_blank" rel="noopener noreferrer">
-        <span class="logo-title">IES <span class="logo-title-accent">Alcalans</span></span>
-      </a>
+    <div class="tv-header-top" id="tvHeaderTop">
+      <div class="logo">
+        <a class="logo-link" href="https://portal.edu.gva.es/iesalcalans/es/" target="_blank" rel="noopener noreferrer">
+          <span class="logo-title">IES <span class="logo-title-accent">Alcalans</span></span>
+        </a>
+      </div>
+      <a class="tv-exit-btn" id="tvExitBtn" href="/" onclick="closeTvPanel(); return false;">Salir del panel</a>
+    </div>
+    <div class="tv-header-meta" id="tvHeaderMeta">
+      <span class="pulse-badge"><span class="pulse-dot"></span>En directo</span>
+      <span class="tv-header-day" id="tvHeaderDay">Lunes</span>
+      <span class="tv-header-corridor tv-header-corridor-ok" id="tvHeaderCorridor">
+        <span class="tv-header-corridor-label">Pasillo</span>
+        <strong id="tvHeaderCorridorValue">0/10</strong>
+      </span>
     </div>
     <div class="clock" id="clock"></div>
   </div>
   <div class="header-actions">
-    <div class="pulse-badge"><div class="pulse-dot"></div>En directo</div>
     <button class="btn" id="btnTeacher" onclick="openTeacherPanel()">Profesorado</button>
     <button class="btn" id="btnAdmin" onclick="toggleAdmin()">Jefe de estudios</button>
+    <button class="btn" id="btnTv" onclick="openTvPanel()">Sala de profesores</button>
     <button class="btn" id="btnSuperAdmin" onclick="toggleSuperAdmin()" style="display:none">Superadmin</button>
   </div>
 </header>
 <main>
+  <section class="tv-shell" id="tvShell" aria-live="polite">
+    <div class="tv-grid">
+      <section class="tv-panel tv-panel-now">
+        <div class="tv-panel-head">
+          <div>
+            <div class="tv-panel-kicker">Tramo actual</div>
+            <h2 class="tv-panel-title">Guardias ahora</h2>
+          </div>
+          <div class="tv-slot-badge" id="tvCurrentSlotBadge">Sin tramo lectivo</div>
+        </div>
+        <div class="tv-panel-body" id="tvCurrentPanel"></div>
+      </section>
+      <section class="tv-panel tv-panel-next">
+        <div class="tv-panel-head">
+          <div>
+            <div class="tv-panel-kicker">Siguiente referencia</div>
+            <h2 class="tv-panel-title">Siguiente tramo</h2>
+          </div>
+          <div class="tv-slot-badge tv-slot-badge-secondary" id="tvNextSlotBadge">Sin siguiente tramo</div>
+        </div>
+        <div class="tv-panel-body" id="tvNextPanel"></div>
+      </section>
+      <section class="tv-panel tv-panel-later">
+        <div class="tv-panel-head">
+          <div>
+            <div class="tv-panel-kicker">Siguiente referencia</div>
+            <h2 class="tv-panel-title">Después</h2>
+          </div>
+          <div class="tv-slot-badge tv-slot-badge-secondary" id="tvLaterSlotBadge">Sin siguiente tramo</div>
+        </div>
+        <div class="tv-panel-body" id="tvLaterPanel"></div>
+      </section>
+    </div>
+  </section>
   <div class="day-strip">
     <div class="day-strip-title">Guardias - <em id="dNombre">Lunes</em></div>
     <div class="week-strip" id="weekStrip">
@@ -454,7 +502,7 @@
   <a class="site-footer-link" href="https://ceice.gva.es/es/" target="_blank" rel="noopener noreferrer">
     <img
       class="site-footer-logo site-footer-logo-conselleria"
-      src="imagenes/gv_conselleria_educacion_cmyk_cast-1024x505-2.png"
+      src="imagenes/Conselleria de Educación, Cultura y Universidades CMYK.png"
       alt="Logo de la Conselleria de Educaci&oacute;n"
     >
   </a>
