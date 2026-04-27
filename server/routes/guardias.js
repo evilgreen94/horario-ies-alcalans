@@ -1,6 +1,6 @@
 const express = require('express');
 const { getDatabase } = require('../db');
-const { ensureArray, sanitizeAusencia } = require('./validation');
+const { ensureArray, normalizeText, sanitizeAusencia } = require('./validation');
 const { requireRole } = require('../session');
 
 const router = express.Router();
@@ -9,6 +9,35 @@ function notFound(message) {
   const error = new Error(message);
   error.status = 404;
   return error;
+}
+
+function conflict(message) {
+  const error = new Error(message);
+  error.status = 409;
+  return error;
+}
+
+function buildAbsenceLogicKeys(row) {
+  return {
+    ausente_key: normalizeText(row?.ausente),
+    guardia_key: normalizeText(row?.guardia)
+  };
+}
+
+async function ensureNoDuplicateAbsence(db, row, excludeId = null) {
+  const rows = await db.all(
+    'SELECT id, dia, hora, ausente FROM ausencias WHERE dia = ? AND hora = ?',
+    [row.dia, row.hora]
+  );
+  const targetKeys = buildAbsenceLogicKeys(row);
+  const duplicate = rows.find(item =>
+    String(item.id) !== String(excludeId ?? '') &&
+    normalizeText(item.ausente) === targetKeys.ausente_key
+  );
+  if (duplicate) {
+    throw conflict('Ya existe una ausencia registrada para ese profesor en ese tramo.');
+  }
+  return targetKeys;
 }
 
 router.get('/', async (_req, res, next) => {
@@ -25,13 +54,14 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
   try {
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
     const db = await getDatabase();
+    const { ausente_key, guardia_key } = await ensureNoDuplicateAbsence(db, { dia, hora, ausente, guardia });
     const result = await db.run(
       `INSERT INTO ausencias (dia, hora, ausente, guardia, aula, faena, obs)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [dia, hora, ausente, guardia, aula, faena ? 1 : 0, obs]
     );
     const row = await db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]);
-    res.status(201).json(row);
+    res.status(201).json({ ...row, ausente_key, guardia_key });
   } catch (error) {
     next(error);
   }
@@ -40,6 +70,14 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
 router.put('/replace', requireRole('admin'), async (req, res, next) => {
   try {
     const rows = ensureArray(req.body, 'Las ausencias').map(sanitizeAusencia);
+    const duplicateKeys = new Set();
+    rows.forEach(row => {
+      const key = `${row.dia}|${row.hora}|${normalizeText(row.ausente)}`;
+      if (duplicateKeys.has(key)) {
+        throw conflict('La lista incluye ausencias duplicadas del mismo profesor en el mismo tramo.');
+      }
+      duplicateKeys.add(key);
+    });
     const db = await getDatabase();
     await db.exec('DELETE FROM ausencias');
 
@@ -72,6 +110,7 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
     const { id } = req.params;
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
     const db = await getDatabase();
+    const { ausente_key, guardia_key } = await ensureNoDuplicateAbsence(db, { dia, hora, ausente, guardia }, id);
     const result = await db.run(
       `UPDATE ausencias
        SET dia = ?, hora = ?, ausente = ?, guardia = ?, aula = ?, faena = ?, obs = ?, updated_at = CURRENT_TIMESTAMP
@@ -82,7 +121,7 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
       throw notFound('No existe una ausencia con ese id.');
     }
     const row = await db.get('SELECT * FROM ausencias WHERE id = ?', [id]);
-    res.json(row);
+    res.json({ ...row, ausente_key, guardia_key });
   } catch (error) {
     next(error);
   }

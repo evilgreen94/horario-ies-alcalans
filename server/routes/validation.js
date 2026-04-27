@@ -23,6 +23,16 @@ function normalizeString(value, fallback = '') {
   return String(value ?? fallback).trim();
 }
 
+function normalizeText(value) {
+  if (!value) return '';
+  return String(value)
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
 function normalizeBoolean(value) {
   return value === true || value === 1 || value === '1' || value === 'true';
 }
@@ -191,6 +201,7 @@ module.exports = {
   ensureTimestamp,
   normalizeBoolean,
   normalizeInteger,
+  normalizeText,
   normalizeString,
   sanitizeAlumnosFueraAula,
   sanitizeAusencia,
