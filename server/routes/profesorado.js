@@ -1,5 +1,7 @@
 const express = require('express');
+const path = require('path');
 const { getDatabase } = require('../db');
+const { parseAnnualXml, writeAnnualSourceArtifacts } = require('../annual-source');
 const {
   ensureArray,
   ensureRequiredString,
@@ -36,6 +38,13 @@ function forbidden(message) {
   const error = new Error(message);
   error.status = 403;
   return error;
+}
+
+function normalizeAnnualImportRequest(body) {
+  const input = body && typeof body === 'object' ? body : {};
+  const xmlText = ensureRequiredString(input.xmlText, 'xmlText');
+  const fileName = String(input.fileName || 'horario-anual.xml').trim() || 'horario-anual.xml';
+  return { xmlText, fileName };
 }
 
 function getExpectedOrigin(req) {
@@ -743,6 +752,30 @@ router.delete('/future-absences/:id', requireRole('admin'), async (req, res, nex
       [FUTURE_ABSENCES_STATE_KEY, JSON.stringify(nextRows)]
     );
     res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/annual-import/xml', requireRole('admin'), requireSameOriginWrite, async (req, res, next) => {
+  try {
+    const { xmlText, fileName } = normalizeAnnualImportRequest(req.body);
+    const source = parseAnnualXml(xmlText, fileName);
+    const result = writeAnnualSourceArtifacts(source, {
+      sourceLabel: fileName,
+      xmlText
+    });
+    res.json({
+      ok: true,
+      importedAt: new Date().toISOString(),
+      sourceFile: path.basename(result.sourcePath),
+      outputFile: path.basename(result.outputPath),
+      xmlSnapshotFile: result.xmlSnapshotPath ? path.basename(result.xmlSnapshotPath) : null,
+      datasetId: result.payload.datasetId,
+      teachers: result.payload.teachers.length,
+      sourceLabel: result.payload.fuente,
+      backups: result.backups
+    });
   } catch (error) {
     next(error);
   }

@@ -93,6 +93,9 @@
     fetchGuardias(){
       return request('/guardias');
     },
+    fetchGuardiaMonthlyLoad(){
+      return request('/guardias/monthly-load');
+    },
     replaceGuardias(rows){
       return request('/guardias/replace', {
         method: 'PUT',
@@ -208,6 +211,15 @@
     fetchTeacherFutureAbsences(){
       return request('/profesorado/future-absences');
     },
+    fetchTvAnnouncement(){
+      return request('/avisos/tv');
+    },
+    saveTvAnnouncement(row){
+      return request('/avisos/tv', {
+        method: 'PUT',
+        body: JSON.stringify(row)
+      });
+    },
     createTeacherFutureAbsence(row){
       return request('/profesorado/future-absences', {
         method: 'POST',
@@ -252,6 +264,12 @@
       return request('/auth/change-password', {
         method: 'POST',
         body: JSON.stringify({ role, currentPassword, newPassword })
+      });
+    },
+    importAnnualXml(fileName, xmlText){
+      return request('/profesorado/annual-import/xml', {
+        method: 'POST',
+        body: JSON.stringify({ fileName, xmlText })
       });
     }
   };

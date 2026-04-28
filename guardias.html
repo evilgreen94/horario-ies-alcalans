@@ -21,6 +21,10 @@
       </div>
       <a class="tv-exit-btn" id="tvExitBtn" href="/" onclick="closeTvPanel(); return false;">Salir del panel</a>
     </div>
+    <div class="tv-announcement" id="tvAnnouncement" hidden>
+      <div class="tv-announcement-label">Aviso del d&iacute;a</div>
+      <div class="tv-announcement-text" id="tvAnnouncementText"></div>
+    </div>
     <div class="tv-header-meta" id="tvHeaderMeta">
       <span class="pulse-badge"><span class="pulse-dot"></span>En directo</span>
       <span class="tv-header-day" id="tvHeaderDay">Lunes</span>
@@ -43,36 +47,26 @@
     <div class="tv-grid">
       <section class="tv-panel tv-panel-now">
         <div class="tv-panel-head">
-          <div>
-            <div class="tv-panel-kicker">Tramo actual</div>
-            <h2 class="tv-panel-title">Guardias ahora</h2>
-          </div>
           <div class="tv-slot-badge" id="tvCurrentSlotBadge">Sin tramo lectivo</div>
         </div>
         <div class="tv-panel-body" id="tvCurrentPanel"></div>
       </section>
       <section class="tv-panel tv-panel-next">
         <div class="tv-panel-head">
-          <div>
-            <div class="tv-panel-kicker">Siguiente referencia</div>
-            <h2 class="tv-panel-title">Siguiente tramo</h2>
-          </div>
           <div class="tv-slot-badge tv-slot-badge-secondary" id="tvNextSlotBadge">Sin siguiente tramo</div>
         </div>
         <div class="tv-panel-body" id="tvNextPanel"></div>
       </section>
       <section class="tv-panel tv-panel-later">
         <div class="tv-panel-head">
-          <div>
-            <div class="tv-panel-kicker">Siguiente referencia</div>
-            <h2 class="tv-panel-title">Después</h2>
-          </div>
           <div class="tv-slot-badge tv-slot-badge-secondary" id="tvLaterSlotBadge">Sin siguiente tramo</div>
         </div>
         <div class="tv-panel-body" id="tvLaterPanel"></div>
       </section>
     </div>
   </section>
+  <section class="print-shell" id="printShell" aria-live="polite"></section>
+  <section class="app-shell" id="appShell">
   <div class="day-strip">
     <div class="day-strip-title">Guardias - <em id="dNombre">Lunes</em></div>
     <div class="week-strip" id="weekStrip">
@@ -91,7 +85,7 @@
   <section class="guardia-board">
     <div class="guardia-board-head">
       <div class="guardia-board-title">Guardias previstas por hora</div>
-      <div class="guardia-board-note">Biblioteca y baños se asignan automáticamente por hora. Si faltan coberturas, ambas reservas se liberan.</div>
+      <div class="guardia-board-note">Biblioteca y ba&ntilde;os se asignan autom&aacute;ticamente por hora. Si faltan coberturas, ambas reservas se liberan.</div>
       <button class="btn-mini" id="btnSorteo" type="button" onclick="sortearGuardiasDia()" style="display:none">Sortear orden del d&iacute;a</button>
     </div>
     <div class="guardia-grid" id="guardiaGrid"></div>
@@ -102,20 +96,20 @@
     </div>
     <div class="admin-actions admin-actions-primary">
       <button class="btn-add btn-add-primary" id="btnAddAusencia" onclick="openModal()">+ A&ntilde;adir ausencia</button>
+      <button class="btn-add btn-add-secondary" type="button" onclick="openFutureAbsenceAdminModal()">Faltas futuras</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="openHistoryModal()">Historial</button>
-      <div class="admin-status save-ts" id="saveTs">Edita desde la tabla o registra una nueva ausencia.</div>
     </div>
     <div class="admin-actions admin-actions-secondary">
       <button class="btn-add btn-add-secondary" type="button" onclick="openSubstitutionModal()">Sustituciones</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="openPracticasGuardiasModal()">Pr&aacute;cticas y guardias</button>
-      <button class="btn-add btn-add-secondary" type="button" onclick="openFutureAbsenceAdminModal()">Faltas futuras</button>
+      <button class="btn-add btn-add-secondary" type="button" onclick="openPrintableSchedule()">Imprimir horario</button>
       <button class="btn-add btn-add-secondary" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe diario</button>
       <button class="btn-add btn-add-secondary" id="btnInformeSemanal" onclick="printWeeklyReportPdf()" style="display:none">Informe semanal</button>
+      <button class="btn-add btn-add-secondary" type="button" onclick="triggerAnnualXmlImport()">Importar XML anual</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('admin')">Cambiar contrase&ntilde;a</button>
-      <button class="btn-add btn-add-ghost" type="button" onclick="toggleAdmin()">Salir de Jefatura</button>
     </div>
     <div class="admin-workspace">
-      <section class="admin-panel">
+      <section class="admin-panel admin-panel-overview">
         <div class="admin-section-head">
           <div>
             <div class="admin-section-title">Atenci&oacute;n del d&iacute;a</div>
@@ -124,32 +118,50 @@
         </div>
         <div class="admin-overview-grid" id="adminOverviewGrid"></div>
       </section>
-      <section class="admin-panel">
+      <section class="admin-panel admin-panel-filter">
         <div class="admin-section-head">
           <div>
             <div class="admin-section-title">Filtro r&aacute;pido</div>
-            <div class="admin-section-copy">Deja la tabla en modo trabajo y centra solo las incidencias que importan ahora.</div>
+            <div class="admin-section-copy">Filtra la tabla y centra solo las incidencias del d&iacute;a.</div>
           </div>
         </div>
         <div class="admin-filter-chips" id="adminFilterChips"></div>
       </section>
-      <section class="admin-panel">
-        <div class="admin-section-head">
-          <div>
-            <div class="admin-section-title">Actividad reciente</div>
-            <div class="admin-section-copy">Resumen corto de los &uacute;ltimos cambios hechos desde jefatura.</div>
-          </div>
-        </div>
-        <div class="admin-activity-list" id="adminActivityList"></div>
-      </section>
-      <section class="admin-panel admin-panel-pasillo">
+      <section class="admin-panel admin-panel-pasillo admin-panel-pasillo-inline">
         <div class="admin-section-head">
           <div>
             <div class="admin-section-title">Registro del pasillo</div>
-            <div class="admin-section-copy">Profesorado que ha dejado salir alumnado y estado de retorno por tramo.</div>
+            <div class="admin-section-copy">Salidas del alumnado y retornos pendientes durante la jornada.</div>
           </div>
         </div>
         <div class="admin-pasillo-list" id="adminPasilloList"></div>
+      </section>
+
+      <section class="admin-panel admin-panel-announcements">
+        <div class="admin-section-head">
+          <div>
+            <div class="admin-section-title">Aviso para sala de profesores</div>
+            <div class="admin-section-copy">Se muestra en la cabecera del panel TV solo cuando est&aacute; activado.</div>
+          </div>
+        </div>
+        <div class="fg">
+          <label for="tvAnnouncementInput">Texto del aviso</label>
+          <textarea id="tvAnnouncementInput" placeholder="Escribe el aviso del d&iacute;a para la sala de profesores..."></textarea>
+        </div>
+        <div class="fg-row">
+          <div class="fg">
+            <label for="tvAnnouncementPriority">Prioridad</label>
+            <select id="tvAnnouncementPriority">
+              <option value="urgent">Urgente</option>
+              <option value="important">Importante</option>
+              <option value="normal" selected>Normal</option>
+            </select>
+          </div>
+        </div>
+        <div class="admin-actions admin-actions-secondary">
+          <button class="btn-add btn-add-secondary" type="button" onclick="addTvAnnouncement()">A&ntilde;adir aviso</button>
+          <button class="btn-add btn-add-secondary" type="button" onclick="deactivateAllTvAnnouncements()">Desactivar todos</button>
+        </div>
       </section>
     </div>
   </div>
@@ -162,8 +174,8 @@
       <section class="superadmin-panel superadmin-panel-toolbar">
         <div class="superadmin-section-head">
           <div>
-            <div class="superadmin-section-title">Acciones rápidas</div>
-            <div class="superadmin-section-copy">Operaciones manuales y acceso técnico sin mezclarlo con el estado cambiante del servidor.</div>
+            <div class="superadmin-section-title">Acciones r&aacute;pidas</div>
+            <div class="superadmin-section-copy">Operaciones manuales y acceso t&eacute;cnico sin mezclarlo con el estado cambiante del servidor.</div>
           </div>
         </div>
         <div class="superadmin-toolbar-actions">
@@ -179,7 +191,7 @@
         <div class="superadmin-section-head">
           <div>
             <div class="superadmin-section-title">Resumen operativo</div>
-            <div class="superadmin-section-copy">Lectura rápida de la base, la actividad reciente y el estado de sincronización.</div>
+            <div class="superadmin-section-copy">Lectura r&aacute;pida de la base, la actividad reciente y el estado de sincronizaci&oacute;n.</div>
           </div>
         </div>
         <div class="superadmin-ops-list" id="superAdminOpsList"></div>
@@ -228,6 +240,7 @@
       <tbody id="tbody"></tbody>
     </table>
   </div>
+  </section>
 </main>
 <div class="overlay" id="overlay" onclick="bgClose(event)">
   <div class="modal absence-modal">
@@ -241,17 +254,17 @@
         <div class="modal-section-title">Tramo horario</div>
         <div class="modal-section-copy">Indica cu&aacute;ndo se produce la ausencia.</div>
       </div>
-      <div class="fg-row">
-        <div class="fg">
-          <label>D&iacute;a</label>
-          <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Mi&eacute;rcoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
-          <div class="field-error" id="fDiaError"></div>
-        </div>
-        <div class="fg">
-          <label>Hora</label>
-          <select id="fHora"><option value="1">1a hora (08:15-09:10)</option><option value="2">2a hora (09:10-10:05)</option><option value="3">3a hora (10:05-11:00)</option><option value="4">4a hora (11:00-11:25)</option><option value="5">5a hora (11:25-12:20)</option><option value="6">6a hora (12:20-13:15)</option><option value="7">7a hora (13:15-14:10)</option><option value="8">8a hora (14:10-14:25)</option><option value="9">9a hora (14:25-15:20)</option></select>
-          <div class="field-error" id="fHoraError"></div>
-        </div>
+      <div class="fg">
+        <label>D&iacute;a</label>
+        <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Mi&eacute;rcoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
+        <div class="field-error" id="fDiaError"></div>
+      </div>
+      <input id="fHora" type="hidden" value="1">
+      <div class="fg">
+        <label>Horas de ausencia</label>
+        <div class="modal-inline-copy">Marca una, varias o todas las horas que correspondan. Si activas ausencia de todo el d&iacute;a, esta selecci&oacute;n queda bloqueada.</div>
+        <div class="absence-hours-grid" id="fHorasMulti"></div>
+        <div class="field-error" id="fHorasMultiError"></div>
       </div>
     </div>
 
@@ -264,10 +277,11 @@
         <label>Profesor ausente</label>
         <div class="input-with-action">
           <input type="text" id="fAusente" placeholder="Selecciona o busca un profesor" autocomplete="off" aria-autocomplete="list" aria-controls="ausenteSuggestions">
-          <button class="btn-inline-save" type="button" onclick="save()">Guardar</button>
+          <button class="btn-inline-save" type="button" onclick="saveAbsence()">Guardar</button>
         </div>
         <div class="absence-suggestions" id="ausenteSuggestions" hidden></div>
         <div class="absence-preview" id="ausentePreview">Empieza a escribir para localizar al profesor.</div>
+        <div class="teacher-admin-stats" id="teacherAdminStats"></div>
         <div class="field-error" id="fAusenteError"></div>
       </div>
     </div>
@@ -304,7 +318,7 @@
 
     <div class="modal-actions">
       <button class="btn-cancel" type="button" onclick="closeModal()">Cancelar</button>
-      <button class="btn-save" type="button" onclick="save()">Guardar</button>
+      <button class="btn-save" type="button" onclick="saveAbsence()">Guardar</button>
     </div>
     <button class="btn-del" id="btnDel" style="display:none" onclick="del()">Eliminar registro</button>
   </div>
@@ -341,7 +355,7 @@
       <button class="modal-x" onclick="closeTeacherAccess()">x</button>
     </div>
     <div class="teacher-access-shell">
-      <div class="teacher-access-intro">Busca tu nombre para abrir tu panel del día. Desde ahí podrás revisar sesiones, indicar tarea y ajustar materia, grupo o aula si hace falta.</div>
+      <div class="teacher-access-intro">Busca tu nombre para abrir tu panel del d&iacute;a. Desde ah&iacute; podr&aacute;s revisar sesiones, indicar tarea y ajustar materia, grupo o aula si hace falta.</div>
       <div class="teacher-access-search-panel">
         <div class="fg">
           <label>Profesor</label>
@@ -451,7 +465,7 @@
       </div>
     </div>
     <div class="fg">
-      <label>Horas lectivas de ese día</label>
+      <label>Horas lectivas de ese d&iacute;a</label>
       <div class="absence-preview" id="teacherFutureAbsenceDayMeta">Selecciona una fecha para ver tus horas de clase.</div>
       <div class="teacher-future-hours" id="teacherFutureAbsenceHours"></div>
     </div>
@@ -520,6 +534,7 @@
   </div>
 </footer>
 <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+<input type="file" id="annualImportXmlInput" accept=".xml,text/xml,application/xml" hidden>
 <div class="overlay" id="dialogOverlay" onclick="bgDialogClose(event)">
   <div class="modal dialog-modal">
     <div class="modal-hd">
@@ -541,3 +556,6 @@
 <script src="js/app/guardias.js"></script>
 </body>
 </html>
+
+
+

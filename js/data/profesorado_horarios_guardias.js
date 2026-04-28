@@ -8870,15 +8870,33 @@ window.PROFESORADO_SOURCE={
           "texto": "IMX | 2 CFB INF | A15",
           "aula": "A15"
         },
+           {
+          "dia": "Martes",
+          "franja": "11:25-12:20",
+          "texto": "IMX | 2 CFB INF | A15",
+          "aula": "A15"
+        },
         {
           "dia": "Martes",
           "franja": "12:20-13:15",
           "texto": "IMX | 2 CFB INF | A15",
           "aula": "A15"
         },
+           {
+          "dia": "Martes",
+          "franja": "13:15-14:10",
+          "texto": "IMX | 2 CFB INF | A15",
+          "aula": "A15"
+        },      
         {
           "dia": "Miércoles",
           "franja": "08:15-09:10",
+          "texto": "SOM | 1 GM | E24",
+          "aula": "E24"
+        },
+        {
+          "dia": "Miércoles",
+          "franja": "09:10-10:05",
           "texto": "SOM | 1 GM | E24",
           "aula": "E24"
         },
