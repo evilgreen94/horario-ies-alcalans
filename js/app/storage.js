@@ -93,6 +93,9 @@
     fetchGuardias(){
       return request('/guardias');
     },
+    fetchGuardiaMonthlyLoad(){
+      return request('/guardias/monthly-load');
+    },
     replaceGuardias(rows){
       return request('/guardias/replace', {
         method: 'PUT',

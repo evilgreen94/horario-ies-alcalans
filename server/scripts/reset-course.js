@@ -6,6 +6,7 @@ const { DB_PATH, getDatabase } = require('../db');
 const BACKUP_DIR = path.join(__dirname, '..', '..', 'BD', 'backups');
 const APP_STATE_KEYS_TO_CLEAR = [
   'school_week_key',
+  'guardia_monthly_load',
   'teacher_substitutions',
   'teacher_future_absences',
   'teacher_practicas_guardias',

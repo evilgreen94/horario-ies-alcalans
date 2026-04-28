@@ -256,13 +256,14 @@ body.tv-mode .header-center {
 .tv-announcement-track {
   display: inline-flex;
   align-items: center;
-  gap: 4.25rem;
-  min-width: max-content;
-  padding-right: 4.25rem;
-  animation: tvAnnouncementMarquee 32s linear infinite;
+  width: max-content;
+  will-change: transform;
 }
-.tv-announcement-track span {
-  display: inline-block;
+.tv-announcement-segment {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding-right: 4.25rem;
 }
 .tv-admin-item {
   display: grid;
@@ -313,10 +314,6 @@ body.tv-mode .header-center {
   flex-wrap: wrap;
   gap: .5rem;
   justify-content: flex-end;
-}
-@keyframes tvAnnouncementMarquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
 }
 .tv-header-meta {
   display: none;
@@ -426,17 +423,8 @@ body.tv-mode .tv-shell {
   display: grid;
   gap: 1rem;
 }
-.tv-panel {
-  background: rgba(255,255,255,0.84);
-  border: 1px solid rgba(219,227,238,0.92);
-  box-shadow: 0 22px 50px rgba(31,41,55,0.08);
-}
-.tv-panel-kicker {
-  font-size: .82rem;
-  font-weight: 800;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--muted2);
+.app-shell {
+  display: contents;
 }
 .tv-grid {
   display: grid;
@@ -445,6 +433,9 @@ body.tv-mode .tv-shell {
   align-items: start;
 }
 .tv-panel {
+  background: rgba(255,255,255,0.84);
+  border: 1px solid rgba(219,227,238,0.92);
+  box-shadow: 0 22px 50px rgba(31,41,55,0.08);
   border-radius: 18px;
   padding: 1.35rem 1.35rem 1.45rem;
   display: grid;
@@ -466,7 +457,9 @@ body.tv-mode .tv-shell {
   box-shadow: 0 16px 34px rgba(31,41,55,0.05);
 }
 .tv-panel-head {
-  display: block;
+  display: grid;
+  gap: .75rem;
+  align-content: start;
 }
 .tv-slot-badge {
   display: flex;
@@ -483,10 +476,6 @@ body.tv-mode .tv-shell {
   font-weight: 800;
   text-align: center;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45);
-}
-.tv-panel-kicker,
-.tv-panel-title {
-  display: none;
 }
 .tv-slot-badge-secondary {
   background: #f2f6fb;
@@ -1048,9 +1037,7 @@ main { width: min(1380px, calc(100vw - 32px)); margin: 0 auto; padding: 1.75rem 
 }
 .admin-panel-announcements .fg,
 .admin-panel-announcements .fg-row,
-.admin-panel-announcements .admin-actions,
-.admin-panel-announcements #tvAnnouncementStatus,
-.admin-panel-announcements #tvAnnouncementList {
+.admin-panel-announcements .admin-actions {
   width: 100%;
 }
 .admin-panel-announcements .fg textarea {
@@ -1064,75 +1051,6 @@ main { width: min(1380px, calc(100vw - 32px)); margin: 0 auto; padding: 1.75rem 
 }
 .admin-panel-announcements .absence-preview {
   margin-top: 0;
-}
-.admin-announcement-item {
-  display: grid;
-  gap: .7rem;
-  padding: .95rem 1rem;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.92);
-  border: 1px solid rgba(217,161,29,0.14);
-}
-.admin-announcement-item-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: .9rem;
-}
-.admin-announcement-item-title {
-  font-size: .82rem;
-  font-weight: 800;
-  color: var(--text);
-}
-.admin-announcement-item-text {
-  color: var(--text);
-  font-size: .92rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.admin-announcement-item-meta {
-  font-size: .74rem;
-  color: var(--muted);
-}
-.admin-announcement-item-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .6rem;
-}
-.admin-announcement-badges {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: .45rem;
-  flex-wrap: wrap;
-}
-.admin-announcement-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: .28rem .58rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  font-size: .68rem;
-  font-weight: 800;
-  white-space: nowrap;
-}
-.admin-announcement-badge.is-normal {
-  background: #eef4ff;
-  border-color: rgba(61,116,197,0.18);
-  color: var(--blue);
-}
-.admin-announcement-badge.is-important {
-  background: #fff7df;
-  border-color: rgba(217,161,29,0.22);
-  color: #8c6707;
-}
-.admin-announcement-badge.is-urgent,
-.admin-announcement-badge.is-active {
-  background: #fff1f1;
-  border-color: rgba(217,83,79,0.2);
-  color: #9b2424;
 }
 .admin-section-head {
   display: flex;
@@ -1234,27 +1152,6 @@ main { width: min(1380px, calc(100vw - 32px)); margin: 0 auto; padding: 1.75rem 
   color: inherit;
   font-size: .7rem;
 }
-.admin-activity-list {
-  display: grid;
-  gap: .55rem;
-}
-.admin-activity-item {
-  padding: .7rem .8rem;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.9);
-  border: 1px solid rgba(217,161,29,0.12);
-}
-.admin-activity-title {
-  font-size: .8rem;
-  font-weight: 800;
-  color: var(--text);
-}
-.admin-activity-meta {
-  margin-top: .16rem;
-  font-size: .74rem;
-  color: var(--muted);
-  line-height: 1.35;
-}
 .admin-activity-empty {
   padding: .85rem;
   border-radius: 12px;
@@ -1317,16 +1214,8 @@ main { width: min(1380px, calc(100vw - 32px)); margin: 0 auto; padding: 1.75rem 
   flex: 1 1 280px;
   min-height: 42px;
 }
-.admin-panel-announcements .fg-row {
-  grid-template-columns: minmax(220px, 320px);
-}
-.admin-panel-announcements #tvAnnouncementInput,
-.admin-panel-announcements #tvAnnouncementList {
+.admin-panel-announcements #tvAnnouncementInput {
   width: 100%;
-}
-.admin-panel-announcements #tvAnnouncementList {
-  display: grid;
-  gap: .7rem;
 }
 .admin-panel-announcements .admin-actions-secondary {
   grid-column: auto;
@@ -1701,6 +1590,82 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   gap: .75rem;
 }
 .check-block { display: flex; align-items: center; gap: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; cursor: pointer; }
+.modal-inline-copy {
+  margin-top: .35rem;
+  font-size: .76rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.absence-hours-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem;
+  margin-top: .7rem;
+}
+.absence-hour-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .1rem;
+  min-width: 88px;
+  padding: .55rem .65rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 800;
+  text-align: center;
+}
+.absence-hour-chip span {
+  font-size: .68rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.absence-hour-chip.is-selected {
+  background: #fff4d6;
+  border-color: rgba(217,161,29,.38);
+  color: #8c6707;
+}
+.absence-hour-chip:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.teacher-admin-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .7rem;
+  margin-top: .8rem;
+}
+.teacher-admin-stat {
+  display: grid;
+  gap: .18rem;
+  padding: .8rem .9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(61,116,197,0.14);
+  background: rgba(255,255,255,0.92);
+}
+.teacher-admin-stat-label {
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted2);
+}
+.teacher-admin-stat-value {
+  font-family: var(--font-h);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.teacher-admin-stat-note {
+  font-size: .76rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
 .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .85rem; }
 .btn-cancel { width: 100%; margin-top: .75rem; background: var(--surface2); color: var(--text); border: 1px solid var(--border); font-family: var(--font-h); font-weight: 800; font-size: .95rem; padding: 11px; border-radius: 9px; cursor: pointer; }
 .btn-save { width: 100%; margin-top: .75rem; background: var(--accent); color: #000; border: none; font-family: var(--font-h); font-weight: 800; font-size: .95rem; padding: 11px; border-radius: 9px; cursor: pointer; }
@@ -2093,7 +2058,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
 }
 .teacher-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 1.2fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   margin-bottom: 1rem;
   padding: 1rem;
@@ -2108,6 +2073,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   display: grid;
   gap: .8rem;
   align-content: start;
+  min-width: 0;
 }
 .teacher-duty-alert {
   padding: .9rem 1rem;
@@ -2139,52 +2105,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   font-size: .84rem;
   line-height: 1.45;
 }
-.teacher-summary-label {
-  font-size: .7rem;
-  font-weight: 800;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--blue);
-  margin-bottom: .35rem;
-}
 .teacher-meta { color: var(--muted); font-size: .82rem; }
-.teacher-user {
-  margin-top: .55rem;
-  display: inline-flex;
-  align-items: center;
-  gap: .4rem;
-  padding: .38rem .6rem;
-  border-radius: 999px;
-  background: rgba(61,116,197,0.1);
-  color: var(--blue);
-  font-size: .74rem;
-  font-weight: 700;
-}
-.teacher-identity-notice {
-  margin-top: .7rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: .75rem;
-  padding: .75rem .85rem;
-  border-radius: 8px;
-  border: 1px solid rgba(61,116,197,0.16);
-  background: rgba(61,116,197,0.06);
-}
-.teacher-identity-copy {
-  display: grid;
-  gap: .14rem;
-}
-.teacher-identity-title {
-  color: var(--text);
-  font-size: .82rem;
-  font-weight: 800;
-}
-.teacher-identity-meta {
-  color: var(--muted);
-  font-size: .76rem;
-  line-height: 1.35;
-}
 .teacher-mood-card {
   margin-top: .7rem;
   display: grid;
@@ -2288,7 +2209,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   font-size: .86rem;
   line-height: 1;
 }
-.teacher-panel-actions { display: flex; justify-content: flex-end; gap: .6rem; flex-wrap: wrap; }
+.teacher-panel-actions { display: flex; justify-content: flex-start; gap: .6rem; flex-wrap: wrap; }
 .btn-teacher-panel { background: transparent; color: var(--blue); border: 1px solid rgba(61,116,197,0.28); border-radius: 8px; padding: 8px 12px; font-weight: 800; cursor: pointer; }
 .btn-teacher-panel-danger { color: var(--red); border-color: rgba(217,83,79,0.28); }
 .teacher-overview {
@@ -2900,7 +2821,6 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .teacher-week-strip,
   .teacher-duty-alert,
   .teacher-panel-actions { width: 100%; }
-  .teacher-identity-notice { flex-direction: column; align-items: stretch; }
   .teacher-panel-actions { justify-content: stretch; }
   .teacher-panel-actions .btn-teacher-panel { flex: 1 1 100%; }
   .teacher-mood-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -3041,19 +2961,8 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
     padding: .5rem .85rem;
   }
   body.tv-mode .clock { min-width: 150px; }
-  .tv-panel-head { flex-direction: column; align-items: stretch; }
+  .tv-panel-head { gap: .6rem; }
   .tv-slot-badge { width: 100%; }
-  .tv-panel-title {
-    font-size: clamp(1.7rem, 7vw, 2.35rem);
-    line-height: .98;
-  }
-  .tv-panel-kicker {
-    font-size: .75rem;
-  }
-  .tv-panel-next .tv-panel-title,
-  .tv-panel-later .tv-panel-title {
-    font-size: clamp(1.5rem, 6vw, 2rem);
-  }
   .tv-panel-later {
     padding: 1rem;
     opacity: .92;
@@ -3094,10 +3003,6 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .admin-actions-secondary { width: 100%; }
   .admin-actions-primary { grid-template-columns: 1fr; }
   .admin-panel-announcements .fg-row { grid-template-columns: 1fr; }
-  .admin-announcement-item-head,
-  .admin-announcement-item-actions {
-    align-items: stretch;
-  }
   .substitution-item,
   .future-absence-item {
     grid-template-columns: 1fr;
@@ -3297,6 +3202,9 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
     align-items: flex-start;
     justify-content: flex-start;
   }
+  .teacher-admin-stats {
+    grid-template-columns: 1fr;
+  }
   .hora-num {
     font-size: 1.2rem;
     font-weight: 800;
@@ -3319,8 +3227,7 @@ tbody tr:not(.row-support):not(.empty-row) td:not(:last-child) {
   .faena-box,
   .faena-status { align-items: flex-start; justify-items: start; }
   .teacher-head, .teacher-session-head { flex-direction: column; align-items: stretch; text-align: left; }
-  .teacher-meta, .teacher-user, .teacher-session-title { text-align: left; width: 100%; }
-  .teacher-summary-label { text-align: left; }
+  .teacher-meta, .teacher-session-title { text-align: left; width: 100%; }
   .teacher-panel-actions { width: 100%; justify-content: center; }
   .btn-teacher-panel { width: 100%; text-align: center; }
   .teacher-mood-options { grid-template-columns: 1fr; }

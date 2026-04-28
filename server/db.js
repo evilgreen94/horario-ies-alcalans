@@ -211,7 +211,9 @@ async function seedDefaultCredentials(db) {
 module.exports = {
   DB_PATH,
   ensureWeeklyResetIfNeeded,
+  formatDateKey,
   getDatabase,
+  getMadridNow,
   getCurrentSchoolWeekKey,
   initializeDatabase
 };

@@ -101,10 +101,10 @@ function formatWeekRangeLabel(weekKey,offset){
   const friday=new Date(monday);
   friday.setDate(monday.getDate()+4);
   const range=`${monday.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})} - ${friday.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})}`;
-  if(offset===0) return `Semana actual · ${range}`;
-  if(offset===1) return `Semana siguiente · ${range}`;
-  if(offset===-1) return `Semana anterior · ${range}`;
-  return `${offset>0?`+${offset}`:offset} semanas · ${range}`;
+  if(offset===0) return `Semana actual Â· ${range}`;
+  if(offset===1) return `Semana siguiente Â· ${range}`;
+  if(offset===-1) return `Semana anterior Â· ${range}`;
+  return `${offset>0?`+${offset}`:offset} semanas Â· ${range}`;
 }
 function stripDiacritics(value){return cleanText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 function repairMojibakeText(value){
@@ -190,95 +190,95 @@ const HORARIO_GUARDIAS=PROFESORADO_DATA.guardiasPorHora;
 const ALL_PROFESORES=[...new Set([...PROFES_PLANTILLA,...Object.keys(PROFESORES_BASE)])].sort((a,b)=>a.localeCompare(b,'es'));
 const PROFESORES_BASE_BY_NORMALIZED=Object.fromEntries(Object.keys(PROFESORES_BASE).map(nombre=>[normalizeText(nombre),nombre]));
 const ALL_PROFESORES_BY_NORMALIZED=Object.fromEntries(ALL_PROFESORES.map(nombre=>[normalizeText(nombre),nombre]));
-const TEACHER_MOOD_OPTIONS = [
+const TEACHER_MOOD_OPTIONS = repairMojibakeDeep([
   {
     id: 'contento',
-    emoji: '\uD83D\uDE0A',
+    emoji: 'Ã°Å¸ËœÅ ',
     label: 'Contento',
     tone: 'warm',
     welcome: 'Hoy vienes con buena cara.',
     messages: [
-      'Buen ánimo, buena letra y que no falle el café.',
+      'Buen ÃƒÂ¡nimo, buena letra y que no falle el cafÃƒÂ©.',
       'Hoy vas con chispa y se nota desde primera hora.',
       'Pinta a jornada de llevarla con una sonrisa decente.',
-      'Con este ánimo, hasta la guardia parece amable.',
-      'Hoy puedes con el grupo difícil... y con el fácil también.',
-      'Día perfecto para que todo fluya, o al menos lo parezca.',
-      'Hoy hay energía de sobra para sacar adelante la mañana.',
+      'Con este ÃƒÂ¡nimo, hasta la guardia parece amable.',
+      'Hoy puedes con el grupo difÃƒÂ­cilÃ¢â‚¬Â¦ y con el fÃƒÂ¡cil tambiÃƒÂ©n.',
+      'DÃƒÂ­a perfecto para que todo fluya, o al menos lo parezca.',
+      'Hoy hay energÃƒÂ­a de sobra para sacar adelante la maÃƒÂ±ana.',
       'Se nota que hoy vienes con el aula de tu parte.'
     ]
   },
   {
     id: 'cansado',
-    emoji: '\uD83D\uDE34',
+    emoji: 'Ã°Å¸ËœÂ´',
     label: 'Cansado',
     tone: 'soft',
-    welcome: 'Día de ir con calma y café cerca.',
+    welcome: 'DÃƒÂ­a de ir con calma y cafÃƒÂ© cerca.',
     messages: [
       'Hoy toca sobrevivir con dignidad y alguna taza extra.',
-      'Modo ahorro de energía, pero seguimos en pie.',
+      'Modo ahorro de energÃƒÂ­a, pero seguimos en pie.',
       'Conviene que la tercera hora no pida heroicidades.',
       'Si hoy no brillas, al menos que no explote nada.',
-      'Día de tirar de experiencia más que de entusiasmo.',
+      'DÃƒÂ­a de tirar de experiencia mÃƒÂ¡s que de entusiasmo.',
       'Reducimos expectativas, mantenemos el tipo.',
-      'Hoy con llegar al recreo medio entero ya se considera éxito.',
+      'Hoy con llegar al recreo medio entero ya se considera ÃƒÂ©xito.',
       'Jornada de resistencia tranquila y oficio docente.'
     ]
   },
   {
     id: 'enfadado',
-    emoji: '\uD83D\uDE24',
+    emoji: 'Ã°Å¸ËœÂ¤',
     label: 'Enfadado',
     tone: 'strong',
     welcome: 'Respiramos hondo y seguimos.',
     messages: [
       'Mejor contar hasta diez antes de abrir ciertos correos.',
-      'Hoy viene bien una respiración larga entre clase y clase.',
-      'Que el día no pruebe demasiado la paciencia, por favor.',
+      'Hoy viene bien una respiraciÃƒÂ³n larga entre clase y clase.',
+      'Que el dÃƒÂ­a no pruebe demasiado la paciencia, por favor.',
       'Si algo puede esperar, que espere.',
       'Hoy la diplomacia es tu mejor herramienta.',
       'No todo merece respuesta inmediata.',
-      'Conviene elegir muy bien qué batalla merece la pena.',
-      'Hoy toca firmeza sin regalar energía de más.'
+      'Conviene elegir muy bien quÃƒÂ© batalla merece la pena.',
+      'Hoy toca firmeza sin regalar energÃƒÂ­a de mÃƒÂ¡s.'
     ]
   },
   {
     id: 'triste',
-    emoji: '\uD83D\uDE14',
+    emoji: 'Ã°Å¸Ëœâ€',
     label: 'Triste',
     tone: 'soft',
-    welcome: 'Hoy toca cuidarse un poco más.',
+    welcome: 'Hoy toca cuidarse un poco mÃƒÂ¡s.',
     messages: [
-      'Vamos pasito a pasito y sin pedir más de la cuenta.',
-      'Día de llevarlo con mimo y algo de aire entre horas.',
-      'Hoy conviene tratarse con un poco más de suavidad.',
+      'Vamos pasito a pasito y sin pedir mÃƒÂ¡s de la cuenta.',
+      'DÃƒÂ­a de llevarlo con mimo y algo de aire entre horas.',
+      'Hoy conviene tratarse con un poco mÃƒÂ¡s de suavidad.',
       'Cumplir ya es suficiente hoy.',
-      'Permítete ir más lento.',
+      'PermÃƒÂ­tete ir mÃƒÂ¡s lento.',
       'Lo importante hoy es llegar, no destacar.',
-      'A veces sostener el día ya es bastante.',
+      'A veces sostener el dÃƒÂ­a ya es bastante.',
       'Hoy toca bajar un poco el ritmo y protegerse.'
     ]
   },
   {
     id: 'guino',
-    emoji: '\uD83D\uDE09',
-    label: 'Guiño gracioso',
+    emoji: 'Ã°Å¸Ëœâ€°',
+    label: 'GuiÃƒÂ±o gracioso',
     tone: 'playful',
-    welcome: 'Modo ironía elegante activado.',
+    welcome: 'Modo ironÃƒÂ­a elegante activado.',
     messages: [
       'Hoy toca sacar oficio, humor fino y seguir adelante.',
       'Modo supervivencia elegante activado. Que sea leve.',
-      'Si el día se pone raro, al menos que nos pille con estilo.',
-      'Sonríe, que nadie sepa el caos que hay detrás.',
-      'Hoy improvisamos... pero con dignidad.',
-      'Todo bajo control... más o menos.',
-      'Que no falte café, tablas y una mirada cómplice.',
-      'Hoy se enseña, se resuelve y se disimula estupendamente.'
+      'Si el dÃƒÂ­a se pone raro, al menos que nos pille con estilo.',
+      'SonrÃƒÂ­e, que nadie sepa el caos que hay detrÃƒÂ¡s.',
+      'Hoy improvisamosÃ¢â‚¬Â¦ pero con dignidad.',
+      'Todo bajo controlÃ¢â‚¬Â¦ mÃƒÂ¡s o menos.',
+      'Que no falte cafÃƒÂ©, tablas y una mirada cÃƒÂ³mplice.',
+      'Hoy se enseÃƒÂ±a, se resuelve y se disimula estupendamente.'
     ]
   },
   {
     id: 'saturado',
-    emoji: '\uD83E\uDD2F',
+    emoji: 'Ã°Å¸Â¤Â¯',
     label: 'Saturado',
     tone: 'neutral',
     welcome: 'Demasiadas cosas en la cabeza.',
@@ -288,80 +288,80 @@ const TEACHER_MOOD_OPTIONS = [
       'Si sobrevives al correo, ya es victoria.',
       'Paso corto, vista al frente.',
       'Una cosa cada vez. Literalmente.',
-      'Entre reuniones, tutorías y clases, respira.',
-      'Hoy conviene no abrir más frentes de los necesarios.',
-      'Haz primero lo que más despeje la mañana.'
+      'Entre reuniones, tutorÃƒÂ­as y clases, respira.',
+      'Hoy conviene no abrir mÃƒÂ¡s frentes de los necesarios.',
+      'Haz primero lo que mÃƒÂ¡s despeje la maÃƒÂ±ana.'
     ]
   },
   {
     id: 'motivado',
-    emoji: '\uD83D\uDD25',
+    emoji: 'Ã°Å¸â€Â¥',
     label: 'Motivado',
     tone: 'energetic',
     welcome: 'Hoy vienes con ganas de liarla, pero bien.',
     messages: [
-      'Día perfecto para probar algo nuevo en clase.',
+      'DÃƒÂ­a perfecto para probar algo nuevo en clase.',
       'Hoy puedes marcar la diferencia en el aula.',
       'Ese grupo hoy te lo ganas.',
       'Aprovecha la inercia, no siempre pasa.',
-      'Hoy hay energía de proyecto interesante.',
-      'Buen día para innovar sin pedir permiso al aburrimiento.',
-      'Hoy se nota vocación y oficio a partes iguales.',
+      'Hoy hay energÃƒÂ­a de proyecto interesante.',
+      'Buen dÃƒÂ­a para innovar sin pedir permiso al aburrimiento.',
+      'Hoy se nota vocaciÃƒÂ³n y oficio a partes iguales.',
       'Pinta a clase de las que dejan huella.'
     ]
   },
   {
     id: 'automatico',
-    emoji: '\uD83E\uDDEA',
-    label: 'Modo automático',
+    emoji: 'Ã°Å¸Â§Å ',
+    label: 'Modo automÃƒÂ¡tico',
     tone: 'neutral',
     welcome: 'Hoy se tira de oficio.',
     messages: [
       'Sin emociones, pero con eficacia.',
-      'Hoy funciona el piloto automático.',
+      'Hoy funciona el piloto automÃƒÂ¡tico.',
       'Cumplir el guion ya es suficiente.',
       'Ni brillante ni desastroso: correcto.',
-      'Día de rutina bien ejecutada.',
-      'Hoy manda la estructura más que la inspiración.',
-      'Clase preparada, café listo y adelante.',
-      'No hace falta épica para sacar el día.'
+      'DÃƒÂ­a de rutina bien ejecutada.',
+      'Hoy manda la estructura mÃƒÂ¡s que la inspiraciÃƒÂ³n.',
+      'Clase preparada, cafÃƒÂ© listo y adelante.',
+      'No hace falta ÃƒÂ©pica para sacar el dÃƒÂ­a.'
     ]
   },
   {
     id: 'caotico',
-    emoji: '\uD83C\uDF2A\uFE0F',
-    label: 'Caótico',
+    emoji: 'Ã°Å¸Å’ÂªÃ¯Â¸Â',
+    label: 'CaÃƒÂ³tico',
     tone: 'playful',
-    welcome: 'Hoy pinta a día movido.',
+    welcome: 'Hoy pinta a dÃƒÂ­a movido.',
     messages: [
-      'A ver qué sorpresa trae cada hora.',
-      'Planifica, pero con flexibilidad máxima.',
+      'A ver quÃƒÂ© sorpresa trae cada hora.',
+      'Planifica, pero con flexibilidad mÃƒÂ¡xima.',
       'Hoy el horario es orientativo.',
-      'Si algo sale según lo previsto, celébralo.',
-      'Día de adaptación continua.',
-      'Entre cambios, avisos y carreras, mantén el rumbo.',
+      'Si algo sale segÃƒÂºn lo previsto, celÃƒÂ©bralo.',
+      'DÃƒÂ­a de adaptaciÃƒÂ³n continua.',
+      'Entre cambios, avisos y carreras, mantÃƒÂ©n el rumbo.',
       'Hoy toca improvisar con elegancia docente.',
-      'Que el caos no te quite el compás.'
+      'Que el caos no te quite el compÃƒÂ¡s.'
     ]
   },
   {
     id: 'tranquilo',
-    emoji: '\uD83D\uDE0C',
+    emoji: 'Ã°Å¸ËœÅ’',
     label: 'Tranquilo',
     tone: 'warm',
-    welcome: 'Día equilibrado por delante.',
+    welcome: 'DÃƒÂ­a equilibrado por delante.',
     messages: [
       'Sin prisa, pero sin pausa.',
-      'Hoy todo debería ir razonablemente bien.',
-      'Día para trabajar con calma y cabeza.',
+      'Hoy todo deberÃƒÂ­a ir razonablemente bien.',
+      'DÃƒÂ­a para trabajar con calma y cabeza.',
       'Aprovecha la estabilidad.',
-      'Buen día para avanzar sin ruido.',
+      'Buen dÃƒÂ­a para avanzar sin ruido.',
       'Hoy el aula invita a trabajar con serenidad.',
-      'Cuando todo está en su sitio, se nota.',
-      'Jornada amable para enseñar sin sobresaltos.'
+      'Cuando todo estÃƒÂ¡ en su sitio, se nota.',
+      'Jornada amable para enseÃƒÂ±ar sin sobresaltos.'
     ]
   }
-];
+]);
 let isAdmin=false,day=0,editId=null;
 let isSuperAdmin=false;
 let teacherName='';
@@ -4943,7 +4943,7 @@ function renderTeacherPanel(){
   if(moodCard){
     moodCard.innerHTML=moodOption
       ?`<div class="teacher-mood-copy"><div class="teacher-mood-title">${moodOption.emoji} ${escapeHtml(moodOption.welcome)}</div><div class="teacher-mood-text">Hoy te sientes ${escapeHtml(moodOption.label.toLowerCase())}. ${escapeHtml(moodMessage)}</div></div><button class="btn-teacher-panel" type="button" onclick="resetTeacherMood()">Cambiar estado</button>`
-      :`<div class="teacher-mood-copy"><div class="teacher-mood-title">¿Cómo te sientes hoy?</div><div class="teacher-mood-text">Elige una opción rápida y seguimos. Es solo un guiño del panel para arrancar el día.</div></div><div class="teacher-mood-options">${TEACHER_MOOD_OPTIONS.map(option=>`<button class="teacher-mood-option" type="button" onclick="selectTeacherMood('${option.id}')" aria-label="${escapeHtml(option.label)}"><span class="teacher-mood-option-emoji">${option.emoji}</span><span class="teacher-mood-option-label">${escapeHtml(option.label)}</span></button>`).join('')}</div>`;
+      :`<div class="teacher-mood-copy"><div class="teacher-mood-title">Ã‚Â¿CÃƒÂ³mo te sientes hoy?</div><div class="teacher-mood-text">Elige una opciÃƒÂ³n rÃƒÂ¡pida y seguimos. Es solo un guiÃƒÂ±o del panel para arrancar el dÃƒÂ­a.</div></div><div class="teacher-mood-options">${TEACHER_MOOD_OPTIONS.map(option=>`<button class="teacher-mood-option" type="button" onclick="selectTeacherMood('${option.id}')" aria-label="${escapeHtml(option.label)}"><span class="teacher-mood-option-emoji">${option.emoji}</span><span class="teacher-mood-option-label">${escapeHtml(option.label)}</span></button>`).join('')}</div>`;
     moodCard.className=`teacher-mood-card${moodOption?` is-${moodOption.tone}`:''}`;
   }
   document.getElementById('teacherDayPills').innerHTML=DIAS.map((nombreDia,index)=>`<button class="${index===teacherDay?'active':''}" onclick="setTeacherDay(${index})">${nombreDia}</button>`).join('');
@@ -4957,13 +4957,13 @@ function renderTeacherPanel(){
       <article class="teacher-overview-card">
         <div class="teacher-overview-label">Hoy tengo clase</div>
         <div class="teacher-overview-value">${horas.length}</div>
-        <div class="teacher-overview-copy">${horas.length?`Próxima sesión: ${escapeHtml(formatHoraLabel(horas[0]))}`:'Sin clases lectivas registradas para este día.'}</div>
+        <div class="teacher-overview-copy">${horas.length?`PrÃƒÂ³xima sesiÃƒÂ³n: ${escapeHtml(formatHoraLabel(horas[0]))}`:'Sin clases lectivas registradas para este dÃƒÂ­a.'}</div>
         <button class="btn-teacher-panel teacher-overview-action" type="button" onclick="document.getElementById('teacherSessions')?.scrollIntoView({behavior:'smooth',block:'start'})">Ver sesiones</button>
       </article>
       <article class="teacher-overview-card teacher-overview-card-duty">
         <div class="teacher-overview-label">Hoy estoy de guardia</div>
         <div class="teacher-overview-value">${dutyAssignments.length}</div>
-        <div class="teacher-overview-copy">${nextDuty?`Próxima cobertura: ${escapeHtml(getVisibleTeacherName(nextDuty.ausente))} · ${escapeHtml(formatHoraLabel(nextDuty.hora))}`:'No tienes coberturas asignadas en este día.'}</div>
+        <div class="teacher-overview-copy">${nextDuty?`PrÃƒÂ³xima cobertura: ${escapeHtml(getVisibleTeacherName(nextDuty.ausente))} Â· ${escapeHtml(formatHoraLabel(nextDuty.hora))}`:'No tienes coberturas asignadas en este dÃƒÂ­a.'}</div>
         <button class="btn-teacher-panel teacher-overview-action" type="button" ${nextDuty?'':'disabled'} onclick="${nextDuty?`focusTeacherDutyHour(${nextDuty.hora})`:''}">${nextDuty?'Ir a mi guardia':'Sin guardias'}</button>
       </article>
       <article class="teacher-overview-card teacher-overview-card-corridor ${getPasilloLevelClass(activeTotal)}${activeSlot?' is-active':''}${activeTotal>=MAX_ALUMNOS_FUERA_AULA?' is-full':''}">
@@ -5024,7 +5024,7 @@ function renderTeacherPanel(){
       <div class="teacher-session-quick">
         <div class="teacher-quick-item"><span class="teacher-quick-label">Grupo</span><span class="teacher-quick-value">${escapeHtml(grupo||'Sin grupo')}</span></div>
         <div class="teacher-quick-item"><span class="teacher-quick-label">Aula</span><span class="teacher-quick-value">${escapeHtml(aula)}</span></div>
-        <div class="teacher-quick-item"><span class="teacher-quick-label">Tarea</span><span class="teacher-quick-value">${checked?(texto?escapeHtml(texto.slice(0,72)+(texto.length>72?'...':'')):'Marcada para el grupo'):'No has dejado tarea todavía'}</span></div>
+        <div class="teacher-quick-item"><span class="teacher-quick-label">Tarea</span><span class="teacher-quick-value">${checked?(texto?escapeHtml(texto.slice(0,72)+(texto.length>72?'...':'')):'Marcada para el grupo'):'No has dejado tarea todavÃƒÂ­a'}</span></div>
       </div>
       <div class="teacher-session-panel" id="teacherSessionPanel-${teacherDay}-${hora}">
         <div class="fg">
@@ -5037,7 +5037,7 @@ function renderTeacherPanel(){
         </label>
         ${guardiaTasksMarkup}
         <details class="teacher-session-settings">
-          <summary>${currentTeacherWeek?'Ajustes de la sesión':'Ver datos de la sesión'}</summary>
+          <summary>${currentTeacherWeek?'Ajustes de la sesiÃƒÂ³n':'Ver datos de la sesiÃƒÂ³n'}</summary>
           <div class="teacher-session-edit">
             <div class="teacher-session-grid">
               <div class="fg">
@@ -5114,76 +5114,6 @@ function renderAbsenceHourChoices(){
     </button>
   `).join('');
 }
-function getTeacherCurrentMonthGuardiaCount(nombre){
-  const canonical=resolveTeacherCanonicalName(nombre)||cleanText(nombre);
-  if(!canonical) return 0;
-  const monthKey=getCurrentMonthKey();
-  if(cleanText(guardiaMonthlyLoad.monthKey)!==monthKey){
-    return buildMonthlyGuardiaCoverageCounter({weekKey:getCurrentSchoolWeekKey()})[canonical]||0;
-  }
-  return Number(guardiaMonthlyLoad.counts?.[canonical]||0);
-}
-function getTeacherCurrentWeekAbsenceRows(nombre){
-  return data.filter(row=>sameNormalizedText(row.ausente,nombre));
-}
-function getTeacherFutureAbsenceStats(nombre){
-  const rows=teacherFutureAbsences.filter(item=>sameNormalizedText(item.profesor,nombre));
-  return {
-    total: rows.length,
-    pending: rows.filter(item=>item.status==='pending').length,
-    approved: rows.filter(item=>item.status==='approved'||item.status==='applied').length
-  };
-}
-function renderTeacherAdminStats(nombre,dia){
-  const container=document.getElementById('teacherAdminStats');
-  if(!container) return;
-  if(!nombre){
-    container.innerHTML='';
-    return;
-  }
-  const scheduledHours=getHorasProgramadasProfesorDia(nombre,dia);
-  const weekAbsenceRows=getTeacherCurrentWeekAbsenceRows(nombre);
-  const futureStats=getTeacherFutureAbsenceStats(nombre);
-  const currentMonthGuardias=getTeacherCurrentMonthGuardiaCount(nombre);
-  const plannedGuardiasWeek=[0,1,2,3,4]
-    .flatMap(dayIndex=>Object.keys(getHorarioProfesorDia(nombre,dayIndex)||{}).map(Number).filter(hora=>getHorarioProfesorDia(nombre,dayIndex)?.[hora]?.tipo==='guardia'))
-    .length;
-  const absenceHoursWeek=weekAbsenceRows.length;
-  const statCards=[
-    {
-      label:'Guardias mes',
-      value:String(currentMonthGuardias),
-      note:'Coberturas acumuladas en el mes actual'
-    },
-    {
-      label:'Ausencias semana',
-      value:String(absenceHoursWeek),
-      note:absenceHoursWeek===1?'1 hora registrada esta semana':`${absenceHoursWeek} horas registradas esta semana`
-    },
-    {
-      label:'Horario de hoy',
-      value:String(scheduledHours.length),
-      note:scheduledHours.length?scheduledHours.map(formatHoraLabel).join(', '):'Sin sesiones programadas hoy'
-    },
-    {
-      label:'Faltas futuras',
-      value:String(futureStats.total),
-      note:futureStats.total?`${futureStats.pending} pendientes · ${futureStats.approved} validadas/aplicadas`:'Sin avisos futuros'
-    },
-    {
-      label:'Guardias previstas',
-      value:String(plannedGuardiasWeek),
-      note:'Tramos de guardia en su horario semanal'
-    }
-  ];
-  container.innerHTML=statCards.map(item=>`
-    <article class="teacher-admin-stat">
-      <div class="teacher-admin-stat-label">${escapeHtml(item.label)}</div>
-      <div class="teacher-admin-stat-value">${escapeHtml(item.value)}</div>
-      <div class="teacher-admin-stat-note">${escapeHtml(item.note)}</div>
-    </article>
-  `).join('');
-}
 function openModal(id){if(!isCurrentWeekOffset(weekOffset)){showToast('La edición solo está disponible en la semana actual.','info');return;}editId=id||null;const g=id?data.find(x=>x.id===id):null;const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;setAusenteSelection(g?g.ausente:'');if(!g) document.getElementById('fAusente').value='';document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fTodoDia').checked=false;setAbsenceSelectedHours(g?[g.hora]:[]);document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';renderAbsenceHourChoices();populateProfesoresGuardia();syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
 function renderAusentePreview(){
   const input=document.getElementById('fAusente');
@@ -5192,7 +5122,6 @@ function renderAusentePreview(){
   const nombre=getProfesorNombreSeleccionado(input.value);
   if(!nombre){
     preview.textContent='Empieza a escribir para localizar al profesor.';
-    renderTeacherAdminStats('',+document.getElementById('fDia').value);
     return;
   }
   const dia=+document.getElementById('fDia').value;
@@ -5200,7 +5129,6 @@ function renderAusentePreview(){
   const aula=getAulaProfesor(nombre,dia,hora)||'Sin aula registrada';
   const horas=getHorasProgramadasProfesorDia(nombre,dia);
   preview.textContent=`${getVisibleTeacherName(nombre)} \u00b7 ${DIAS[dia]} \u00b7 ${horas.length} sesiones programadas \u00b7 ${aula}`;
-  renderTeacherAdminStats(nombre,dia);
 }
 function renderAbsenceDecisionBar(){
   const panel=document.getElementById('absenceDecisionBar');

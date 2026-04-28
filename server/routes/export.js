@@ -31,6 +31,7 @@ const FUTURE_ABSENCES_STATE_KEY = 'teacher_future_absences';
 const WEEK_STATE_KEY = 'school_week_key';
 const PRACTICAS_GUARDIAS_STATE_KEY = 'teacher_practicas_guardias';
 const PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY = 'teacher_practicas_guardias_tramos';
+const MONTHLY_GUARDIA_LOAD_STATE_KEY = 'guardia_monthly_load';
 
 function badRequest(message, details) {
   const error = new Error(message);
@@ -125,7 +126,8 @@ function sanitizeBackupPayload(payload) {
     schoolWeekKey: normalizeString(input.schoolWeekKey),
     teacherSubstitutions: ensureOptionalBackupSection(input, 'teacherSubstitutions', 'teacherSubstitutions', sanitizeTeacherSubstitution),
     teacherPracticasGuardias: ensureOptionalBackupSection(input, 'teacherPracticasGuardias', 'teacherPracticasGuardias', sanitizeTeacherPracticeGuardia),
-    teacherPracticasGuardiasTramos: ensureOptionalBackupSection(input, 'teacherPracticasGuardiasTramos', 'teacherPracticasGuardiasTramos', sanitizeTeacherPracticeGuardiaSlot)
+    teacherPracticasGuardiasTramos: ensureOptionalBackupSection(input, 'teacherPracticasGuardiasTramos', 'teacherPracticasGuardiasTramos', sanitizeTeacherPracticeGuardiaSlot),
+    monthlyGuardiaLoad: input.monthlyGuardiaLoad && typeof input.monthlyGuardiaLoad === 'object' && !Array.isArray(input.monthlyGuardiaLoad) ? input.monthlyGuardiaLoad : null
   };
 }
 
@@ -163,8 +165,8 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       db.all('SELECT * FROM alumnos_fuera_aula ORDER BY dia, hora, profesor, id'),
       db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora'),
       db.all(
-        'SELECT key, value FROM app_state WHERE key IN (?, ?, ?) ORDER BY key',
-        [SUBSTITUTIONS_STATE_KEY, FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY]
+        'SELECT key, value FROM app_state WHERE key IN (?, ?, ?, ?) ORDER BY key',
+        [SUBSTITUTIONS_STATE_KEY, FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY, MONTHLY_GUARDIA_LOAD_STATE_KEY]
       ),
       db.get('SELECT value FROM app_state WHERE key = ?', [SUBSTITUTIONS_STATE_KEY]),
       db.get('SELECT value FROM app_state WHERE key = ?', [PRACTICAS_GUARDIAS_STATE_KEY]),
@@ -175,6 +177,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
     const substitutions = appState[SUBSTITUTIONS_STATE_KEY] ? JSON.parse(appState[SUBSTITUTIONS_STATE_KEY]) : [];
     const futureAbsences = appState[FUTURE_ABSENCES_STATE_KEY] ? JSON.parse(appState[FUTURE_ABSENCES_STATE_KEY]) : [];
     const schoolWeekKey = appState[WEEK_STATE_KEY] || '';
+    const monthlyGuardiaLoad = appState[MONTHLY_GUARDIA_LOAD_STATE_KEY] ? JSON.parse(appState[MONTHLY_GUARDIA_LOAD_STATE_KEY]) : null;
 
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -211,6 +214,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       substitutions: Array.isArray(substitutions) ? substitutions : [],
       futureAbsences: Array.isArray(futureAbsences) ? futureAbsences : [],
       schoolWeekKey,
+      monthlyGuardiaLoad,
       teacherSubstitutions: substitutionsState?.value ? JSON.parse(substitutionsState.value) : [],
       teacherPracticasGuardias: practicasGuardiasState?.value ? JSON.parse(practicasGuardiasState.value) : [],
       teacherPracticasGuardiasTramos: practicasGuardiasTramosState?.value ? JSON.parse(practicasGuardiasTramosState.value) : []
@@ -243,8 +247,8 @@ router.get('/info', requireRole('superadmin'), async (_req, res, next) => {
       db.get('SELECT COUNT(*) AS total FROM alumnos_fuera_aula'),
       db.get('SELECT COUNT(*) AS total FROM session_overrides'),
       db.all(
-        'SELECT key, LENGTH(value) AS size, updated_at FROM app_state WHERE key IN (?, ?, ?) ORDER BY key',
-        [SUBSTITUTIONS_STATE_KEY, FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY]
+        'SELECT key, LENGTH(value) AS size, updated_at FROM app_state WHERE key IN (?, ?, ?, ?) ORDER BY key',
+        [SUBSTITUTIONS_STATE_KEY, FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY, MONTHLY_GUARDIA_LOAD_STATE_KEY]
       )
     ]);
 
@@ -301,6 +305,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       substitutions,
       futureAbsences,
       schoolWeekKey,
+      monthlyGuardiaLoad,
       teacherSubstitutions,
       teacherPracticasGuardias,
       teacherPracticasGuardiasTramos
@@ -317,11 +322,12 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       await db.exec('DELETE FROM alumnos_fuera_aula');
       await db.exec('DELETE FROM session_overrides');
       await db.run(
-        'DELETE FROM app_state WHERE key IN (?, ?, ?, ?, ?)',
+        'DELETE FROM app_state WHERE key IN (?, ?, ?, ?, ?, ?)',
         [
           SUBSTITUTIONS_STATE_KEY,
           FUTURE_ABSENCES_STATE_KEY,
           WEEK_STATE_KEY,
+          MONTHLY_GUARDIA_LOAD_STATE_KEY,
           PRACTICAS_GUARDIAS_STATE_KEY,
           PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY
         ]
@@ -427,6 +433,14 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         );
       }
 
+      if (monthlyGuardiaLoad) {
+        await db.run(
+          `INSERT INTO app_state (key, value, updated_at)
+           VALUES (?, ?, CURRENT_TIMESTAMP)`,
+          [MONTHLY_GUARDIA_LOAD_STATE_KEY, JSON.stringify(monthlyGuardiaLoad)]
+        );
+      }
+
       if (teacherPracticasGuardias.length) {
         await db.run(
           `INSERT INTO app_state (key, value, updated_at)
@@ -462,6 +476,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
           substitutions: effectiveSubstitutions.length,
           futureAbsences: futureAbsences.length,
           teacherSubstitutions: effectiveSubstitutions.length,
+        monthlyGuardiaLoad: monthlyGuardiaLoad ? 1 : 0,
         teacherPracticasGuardias: teacherPracticasGuardias.length,
         teacherPracticasGuardiasTramos: teacherPracticasGuardiasTramos.length
       }

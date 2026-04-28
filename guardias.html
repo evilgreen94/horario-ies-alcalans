@@ -22,7 +22,7 @@
       <a class="tv-exit-btn" id="tvExitBtn" href="/" onclick="closeTvPanel(); return false;">Salir del panel</a>
     </div>
     <div class="tv-announcement" id="tvAnnouncement" hidden>
-      <div class="tv-announcement-label">Aviso del día</div>
+      <div class="tv-announcement-label">Aviso del d&iacute;a</div>
       <div class="tv-announcement-text" id="tvAnnouncementText"></div>
     </div>
     <div class="tv-header-meta" id="tvHeaderMeta">
@@ -59,10 +59,6 @@
       </section>
       <section class="tv-panel tv-panel-later">
         <div class="tv-panel-head">
-          <div>
-            <div class="tv-panel-kicker">Siguiente referencia</div>
-            <h2 class="tv-panel-title">Después</h2>
-          </div>
           <div class="tv-slot-badge tv-slot-badge-secondary" id="tvLaterSlotBadge">Sin siguiente tramo</div>
         </div>
         <div class="tv-panel-body" id="tvLaterPanel"></div>
@@ -70,6 +66,7 @@
     </div>
   </section>
   <section class="print-shell" id="printShell" aria-live="polite"></section>
+  <section class="app-shell" id="appShell">
   <div class="day-strip">
     <div class="day-strip-title">Guardias - <em id="dNombre">Lunes</em></div>
     <div class="week-strip" id="weekStrip">
@@ -88,7 +85,7 @@
   <section class="guardia-board">
     <div class="guardia-board-head">
       <div class="guardia-board-title">Guardias previstas por hora</div>
-      <div class="guardia-board-note">Biblioteca y baños se asignan automáticamente por hora. Si faltan coberturas, ambas reservas se liberan.</div>
+      <div class="guardia-board-note">Biblioteca y ba&ntilde;os se asignan autom&aacute;ticamente por hora. Si faltan coberturas, ambas reservas se liberan.</div>
       <button class="btn-mini" id="btnSorteo" type="button" onclick="sortearGuardiasDia()" style="display:none">Sortear orden del d&iacute;a</button>
     </div>
     <div class="guardia-grid" id="guardiaGrid"></div>
@@ -165,8 +162,6 @@
           <button class="btn-add btn-add-secondary" type="button" onclick="addTvAnnouncement()">A&ntilde;adir aviso</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="deactivateAllTvAnnouncements()">Desactivar todos</button>
         </div>
-        <div class="absence-preview" id="tvAnnouncementStatus">No hay aviso activo.</div>
-        <div class="substitution-list" id="tvAnnouncementList"></div>
       </section>
     </div>
   </div>
@@ -179,8 +174,8 @@
       <section class="superadmin-panel superadmin-panel-toolbar">
         <div class="superadmin-section-head">
           <div>
-            <div class="superadmin-section-title">Acciones rápidas</div>
-            <div class="superadmin-section-copy">Operaciones manuales y acceso técnico sin mezclarlo con el estado cambiante del servidor.</div>
+            <div class="superadmin-section-title">Acciones r&aacute;pidas</div>
+            <div class="superadmin-section-copy">Operaciones manuales y acceso t&eacute;cnico sin mezclarlo con el estado cambiante del servidor.</div>
           </div>
         </div>
         <div class="superadmin-toolbar-actions">
@@ -196,7 +191,7 @@
         <div class="superadmin-section-head">
           <div>
             <div class="superadmin-section-title">Resumen operativo</div>
-            <div class="superadmin-section-copy">Lectura rápida de la base, la actividad reciente y el estado de sincronización.</div>
+            <div class="superadmin-section-copy">Lectura r&aacute;pida de la base, la actividad reciente y el estado de sincronizaci&oacute;n.</div>
           </div>
         </div>
         <div class="superadmin-ops-list" id="superAdminOpsList"></div>
@@ -245,6 +240,7 @@
       <tbody id="tbody"></tbody>
     </table>
   </div>
+  </section>
 </main>
 <div class="overlay" id="overlay" onclick="bgClose(event)">
   <div class="modal absence-modal">
@@ -258,17 +254,17 @@
         <div class="modal-section-title">Tramo horario</div>
         <div class="modal-section-copy">Indica cu&aacute;ndo se produce la ausencia.</div>
       </div>
-      <div class="fg-row">
-        <div class="fg">
-          <label>D&iacute;a</label>
-          <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Mi&eacute;rcoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
-          <div class="field-error" id="fDiaError"></div>
-        </div>
-        <div class="fg">
-          <label>Hora</label>
-          <select id="fHora"><option value="1">1a hora (08:15-09:10)</option><option value="2">2a hora (09:10-10:05)</option><option value="3">3a hora (10:05-11:00)</option><option value="4">4a hora (11:00-11:25)</option><option value="5">5a hora (11:25-12:20)</option><option value="6">6a hora (12:20-13:15)</option><option value="7">7a hora (13:15-14:10)</option><option value="8">8a hora (14:10-14:25)</option><option value="9">9a hora (14:25-15:20)</option></select>
-          <div class="field-error" id="fHoraError"></div>
-        </div>
+      <div class="fg">
+        <label>D&iacute;a</label>
+        <select id="fDia"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Mi&eacute;rcoles</option><option value="3">Jueves</option><option value="4">Viernes</option></select>
+        <div class="field-error" id="fDiaError"></div>
+      </div>
+      <input id="fHora" type="hidden" value="1">
+      <div class="fg">
+        <label>Horas de ausencia</label>
+        <div class="modal-inline-copy">Marca una, varias o todas las horas que correspondan. Si activas ausencia de todo el d&iacute;a, esta selecci&oacute;n queda bloqueada.</div>
+        <div class="absence-hours-grid" id="fHorasMulti"></div>
+        <div class="field-error" id="fHorasMultiError"></div>
       </div>
     </div>
 
@@ -285,6 +281,7 @@
         </div>
         <div class="absence-suggestions" id="ausenteSuggestions" hidden></div>
         <div class="absence-preview" id="ausentePreview">Empieza a escribir para localizar al profesor.</div>
+        <div class="teacher-admin-stats" id="teacherAdminStats"></div>
         <div class="field-error" id="fAusenteError"></div>
       </div>
     </div>
@@ -358,7 +355,7 @@
       <button class="modal-x" onclick="closeTeacherAccess()">x</button>
     </div>
     <div class="teacher-access-shell">
-      <div class="teacher-access-intro">Busca tu nombre para abrir tu panel del día. Desde ahí podrás revisar sesiones, indicar tarea y ajustar materia, grupo o aula si hace falta.</div>
+      <div class="teacher-access-intro">Busca tu nombre para abrir tu panel del d&iacute;a. Desde ah&iacute; podr&aacute;s revisar sesiones, indicar tarea y ajustar materia, grupo o aula si hace falta.</div>
       <div class="teacher-access-search-panel">
         <div class="fg">
           <label>Profesor</label>
@@ -468,7 +465,7 @@
       </div>
     </div>
     <div class="fg">
-      <label>Horas lectivas de ese día</label>
+      <label>Horas lectivas de ese d&iacute;a</label>
       <div class="absence-preview" id="teacherFutureAbsenceDayMeta">Selecciona una fecha para ver tus horas de clase.</div>
       <div class="teacher-future-hours" id="teacherFutureAbsenceHours"></div>
     </div>
@@ -559,3 +556,6 @@
 <script src="js/app/guardias.js"></script>
 </body>
 </html>
+
+
+
