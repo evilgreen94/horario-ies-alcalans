@@ -1413,7 +1413,7 @@ function renderAdminWorkspace(){
   const pendingCorredor=insight.corredor.pending.slice(0,4);
   const recentEntries=historialCambios.slice(0,Math.max(0,3-pendingCorredor.length));
   activityList.innerHTML=pendingCorredor.length
-    ?pendingCorredor.map(row=>`<article class="admin-activity-item admin-activity-warning"><div class="admin-activity-title">${escapeHtml(getVisibleTeacherName(row.profesor))}: ${row.cantidad} pendiente${row.cantidad===1?'':'s'} de volver</div><div class="admin-activity-meta">${escapeHtml(formatDiaHora(row.dia,row.hora))}${row.lastExitAt?` Â· salida ${escapeHtml(formatTimeShort(row.lastExitAt))}`:''}</div></article>`).join('')
+    ?pendingCorredor.map(row=>`<article class="admin-activity-item admin-activity-warning"><div class="admin-activity-title">${escapeHtml(getVisibleTeacherName(row.profesor))}: ${row.cantidad} pendiente${row.cantidad===1?'':'s'} de volver</div><div class="admin-activity-meta">${escapeHtml(formatDiaHora(row.dia,row.hora))}${row.lastExitAt?` · salida ${escapeHtml(formatTimeShort(row.lastExitAt))}`:''}</div></article>`).join('')
     :recentEntries.length
     ?recentEntries.map(entry=>`<article class="admin-activity-item"><div class="admin-activity-title">${escapeHtml(entry.title||'Cambio')}</div><div class="admin-activity-meta">${escapeHtml(formatHistoryTimestamp(entry.ts))} · ${escapeHtml(entry.detail||'Sin detalle adicional.')}</div></article>`).join('')
     :'<div class="admin-activity-empty">Todavía no hay cambios recientes en la jornada actual.</div>';
