@@ -776,7 +776,7 @@ function renderTvAnnouncement(){
   if(priorityInput&&document.activeElement!==priorityInput) priorityInput.value='normal';
   if(status){
     status.textContent=active
-      ?`${activeItems.length} aviso${activeItems.length===1?'':'s'} activo${activeItems.length===1?'':'s'}${tvAnnouncement.updatedAt?` Â· ${new Date(tvAnnouncement.updatedAt).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`:''}`
+      ?`${activeItems.length} aviso${activeItems.length===1?'':'s'} activo${activeItems.length===1?'':'s'}${tvAnnouncement.updatedAt?` · ${new Date(tvAnnouncement.updatedAt).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`:''}`
       :'No hay aviso activo.';
   }
   if(list){
@@ -855,7 +855,7 @@ function formatHistoryAbsence(row){
   const aula=resolveAulaRegistro(row)||row.aula||'';
   if(aula) partes.push(aula);
   if(row.guardia) partes.push(`Guardia: ${getVisibleTeacherName(row.guardia)}`);
-  return partes.join(' Â· ');
+  return partes.join(' · ');
 }
 function buildUndoState(targetDay,options={}){
   const state={
@@ -1170,7 +1170,7 @@ function getGuardiaSugerida(dia,hora,turno,rowsSource=data){
 }
 function isPracticasSessionEligible(sesion){
   if(!sesion||sesion.tipo==='guardia') return false;
-  const texto=[sesion.materia,sesion.grupo,sesion.detalle,sesion.aula].map(cleanText).filter(Boolean).join(' Â· ');
+  const texto=[sesion.materia,sesion.grupo,sesion.detalle,sesion.aula].map(cleanText).filter(Boolean).join(' · ');
   return /(\bCFB\b|\bCFM\b|\bGM\b|\bGS\b|\bFPB\b|INTERMODULAR|FCT|PRACTIC)/i.test(texto);
 }
 function makePracticasGuardiasSlotKey(profesor,dia,hora){return `${normalizeText(resolveTeacherCanonicalName(profesor)||profesor)}|${dia}|${hora}`;}
@@ -1775,16 +1775,16 @@ function getSuperAdminHealthMeta(){
     return {label:'Sin backend',className:'superadmin-pill-warn',note:'La web funciona sin servidor accesible o solo con cache local.'};
   }
   if(!superAdminOpsInfo){
-    return {label:superAdminOpsLoading?'Consultando':'Sin datos',className:'superadmin-pill-warn',note:'TodavÃƒÂ­a no hay lectura operativa del servidor.'};
+    return {label:superAdminOpsLoading?'Consultando':'Sin datos',className:'superadmin-pill-warn',note:'Todavía no hay lectura operativa del servidor.'};
   }
   if(superAdminOpsInfo.restoreInProgress){
-    return {label:'Restaurando',className:'superadmin-pill-warn',note:'Hay una restauraciÃƒÂ³n activa. Conviene evitar cambios hasta que termine.'};
+    return {label:'Restaurando',className:'superadmin-pill-warn',note:'Hay una restauración activa. Conviene evitar cambios hasta que termine.'};
   }
   const minute=superAdminOpsInfo.server?.telemetry?.recent?.lastMinute||{};
   const fiveMinutes=superAdminOpsInfo.server?.telemetry?.recent?.lastFiveMinutes||{};
   const activeRequests=Number(superAdminOpsInfo.server?.telemetry?.activeRequests)||0;
   if(superAdminStatus.lastError||Number(minute.errors||0)>=3){
-    return {label:'Con incidencias',className:'superadmin-pill-error',note:'Se han detectado errores recientes o fallos de sincronizaciÃƒÂ³n.'};
+    return {label:'Con incidencias',className:'superadmin-pill-error',note:'Se han detectado errores recientes o fallos de sincronización.'};
   }
   if(activeRequests>=12||Number(minute.count||0)>=180||Number(fiveMinutes.avgDurationMs||0)>=1200){
     return {label:'Carga alta',className:'superadmin-pill-error',note:'El servidor esta bastante exigido. Mejor no lanzar tareas pesadas ahora.'};
@@ -1801,27 +1801,27 @@ function buildSuperAdminOpsItems(){
   if(superAdminOpsInfo){
     items.push({
       title:`Base de datos: ${formatBytes(superAdminOpsInfo.dbSizeBytes)}`,
-      note:`${superAdminOpsInfo.dbFileName||'SQLite'} Â· ${superAdminOpsInfo.counts?.guardias||0} guardias Â· ${superAdminOpsInfo.counts?.tareasProfesorado||0} tareas.`
+      note:`${superAdminOpsInfo.dbFileName||'SQLite'} · ${superAdminOpsInfo.counts?.guardias||0} guardias · ${superAdminOpsInfo.counts?.tareasProfesorado||0} tareas.`
     });
     const minute=superAdminOpsInfo.server?.telemetry?.recent?.lastMinute||{};
     items.push({
       title:`Actividad reciente: ${minute.count||0} peticiones/min`,
-      note:`Errores en el ÃƒÂºltimo minuto: ${minute.errors||0}. Activas ahora: ${superAdminOpsInfo.server?.telemetry?.activeRequests||0}.`
+      note:`Errores en el último minuto: ${minute.errors||0}. Activas ahora: ${superAdminOpsInfo.server?.telemetry?.activeRequests||0}.`
     });
     items.push({
-      title:`ÃƒÅ¡ltima lectura: ${formatStatusTimestamp(superAdminOpsLastFetchAt)}`,
-      note:`Uptime ${formatUptime(superAdminOpsInfo.server?.uptimeSec||0)} Â· Node ${superAdminOpsInfo.server?.nodeVersion||'-'} Â· ${superAdminOpsInfo.server?.platform||'-'}.`
+      title:`Última lectura: ${formatStatusTimestamp(superAdminOpsLastFetchAt)}`,
+      note:`Uptime ${formatUptime(superAdminOpsInfo.server?.uptimeSec||0)} · Node ${superAdminOpsInfo.server?.nodeVersion||'-'} · ${superAdminOpsInfo.server?.platform||'-'}.`
     });
   }else if(storage.hasBackend()){
     items.push({
-      title:'TelemetrÃƒÂ­a pendiente',
+      title:'Telemetría pendiente',
       note:'Pulsa "Actualizar estado" para cargar datos del servidor y revisar la carga real.'
     });
   }
   if(lastBackendSnapshot&&lastBackendSnapshot!==makeBackendSnapshot()){
     items.push({
       title:'Cambios locales pendientes',
-      note:'Hay diferencias entre el estado local y el backend. Conviene revisarlas antes de hacer backup o restauraciÃƒÂ³n.'
+      note:'Hay diferencias entre el estado local y el backend. Conviene revisarlas antes de hacer backup o restauración.'
     });
   }
   return items.slice(0,4);
@@ -1841,7 +1841,7 @@ async function refreshSuperAdminOps(force){
     }
   }catch(error){
     console.warn('Superadmin info fetch failed',error);
-    setSuperAdminHint('No se pudo consultar el estado del servidor. Revisa sesiÃƒÂ³n o conectividad.','error');
+    setSuperAdminHint('No se pudo consultar el estado del servidor. Revisa sesión o conectividad.','error');
   }finally{
     superAdminOpsLoading=false;
     renderSuperAdminMonitor();
@@ -1873,7 +1873,7 @@ function buildSuperAdminIncidentItems(){
     items.push({
       level:'error',
       title:'Aviso activo del sistema',
-      meta:`${formatStatusTimestamp(superAdminStatus.lastErrorAt)} Â· ${superAdminStatus.lastError}`
+      meta:`${formatStatusTimestamp(superAdminStatus.lastErrorAt)} · ${superAdminStatus.lastError}`
     });
   }
   superAdminEvents
@@ -1883,14 +1883,14 @@ function buildSuperAdminIncidentItems(){
       items.push({
         level:/error|fallo/i.test(`${item.type||''} ${item.message||''}`)?'error':'warn',
         title:item.type||'Incidencia',
-        meta:`${formatStatusTimestamp(item.ts)} Â· ${item.message||'Sin detalle'}`
+        meta:`${formatStatusTimestamp(item.ts)} · ${item.message||'Sin detalle'}`
       });
     });
   if(!items.length){
     items.push({
       level:'ok',
       title:'Sin incidencias activas',
-      meta:'No hay errores recientes ni avisos pendientes de sincronizaciÃƒÂ³n.'
+      meta:'No hay errores recientes ni avisos pendientes de sincronización.'
     });
   }
   return items.slice(0,6);
@@ -1921,10 +1921,10 @@ function renderSuperAdminMonitor(){
     {
       k:'Backend',
       v:backendConnected?'Disponible':'No configurado',
-      note:`Modo ${storage.storageMode||'hybrid'}${superAdminOpsLoading?' Â· Actualizando...':''}`
+      note:`Modo ${storage.storageMode||'hybrid'}${superAdminOpsLoading?' · Actualizando...':''}`
     },
     {
-      k:'SincronizaciÃƒÂ³n',
+      k:'Sincronización',
       v:`<span class="superadmin-pill ${syncClass}">${syncState}</span>`,
       note:`Admin: ${formatStatusTimestamp(superAdminStatus.lastAdminSyncAt)}`
     },
@@ -1936,32 +1936,32 @@ function renderSuperAdminMonitor(){
     {
       k:'Carga reciente',
       v:`${minute.count||0} req/min`,
-      note:`Activas ${telemetry.activeRequests||0} Â· pico ${telemetry.peakConcurrentRequests||0}`
+      note:`Activas ${telemetry.activeRequests||0} · pico ${telemetry.peakConcurrentRequests||0}`
     },
     {
       k:'Respuesta',
       v:fiveMinutes.avgDurationMs?formatDurationShort(fiveMinutes.avgDurationMs):'Sin datos',
-      note:`P95 ${fiveMinutes.p95DurationMs?formatDurationShort(fiveMinutes.p95DurationMs):'Sin datos'} Â· errores 5 min: ${fiveMinutes.errors||0}`
+      note:`P95 ${fiveMinutes.p95DurationMs?formatDurationShort(fiveMinutes.p95DurationMs):'Sin datos'} · errores 5 min: ${fiveMinutes.errors||0}`
     },
     {
       k:'Base SQLite',
       v:superAdminOpsInfo?formatBytes(superAdminOpsInfo.dbSizeBytes):'Sin datos',
-      note:superAdminOpsInfo?`${superAdminOpsInfo.dbFileName||'guardias.sqlite'} Â· ${superAdminOpsInfo.counts?.guardias||0} guardias`:'Sin lectura del servidor'
+      note:superAdminOpsInfo?`${superAdminOpsInfo.dbFileName||'guardias.sqlite'} · ${superAdminOpsInfo.counts?.guardias||0} guardias`:'Sin lectura del servidor'
     },
     {
       k:'Servidor',
       v:superAdminOpsInfo?formatUptime(superAdminOpsInfo.server?.uptimeSec||0):'Sin datos',
-      note:superAdminOpsInfo?`${formatBytes(superAdminOpsInfo.server?.memory?.rss||0)} en memoria RSS Â· ${superAdminOpsInfo.server?.cpuCount||0} CPU`:'Sin lectura del servidor'
+      note:superAdminOpsInfo?`${formatBytes(superAdminOpsInfo.server?.memory?.rss||0)} en memoria RSS · ${superAdminOpsInfo.server?.cpuCount||0} CPU`:'Sin lectura del servidor'
     },
     {
       k:'Mantenimiento',
       v:superAdminOpsInfo?.restoreInProgress?`<span class="superadmin-pill superadmin-pill-warn">Restaurando</span>`:`<span class="superadmin-pill superadmin-pill-ok">Operativo</span>`,
-      note:superAdminOpsInfo?`Estado app: ${appStateSummary||'sin extras'} Â· poll ${formatStatusTimestamp(superAdminStatus.lastPollAt)}`:`${syncPending} avisos futuros pendientes de backend`
+      note:superAdminOpsInfo?`Estado app: ${appStateSummary||'sin extras'} · poll ${formatStatusTimestamp(superAdminStatus.lastPollAt)}`:`${syncPending} avisos futuros pendientes de backend`
     },
     {
       k:'Diferencias',
       v:`<span class="superadmin-pill ${driftClass}">${driftState}</span>`,
-      note:superAdminStatus.lastError?`ÃƒÅ¡ltimo error: ${superAdminStatus.lastError}`:'Sin errores recientes'
+      note:superAdminStatus.lastError?`Último error: ${superAdminStatus.lastError}`:'Sin errores recientes'
     }
   ];
   grid.innerHTML=cards.map(card=>`<article class="superadmin-monitor-card"><div class="superadmin-monitor-k">${card.k}</div><div class="superadmin-monitor-v">${card.v}</div><div class="superadmin-monitor-note">${card.note}</div></article>`).join('');
@@ -1976,8 +1976,8 @@ function renderSuperAdminMonitor(){
       .join('');
   }
   log.innerHTML=superAdminEvents.length
-    ?superAdminEvents.map(item=>`<div class="superadmin-monitor-log-item"><strong>${escapeHtml(item.type)}</strong> Â· ${escapeHtml(formatStatusTimestamp(item.ts))}<br>${escapeHtml(item.message)}</div>`).join('')
-    :'<div class="superadmin-monitor-log-item">Sin eventos de sincronizaciÃƒÂ³n registrados todavÃƒÂ­a.</div>';
+    ?superAdminEvents.map(item=>`<div class="superadmin-monitor-log-item"><strong>${escapeHtml(item.type)}</strong> · ${escapeHtml(formatStatusTimestamp(item.ts))}<br>${escapeHtml(item.message)}</div>`).join('')
+    :'<div class="superadmin-monitor-log-item">Sin eventos de sincronización registrados todavía.</div>';
 }
 function drainPendingBackendSync(){
   renderSuperAdminMonitor();
@@ -2023,7 +2023,7 @@ async function syncAdminState(){
     notifyRealtimeSync('admin-sync');
   }catch(error){
     console.warn('Backend sync failed',error);
-    setSuperAdminError('Fallo en la sincronizaciÃƒÂ³n de Jefatura.');
+    setSuperAdminError('Fallo en la sincronización de Jefatura.');
     pushSuperAdminEvent('Error sync',`Jefatura: ${String(error?.message||error)}`);
   }finally{
     backendSyncInFlight=false;
@@ -2049,7 +2049,7 @@ async function syncTeacherState(){
     pushSuperAdminEvent('Teacher sync','Tareas y ajustes de profesorado sincronizados con backend.');
   }catch(error){
     console.warn('Teacher backend sync failed',error);
-    setSuperAdminError('Fallo en la sincronizaciÃƒÂ³n de profesorado.');
+    setSuperAdminError('Fallo en la sincronización de profesorado.');
     pushSuperAdminEvent('Error sync',`Profesorado: ${String(error?.message||error)}`);
   }finally{
     backendSyncInFlight=false;
@@ -2100,7 +2100,7 @@ async function syncTeacherTaskEntry(overrideKey,overrideRow,tareaKey,tareaRow){
   }catch(error){
     console.warn('Teacher task backend sync failed',error);
     backendSyncPendingTeacher=true;
-    setSuperAdminError('Fallo en la sincronizaciÃƒÂ³n de tarea de profesorado.');
+    setSuperAdminError('Fallo en la sincronización de tarea de profesorado.');
     pushSuperAdminEvent('Error sync',`Profesorado: ${String(error?.message||error)}`);
     return {ok:true,localOnly:true,syncError:true};
   }finally{
@@ -2436,7 +2436,7 @@ async function addTvAnnouncement(){
   const text=cleanText(input?.value||'').replace(/\s+/g,' ').trim();
   const priority=['urgent','important','normal'].includes(priorityInput?.value)?priorityInput.value:'normal';
   if(!text){
-    showToast('Escribe un aviso antes de aÃƒÂ±adirlo.','error');
+    showToast('Escribe un aviso antes de añadirlo.','error');
     input?.focus();
     return;
   }
@@ -2447,7 +2447,7 @@ async function addTvAnnouncement(){
     priority,
     active:true
   },items.length));
-  const ok=await persistTvAnnouncementState({items},'Aviso aÃƒÂ±adido y activado en sala de profesores.');
+  const ok=await persistTvAnnouncementState({items},'Aviso añadido y activado en sala de profesores.');
   if(ok&&input) input.value='';
 }
 async function deactivateAllTvAnnouncements(){
@@ -2522,7 +2522,7 @@ function getTvSlotAssignments(slot,rowsSource){
     .sort((a,b)=>String(getVisibleTeacherName(a.guardia||'')).localeCompare(getVisibleTeacherName(b.guardia||''),'es'));
   const assignments=rows.map(row=>({
     teacher:getVisibleTeacherName(row.guardia||'')||'Sin cubrir',
-    location:resolveAulaRegistro(row)||'Sin ubicaciÃƒÂ³n',
+    location:resolveAulaRegistro(row)||'Sin ubicación',
     meta:getVisibleTeacherName(row.ausente)?`Cubre a ${getVisibleTeacherName(row.ausente)}`:'',
     tone:'general'
   }));
@@ -2540,7 +2540,7 @@ function getTvSlotAssignments(slot,rowsSource){
   if(banos && !assignedTeachers.has(cleanText(getVisibleTeacherName(banos)))){
     assignments.push({
       teacher:getVisibleTeacherName(banos),
-      location:'BaÃƒÂ±os',
+      location:'Baños',
       meta:'Puesto de apoyo',
       tone:'banos'
     });
@@ -2553,7 +2553,7 @@ function getTvSlotAssignments(slot,rowsSource){
   if(rows.length){
     return rows.map(row=>({
       teacher:getVisibleTeacherName(row.guardia||'')||'Sin cubrir',
-      location:resolveAulaRegistro(row)||'Sin ubicaciÃƒÂ³n',
+      location:resolveAulaRegistro(row)||'Sin ubicación',
       meta:getVisibleTeacherName(row.ausente)?`Cubre a ${getVisibleTeacherName(row.ausente)}`:'',
       tone:'general'
     }));
@@ -2570,7 +2570,7 @@ function getTvSlotAssignments(slot,rowsSource){
   if(banos){
     fallbackAssignments.push({
       teacher:getVisibleTeacherName(banos),
-      location:'BaÃƒÂ±os',
+      location:'Baños',
       meta:'Puesto de apoyo',
       tone:'banos'
     });
@@ -2586,7 +2586,7 @@ function renderTvSlotPanel(containerId,slot,badgeId,rowsSource,options={}){
     container.innerHTML=`<div class="tv-empty">${escapeHtml(options.emptyMessage||'No hay un tramo lectivo activo ahora mismo.')}</div>`;
     return;
   }
-  badge.textContent=`${HORA_MAP[slot.hora].label} hora Â· ${HORA_MAP[slot.hora].rango.replace('-', ' - ')}`;
+  badge.textContent=`${HORA_MAP[slot.hora].label} hora · ${HORA_MAP[slot.hora].rango.replace('-', ' - ')}`;
   const assignments=getTvSlotAssignments(slot,rowsSource);
   if(!assignments.length){
     container.innerHTML='<div class="tv-empty">No hay guardias registradas para este tramo.</div>';
@@ -2611,19 +2611,19 @@ function renderTvPanel(){
   renderTvSlotPanel('tvCurrentPanel',currentSlot,'tvCurrentSlotBadge',rowsSource,{
     emptyBadge:'Sin tramo lectivo',
     emptyMessage:getTodaySchoolDayIndex()==null
-      ?'Hoy no hay jornada lectiva. El panel volverÃƒÂ¡ a activarse en el prÃƒÂ³ximo dÃƒÂ­a de clase.'
+      ?'Hoy no hay jornada lectiva. El panel volverá a activarse en el próximo día de clase.'
       :'Ahora mismo no hay un tramo lectivo activo.'
   });
   renderTvSlotPanel('tvNextPanel',nextSlot,'tvNextSlotBadge',rowsSource,{
     emptyBadge:'Sin siguiente tramo',
     emptyMessage:getTodaySchoolDayIndex()==null
       ?'No hay siguiente tramo programado para hoy.'
-      :'No queda ningÃƒÂºn tramo lectivo por delante en la jornada de hoy.'
+      :'No queda ningún tramo lectivo por delante en la jornada de hoy.'
   });
   renderTvSlotPanel('tvLaterPanel',laterSlot,'tvLaterSlotBadge',rowsSource,{
     emptyBadge:'Sin siguiente tramo',
     emptyMessage:getTodaySchoolDayIndex()==null
-      ?'No hay mÃƒÂ¡s tramos programados para hoy.'
+      ?'No hay más tramos programados para hoy.'
       :'No queda un tercer tramo visible en la jornada de hoy.'
   });
 }
@@ -2653,7 +2653,7 @@ function renderPrintSchedule(){
     <section class="print-sheet">
       <header class="print-sheet-head">
         <div>
-          <div class="print-sheet-kicker">IES Alcalans Â· Parte de guardias</div>
+          <div class="print-sheet-kicker">IES Alcalans · Parte de guardias</div>
           <h1 class="print-sheet-title">Horario de contingencia</h1>
           <div class="print-sheet-meta">Generado a las ${escapeHtml(generatedAt)}</div>
         </div>
@@ -2736,7 +2736,7 @@ async function applyApprovedFutureAbsencesForCurrentWeek(){
       data.push({dia:weekInfo.dayIndex,hora:horaItem,ausente:item.profesor,guardia:'',aula:getAulaProfesor(item.profesor,weekInfo.dayIndex,horaItem)||'',faena:false,obs:'',id:nid++});
       stateChanged=true;
     });
-    appliedSummaries.push(`${getVisibleTeacherName(item.profesor)||item.profesor} Â· ${item.date} Â· ${horasLectivas.map(formatHoraLabel).join(', ')}`);
+    appliedSummaries.push(`${getVisibleTeacherName(item.profesor)||item.profesor} · ${item.date} · ${horasLectivas.map(formatHoraLabel).join(', ')}`);
     item.status='applied';
     item.appliedAt=new Date().toISOString();
     approvalsChanged=true;
@@ -2752,7 +2752,7 @@ async function applyApprovedFutureAbsencesForCurrentWeek(){
     historialCambios.unshift({
       id:`hist-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
       title:appliedSummaries.length===1?'Falta futura aplicada':'Faltas futuras aplicadas',
-      detail:appliedSummaries.join(' Â· '),
+      detail:appliedSummaries.join(' · '),
       type:'create',
       undoState,
       actor:'Jefatura',
@@ -2819,7 +2819,7 @@ async function deleteTeacherFutureAbsenceEntry(id){
     console.warn('Teacher future absence delete backend sync failed; keeping local state',error);
     futureAbsenceSyncFlags.add(`delete:${id}`);
     setSuperAdminError('Hay eliminaciones pendientes de sincronizar.');
-    pushSuperAdminEvent('Pendiente backend',`EliminaciÃƒÂ³n local pendiente para aviso ${id}.`);
+    pushSuperAdminEvent('Pendiente backend',`Eliminación local pendiente para aviso ${id}.`);
     renderSuperAdminMonitor();
     return {ok:true,localOnly:true,syncError:true};
   }
@@ -3095,11 +3095,11 @@ async function pollBackendState(force=false){
       renderPracticasGuardiasConfig();
       renderTvAnnouncement();
     }else{
-      pushSuperAdminEvent('Polling','ComprobaciÃƒÂ³n remota sin cambios.');
+      pushSuperAdminEvent('Polling','Comprobación remota sin cambios.');
     }
   }catch(error){
     console.warn('Backend polling failed',error);
-    setSuperAdminError('Fallo en la comprobaciÃƒÂ³n periÃƒÂ³dica del backend.');
+    setSuperAdminError('Fallo en la comprobación periódica del backend.');
     pushSuperAdminEvent('Error polling',String(error?.message||error));
   }finally{
     backendPollingInFlight=false;
@@ -3301,14 +3301,14 @@ async function ensureSuperAdminRouteAccess(){
   if(isSuperAdmin||isAdmin){
     await logoutCurrentRole();
   }
-  const password=await askPassword('Acceso Superadmin','Introduce la contraseÃƒÂ±a del modo superadmin.');
+  const password=await askPassword('Acceso Superadmin','Introduce la contraseña del modo superadmin.');
   if(!password){
     window.location.href=window.location.pathname;
     return false;
   }
   const ok=await loginRole('superadmin',password);
   if(ok) return true;
-  showToast('ContraseÃƒÂ±a incorrecta.','error');
+  showToast('Contraseña incorrecta.','error');
   window.location.href=window.location.pathname;
   return false;
 }
@@ -3422,7 +3422,7 @@ async function changeWeekOffset(delta){
   if(openPanels.length){
     const confirmed=await askConfirm(
       'Cambiar de semana',
-      'Tienes paneles o formularios abiertos. Al cambiar de semana se cerrarÃƒÂ¡n y verÃƒÂ¡s la nueva vista.',
+      'Tienes paneles o formularios abiertos. Al cambiar de semana se cerrarán y verás la nueva vista.',
       'Cambiar de semana'
     );
     if(!confirmed) return;
@@ -3442,7 +3442,7 @@ async function sortearGuardiasDia(){
   const undoState=buildUndoState(day,{includeOrden:true});
   const confirmed=await askConfirm(
     'Confirmar sorteo',
-    `Se generarÃƒÂ¡ un nuevo orden para ${DIAS[day]}. El orden anterior quedarÃƒÂ¡ guardado en historial para poder deshacerlo.`,
+    `Se generará un nuevo orden para ${DIAS[day]}. El orden anterior quedará guardado en historial para poder deshacerlo.`,
     'Sortear y guardar'
   );
   if(!confirmed) return;
@@ -3450,7 +3450,7 @@ async function sortearGuardiasDia(){
     ordenGuardias[day][hora]=makeOrdenHora(day,hora);
   }
   persistOrden(ordenGuardias);
-  addHistoryEntry('Sorteo del dÃƒÂ­a',`Nuevo orden generado para ${DIAS[day]}.`,'edit',{undoState});
+  addHistoryEntry('Sorteo del día',`Nuevo orden generado para ${DIAS[day]}.`,'edit',{undoState});
   renderHistoryList();
   renderGuardiaBoard();
   renderTable();
@@ -3520,11 +3520,11 @@ function buildDailyReportHtml(){
           <div class="meta-card"><span class="meta-k">Aula</span><span class="meta-v">${escapeHtml(aula)}</span></div>
           <div class="meta-card"><span class="meta-k">Tarea</span><span class="meta-v">${faenaInfo.faena?'Disponible':'No registrada'}</span></div>
           <div class="meta-card"><span class="meta-k">Biblioteca</span><span class="meta-v">${escapeHtml(biblioteca)}</span></div>
-          <div class="meta-card"><span class="meta-k">BaÃƒÂ±os</span><span class="meta-v">${escapeHtml(banos)}</span></div>
+          <div class="meta-card"><span class="meta-k">Baños</span><span class="meta-v">${escapeHtml(banos)}</span></div>
         </div>
         ${faenaInfo.obs?`<div class="task-box"><div class="task-title">Indicaciones para el grupo</div><div class="task-text">${escapeHtml(faenaInfo.obs)}</div></div>`:''}
       </article>`;
-  }).join(''):`<p class="empty empty-left">No hay ausencias registradas para este dÃƒÂ­a.</p>`;
+  }).join(''):`<p class="empty empty-left">No hay ausencias registradas para este día.</p>`;
   return `<!DOCTYPE html>
   <html lang="es">
   <head>
@@ -3573,13 +3573,13 @@ function buildDailyReportHtml(){
     <main class="sheet">
       <div class="topbar">
         <div>
-          <div class="title-kicker">IES Alcalans Â· Guardias</div>
-          <h1>Informe diario Â· ${escapeHtml(DIAS[day])}</h1>
-          <div class="subtitle">Fecha de generaciÃƒÂ³n: ${escapeHtml(fecha)}</div>
+          <div class="title-kicker">IES Alcalans · Guardias</div>
+          <h1>Informe diario · ${escapeHtml(DIAS[day])}</h1>
+          <div class="subtitle">Fecha de generación: ${escapeHtml(fecha)}</div>
         </div>
       </div>
       <section class="summary">
-        <article class="summary-card"><span class="summary-k">Ausencias</span><span class="summary-v">${totalAusencias}</span><span class="summary-note">Registros del dÃƒÂ­a</span></article>
+        <article class="summary-card"><span class="summary-k">Ausencias</span><span class="summary-v">${totalAusencias}</span><span class="summary-note">Registros del día</span></article>
         <article class="summary-card"><span class="summary-k">Coberturas</span><span class="summary-v">${totalCubiertas}</span><span class="summary-note">Asignadas o previstas</span></article>
         <article class="summary-card"><span class="summary-k">Con tarea</span><span class="summary-v">${totalConTarea}</span><span class="summary-note">Faena disponible</span></article>
       </section>
@@ -3599,7 +3599,7 @@ function buildWeeklyReportHtml(){
       .filter(row=>row.dia===diaIndex)
       .sort((a,b)=>a.hora-b.hora||String(a.ausente||'').localeCompare(String(b.ausente||''),'es'));
     if(!rows.length){
-      return `<section class="day-block"><div class="day-head"><h2>${escapeHtml(diaNombre)}</h2><span class="day-count">Sin incidencias</span></div><p class="empty empty-left">No hay ausencias registradas para este dÃƒÂ­a.</p></section>`;
+      return `<section class="day-block"><div class="day-head"><h2>${escapeHtml(diaNombre)}</h2><span class="day-count">Sin incidencias</span></div><p class="empty empty-left">No hay ausencias registradas para este día.</p></section>`;
     }
     const grouped=new Map();
     rows.forEach(row=>{
@@ -3622,9 +3622,9 @@ function buildWeeklyReportHtml(){
             <div class="item-head">${escapeHtml(item.ausente)}</div>
             <span class="pill ${item.conTarea?'pill-ok':'pill-warn'}">${item.conTarea?'Con tarea':'Sin tarea'}</span>
           </div>
-          <div class="item-row"><span class="item-k">Horas</span><span class="item-v">${escapeHtml(item.horas.map(hora=>`${formatHoraLabel(hora)} (${HORA_MAP[hora]?.rango||''})`).join(' Â· '))}</span></div>
-          <div class="item-row"><span class="item-k">Cobertura</span><span class="item-v">${escapeHtml(item.guardias.length?item.guardias.join(' Â· '):'Sin asignar')}</span></div>
-          <div class="item-row"><span class="item-k">Aula</span><span class="item-v">${escapeHtml(item.aulas.length?item.aulas.join(' Â· '):'Sin aula')}</span></div>
+          <div class="item-row"><span class="item-k">Horas</span><span class="item-v">${escapeHtml(item.horas.map(hora=>`${formatHoraLabel(hora)} (${HORA_MAP[hora]?.rango||''})`).join(' · '))}</span></div>
+          <div class="item-row"><span class="item-k">Cobertura</span><span class="item-v">${escapeHtml(item.guardias.length?item.guardias.join(' · '):'Sin asignar')}</span></div>
+          <div class="item-row"><span class="item-k">Aula</span><span class="item-v">${escapeHtml(item.aulas.length?item.aulas.join(' · '):'Sin aula')}</span></div>
         </article>
       `)
       .join('');
@@ -3670,16 +3670,16 @@ function buildWeeklyReportHtml(){
     <main class="sheet">
       <section class="hero">
         <div>
-          <div class="hero-kicker">IES Alcalans Â· Guardias</div>
+          <div class="hero-kicker">IES Alcalans · Guardias</div>
           <h1>Informe semanal de guardias</h1>
-          <div class="hero-meta">Fecha de generaciÃƒÂ³n: ${escapeHtml(fecha)}</div>
+          <div class="hero-meta">Fecha de generación: ${escapeHtml(fecha)}</div>
         </div>
       </section>
       <section class="summary">
         <article class="summary-card"><span class="summary-k">Ausencias</span><span class="summary-v">${totalAusencias}</span><span class="summary-note">Registros semanales</span></article>
         <article class="summary-card"><span class="summary-k">Coberturas</span><span class="summary-v">${totalCoberturas}</span><span class="summary-note">Guardias asignadas</span></article>
         <article class="summary-card"><span class="summary-k">Con tarea</span><span class="summary-v">${totalConTarea}</span><span class="summary-note">Faena disponible</span></article>
-        <article class="summary-card"><span class="summary-k">DÃƒÂ­as activos</span><span class="summary-v">${diasConIncidencia}</span><span class="summary-note">Con incidencias registradas</span></article>
+        <article class="summary-card"><span class="summary-k">Días activos</span><span class="summary-v">${diasConIncidencia}</span><span class="summary-note">Con incidencias registradas</span></article>
       </section>
       ${daySections}
     </main>
@@ -3765,7 +3765,7 @@ async function importAnnualXmlFile(file){
   if(!file||!isAdmin||!storage.hasBackend()) return;
   const confirmed=await askConfirm(
     'Importar XML anual',
-    'Se actualizarÃƒÂ¡ la plantilla anual de profesorado, horario y guardias del curso. La vista actual necesitarÃƒÂ¡ recargarse para usar la nueva fuente.',
+    'Se actualizará la plantilla anual de profesorado, horario y guardias del curso. La vista actual necesitará recargarse para usar la nueva fuente.',
     'Importar XML'
   );
   if(!confirmed) return;
@@ -3775,12 +3775,12 @@ async function importAnnualXmlFile(file){
     if(saveTs) saveTs.textContent=`Importando ${file.name}...`;
     const xmlText=await file.text();
     const result=await storage.importAnnualXml(file.name,xmlText);
-    const summary=`XML anual importado Â· ${result?.teachers ?? 0} profesores Â· dataset ${result?.datasetId || '-'}`;
+    const summary=`XML anual importado · ${result?.teachers ?? 0} profesores · dataset ${result?.datasetId || '-'}`;
     if(saveTs) saveTs.textContent=summary;
-    showToast('Plantilla anual actualizada. Recarga la aplicaciÃƒÂ³n para usarla.','success');
+    showToast('Plantilla anual actualizada. Recarga la aplicación para usarla.','success');
     const shouldReload=await askConfirm(
-      'ImportaciÃƒÂ³n completada',
-      `${summary}. La aplicaciÃƒÂ³n debe recargarse para reconstruir horarios y guardias con la nueva fuente.`,
+      'Importación completada',
+      `${summary}. La aplicación debe recargarse para reconstruir horarios y guardias con la nueva fuente.`,
       'Recargar ahora'
     );
     if(shouldReload) window.location.reload();
@@ -3811,7 +3811,7 @@ async function restoreSnapshotFromFile(file){
     showToast(`Copia restaurada. Guardias: ${result?.counts?.guardias ?? 0}.`,'success');
   }catch(error){
     console.warn('Snapshot restore failed',error);
-    setSuperAdminHint(`Error al restaurar ${file?.name||'el backup JSON'}. Revisa el formato o la sesiÃƒÂ³n.`,'error');
+    setSuperAdminHint(`Error al restaurar ${file?.name||'el backup JSON'}. Revisa el formato o la sesión.`,'error');
     showToast('No se pudo restaurar la copia.','error');
   }
 }
@@ -3829,7 +3829,7 @@ function renderHistoryList(){
   });
   if(!visibles.length){
     const texto=historyFilter==='all'
-      ? 'TodavÃƒÂ­a no hay cambios registrados.'
+      ? 'Todavía no hay cambios registrados.'
       : 'No hay cambios de este tipo en el historial.';
     historyList.innerHTML=`<div class="history-empty">${texto}</div>`;
     renderAdminWorkspace();
@@ -3980,7 +3980,7 @@ function renderPracticasGuardiasList(){
     summary.innerHTML=`<span class="future-absence-chip"><strong>${enabledSet.size}</strong> habilitados</span><span class="future-absence-chip"><strong>${candidates}</strong> candidatos</span>`;
   }
   if(!teachers.length){
-    list.innerHTML='<div class="history-empty">No hay profesorado de ciclos que coincida con la bÃƒÂºsqueda.</div>';
+    list.innerHTML='<div class="history-empty">No hay profesorado de ciclos que coincida con la búsqueda.</div>';
     return;
   }
   list.innerHTML=teachers.map(nombre=>{
@@ -3990,7 +3990,7 @@ function renderPracticasGuardiasList(){
     return `<article class="substitution-item">
       <div>
         <div class="substitution-item-title">${escapeHtml(getVisibleTeacherName(nombre))}</div>
-        <div class="substitution-item-meta">${escapeHtml(`${enabled?'Disponible para entrar en la rotacion':'Fuera de la rotacion'} Â· ${slots} horas potenciales por practicas Â· ${manualSlots} tramos manuales`)}</div>
+        <div class="substitution-item-meta">${escapeHtml(`${enabled?'Disponible para entrar en la rotacion':'Fuera de la rotacion'} · ${slots} horas potenciales por practicas · ${manualSlots} tramos manuales`)}</div>
       </div>
       <div class="substitution-item-actions">
         <button class="btn-substitution${enabled?' btn-substitution-danger':''}" type="button" data-practicas-guardias-toggle="${escapeHtml(nombre)}">${enabled?'Quitar de guardias':'Habilitar guardias'}</button>
@@ -4053,13 +4053,13 @@ function renderPracticasGuardiasConfig(){
       const manual=manualSet.has(makePracticasGuardiasSlotKey(nombre,dia,hora));
       const classes=['practicas-slot-chip',manual?'is-manual':'',eligible?'is-eligible':''].filter(Boolean).join(' ');
       const stateLabel=manual?'Manual':(eligible?'Practicas':'No activo');
-      chips.push(`<button class="${classes}" type="button" data-practicas-slot-toggle="${escapeHtml(nombre)}|${dia}|${hora}" title="${escapeHtml(`${DIAS[dia]} Â· ${formatHoraLabel(hora)} Â· ${stateLabel}`)}">${escapeHtml(HORA_MAP[hora].label)}<span>${escapeHtml(stateLabel)}</span></button>`);
+      chips.push(`<button class="${classes}" type="button" data-practicas-slot-toggle="${escapeHtml(nombre)}|${dia}|${hora}" title="${escapeHtml(`${DIAS[dia]} · ${formatHoraLabel(hora)} · ${stateLabel}`)}">${escapeHtml(HORA_MAP[hora].label)}<span>${escapeHtml(stateLabel)}</span></button>`);
     }
     rows.push(`<div class="practicas-config-row"><div class="practicas-config-day">${escapeHtml(DIAS[dia])}</div><div class="practicas-config-slots">${chips.join('')}</div></div>`);
   }
   const manualSlots=getPracticasGuardiasTeacherManualSlots(nombre);
   const manualList=manualSlots.length
-    ?manualSlots.map(row=>`${DIAS[row.dia]} ${formatHoraLabel(row.hora)}`).join(' Â· ')
+    ?manualSlots.map(row=>`${DIAS[row.dia]} ${formatHoraLabel(row.hora)}`).join(' · ')
     :'Sin tramos manuales.';
   panel.innerHTML=`<article class="practicas-config-card">
     <div class="practicas-config-head">
@@ -4110,7 +4110,7 @@ function getFutureAbsenceTemporalMeta(item){
   const targetDate=new Date(`${dateValue}T00:00:00`);
   if(Number.isNaN(todayDate.getTime())||Number.isNaN(targetDate.getTime())) return '';
   const diffDays=Math.round((targetDate.getTime()-todayDate.getTime())/86400000);
-  if(diffDays===1) return 'MaÃƒÂ±ana';
+  if(diffDays===1) return 'Mañana';
   if(diffDays>1&&diffDays<=7) return 'Esta semana';
   if(diffDays<0) return 'Pasada';
   return '';
@@ -4206,7 +4206,7 @@ function renderTeacherFutureAbsenceOwnList(){
   if(!list) return;
   const rows=sortFutureAbsenceRowsForDisplay(teacherFutureAbsences.filter(item=>sameNormalizedText(item.profesor,teacherName)));
   if(!rows.length){
-    list.innerHTML='<div class="future-absence-empty">TodavÃƒÂ­a no has enviado avisos de falta futura.</div>';
+    list.innerHTML='<div class="future-absence-empty">Todavía no has enviado avisos de falta futura.</div>';
     return;
   }
   const groups=groupFutureAbsenceRowsByStatus(rows);
@@ -4236,14 +4236,14 @@ function handleTeacherFutureAbsenceDateChange(){
   }
   const hours=getHorasLectivasProfesorDia(teacherName,selection.dayIndex);
   if(!hours.length){
-    meta.textContent=`${DIAS[selection.dayIndex]} Â· Sin clases lectivas registradas.`;
-    hoursWrap.innerHTML='<div class="teacher-future-hours-empty">Ese dÃƒÂ­a no tienes clases lectivas en el horario cargado.</div>';
+    meta.textContent=`${DIAS[selection.dayIndex]} · Sin clases lectivas registradas.`;
+    hoursWrap.innerHTML='<div class="teacher-future-hours-empty">Ese día no tienes clases lectivas en el horario cargado.</div>';
     return;
   }
-  meta.textContent=`${DIAS[selection.dayIndex]} Â· Selecciona las horas que quieres comunicar.`;
+  meta.textContent=`${DIAS[selection.dayIndex]} · Selecciona las horas que quieres comunicar.`;
   hoursWrap.innerHTML=hours.map(hora=>{
     const sesion=resolveTeacherSession(teacherName,selection.dayIndex,hora);
-    const detalle=[sesion?.materia||'Clase',sesion?.grupo||'',sesion?.aula||'Sin aula'].filter(Boolean).join(' Â· ');
+    const detalle=[sesion?.materia||'Clase',sesion?.grupo||'',sesion?.aula||'Sin aula'].filter(Boolean).join(' · ');
     return `<label class="teacher-future-hour-option"><input type="checkbox" data-future-hour value="${hora}" checked><span class="teacher-future-hour-copy"><span class="teacher-future-hour-title">${escapeHtml(formatHoraLabel(hora))}</span><span class="teacher-future-hour-meta">${escapeHtml(detalle)}</span></span></label>`;
   }).join('');
 }
@@ -4277,7 +4277,7 @@ async function submitTeacherFutureAbsence(){
     return;
   }
   if(!selectedHours.length){
-    showToast('Selecciona al menos una hora lectiva para ese dÃƒÂ­a.','error');
+    showToast('Selecciona al menos una hora lectiva para ese día.','error');
     return;
   }
   const entry={
@@ -4458,7 +4458,7 @@ function renderTable(){
   if(!filteredRows.length){
     const emptyMessage=rows.length
       ? 'No hay ausencias que coincidan con el filtro actual.'
-      : `No hay ausencias registradas para ${editableWeek?'este dÃƒÂ­a':'esta vista futura'}.`;
+      : `No hay ausencias registradas para ${editableWeek?'este día':'esta vista futura'}.`;
     tb.innerHTML=`<tr class="empty-row"><td colspan="7">${emptyMessage}</td></tr>`;
   }
   else{
@@ -4602,7 +4602,7 @@ function renderTeacherAccessPreview(){
   const visibleName=getVisibleTeacherName(nombre);
   const summary=getTeacherSummaryForDay(nombre,day);
   const nextSession=summary.nextHour?resolveTeacherSession(nombre,day,summary.nextHour):null;
-  const nextLabel=summary.nextHour&&nextSession?`${formatHoraLabel(summary.nextHour)} - ${nextSession.materia||nextSession.detalle||'SesiÃƒÂ³n'}`:'Sin sesiones lectivas hoy';
+  const nextLabel=summary.nextHour&&nextSession?`${formatHoraLabel(summary.nextHour)} - ${nextSession.materia||nextSession.detalle||'Sesión'}`:'Sin sesiones lectivas hoy';
   preview.innerHTML=`
     <div class="teacher-access-preview-title">${escapeHtml(visibleName)}</div>
     <div class="teacher-access-preview-meta">Usuario: ${escapeHtml(makeTeacherUsername(visibleName))}${profesor?.departamento?` \u00b7 ${escapeHtml(profesor.departamento)}`:''}${getTeacherDisplayMeta(nombre)?` \u00b7 ${escapeHtml(getTeacherDisplayMeta(nombre))}`:''}</div>
@@ -5207,12 +5207,12 @@ function renderAbsenceDecisionBar(){
   if(!panel) return;
   const input=document.getElementById('fAusente');
   if(!input){
-    panel.textContent='Selecciona profesor y hora para ver la ubicaciÃƒÂ³n, la cobertura prevista y la tarea disponible.';
+    panel.textContent='Selecciona profesor y hora para ver la ubicación, la cobertura prevista y la tarea disponible.';
     return;
   }
   const nombre=getProfesorNombreSeleccionado(input.value);
   if(!nombre){
-    panel.textContent='Selecciona profesor y hora para ver la ubicaciÃƒÂ³n, la cobertura prevista y la tarea disponible.';
+    panel.textContent='Selecciona profesor y hora para ver la ubicación, la cobertura prevista y la tarea disponible.';
     return;
   }
   const dia=+document.getElementById('fDia').value;
@@ -5229,7 +5229,7 @@ function renderAbsenceDecisionBar(){
   if(todoDia) extras.push(`Se aplicar\u00e1 a ${horasLectivas.length} ${horasLectivas.length===1?'sesi\u00f3n programada':'sesiones programadas'}`);
   else if(selectedHours.length>1) extras.push(`Se aplicar\u00e1 a ${selectedHours.length} horas: ${selectedHours.map(formatHoraLabel).join(', ')}`);
   if(tarea.faena&&tarea.obs) extras.push(`Tarea: ${escapeHtml((tarea.obs||'').slice(0,90)+((tarea.obs||'').length>90?'...':''))}`);
-  panel.innerHTML=`<strong>UbicaciÃƒÂ³n:</strong> ${escapeHtml(aula)} | <strong>Guardia prevista:</strong> ${escapeHtml(guardia?getVisibleTeacherName(guardia):'Sin cobertura')} | <strong>Tarea:</strong> ${tarea.faena?'Disponible':'No registrada'}${extras.length?` | ${extras.join(' Â· ')}`:''}`;
+  panel.innerHTML=`<strong>Ubicación:</strong> ${escapeHtml(aula)} | <strong>Guardia prevista:</strong> ${escapeHtml(guardia?getVisibleTeacherName(guardia):'Sin cobertura')} | <strong>Tarea:</strong> ${tarea.faena?'Disponible':'No registrada'}${extras.length?` | ${extras.join(' · ')}`:''}`;
 }function closeModal(){document.getElementById('overlay').classList.remove('open');}
 function bgClose(e){if(e.target.id==='overlay')closeModal();}
 function populateProfesoresAusencias(){
@@ -5344,13 +5344,13 @@ function validateAbsenceForm(){
   if(ausente) setAusenteSelection(ausente,ausenteInput);
   clearAbsenceFormErrors();
   if(!ausente){
-    setFieldError('fAusente','Selecciona un profesor ausente del listado o escribe un nombre que deje una coincidencia ÃƒÂºnica.');
+    setFieldError('fAusente','Selecciona un profesor ausente del listado o escribe un nombre que deje una coincidencia única.');
     return {valid:false,focus:ausenteInput};
   }
   if(todoDia){
     const horasLectivas=getHorasProgramadasProfesorDia(ausente,dia);
     if(!horasLectivas.length){
-      setFieldError('fAusente','Ese profesor no tiene horas programadas registradas ese dÃƒÂ­a.');
+      setFieldError('fAusente','Ese profesor no tiene horas programadas registradas ese día.');
       return {valid:false,focus:ausenteInput};
     }
     return {valid:true,ausente,guardia:'',todoDia:true,horasLectivas};
@@ -5486,7 +5486,7 @@ function saveAbsence(){
       syncAdminState();
     }catch(syncError){
       console.error('Absence saved but sync trigger failed',syncError);
-      showToast('La ausencia se ha guardado en local, pero no se ha podido lanzar la sincronizaciÃƒÂ³n.','error');
+      showToast('La ausencia se ha guardado en local, pero no se ha podido lanzar la sincronización.','error');
     }
   }catch(error){
     console.error('saveAbsence failed',error);
