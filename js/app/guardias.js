@@ -19,6 +19,31 @@ const KEY_ANNUAL_DATASET='IES_Alcalans_Annual_Dataset_Id';
 const KEY_TV_ANNOUNCEMENT='IES_Alcalans_TV_Announcement';
 const KEY_GUARDIA_MONTHLY_LOAD='IES_Alcalans_Guardias_Monthly_Load';
 const MAX_ALUMNOS_FUERA_AULA=10;
+const {
+  cleanText,
+  formatDateKey,
+  formatNowParts,
+  formatWeekRangeLabel,
+  getCurrentMonthKey,
+  getCurrentSchoolWeekKey,
+  getMonthKeyFromDateKey,
+  getSchoolWeekDateFromKey,
+  getSchoolWeekKeyFromOffset,
+  normalizeText,
+  repairMojibakeDeep,
+  repairMojibakeText,
+  sameNormalizedText,
+  stripDiacritics
+}=window.GuardiasCore;
+const {
+  askConfirm,
+  askPassword,
+  askText,
+  bgDialogClose,
+  closeDialog,
+  openDialog,
+  showToast
+}=window.GuardiasUi;
 const RAW_PROFESORADO=(window.PROFESORADO_SOURCE&&Array.isArray(window.PROFESORADO_SOURCE.teachers))?window.PROFESORADO_SOURCE.teachers:[];
 const ANNUAL_DATASET_ID=cleanText(window.PROFESORADO_SOURCE?.datasetId||'legacy');
 const GRUPOS_PROFESORADO={};
@@ -30,22 +55,6 @@ function escapeHtml(value){
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;')
     .replace(/'/g,'&#39;');
-}
-function cleanText(value){return String(value ?? '').replace(/\s+/g,' ').trim();}
-function normalizeText(text){
-  if(!text) return '';
-  return text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g,'')
-    .replace(/\s+/g,' ');
-}
-function sameNormalizedText(a,b){return normalizeText(a)===normalizeText(b);}
-function formatNowParts(){
-  const now=new Date();
-  return {hours:now.getHours(),minutes:now.getMinutes(),date:now};
 }
 function getCurrentSchoolSlot(){
   const {hours,minutes,date}=formatNowParts();
@@ -63,64 +72,6 @@ function getCurrentSchoolSlot(){
   const hora=Number(found[0]);
   if(HORAS_PATIO.has(hora)) return null;
   return {dia:weekday-1,hora};
-}
-function formatDateKey(date){
-  const year=date.getFullYear();
-  const month=String(date.getMonth()+1).padStart(2,'0');
-  const day=String(date.getDate()).padStart(2,'0');
-  return `${year}-${month}-${day}`;
-}
-function getMonthKeyFromDateKey(dateKey){
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(dateKey||''))?String(dateKey).slice(0,7):'';
-}
-function getCurrentMonthKey(){
-  return formatDateKey(formatNowParts().date).slice(0,7);
-}
-function getCurrentSchoolWeekKey(){
-  const now=formatNowParts().date;
-  const day=now.getDay();
-  const mondayOffset=day===0?-6:1-day;
-  const monday=new Date(now);
-  monday.setHours(0,0,0,0);
-  monday.setDate(monday.getDate()+mondayOffset);
-  return formatDateKey(monday);
-}
-function getSchoolWeekDateFromKey(weekKey){
-  const date=new Date(`${weekKey}T00:00:00`);
-  return Number.isNaN(date.getTime())?null:date;
-}
-function getSchoolWeekKeyFromOffset(offset){
-  const monday=getSchoolWeekDateFromKey(getCurrentSchoolWeekKey());
-  if(!monday) return getCurrentSchoolWeekKey();
-  monday.setDate(monday.getDate()+(offset*7));
-  return formatDateKey(monday);
-}
-function formatWeekRangeLabel(weekKey,offset){
-  const monday=getSchoolWeekDateFromKey(weekKey);
-  if(!monday) return 'Semana lectiva';
-  const friday=new Date(monday);
-  friday.setDate(monday.getDate()+4);
-  const range=`${monday.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})} - ${friday.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})}`;
-  if(offset===0) return `Semana actual · ${range}`;
-  if(offset===1) return `Semana siguiente · ${range}`;
-  if(offset===-1) return `Semana anterior · ${range}`;
-  return `${offset>0?`+${offset}`:offset} semanas · ${range}`;
-}
-function stripDiacritics(value){return cleanText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
-function repairMojibakeText(value){
-  if(typeof value!=='string'||!/ÃƒÆ’|Ãƒâ€š|ÃƒÂ¢|ÃƒÂ°Ã…Â¸|ÃƒÂ¯Ã‚Â¸/.test(value)) return value;
-  try{
-    return decodeURIComponent(escape(value));
-  }catch(error){
-    return value;
-  }
-}
-function repairMojibakeDeep(value){
-  if(Array.isArray(value)) return value.map(repairMojibakeDeep);
-  if(value&&typeof value==='object'){
-    return Object.fromEntries(Object.entries(value).map(([key,entry])=>[key,repairMojibakeDeep(entry)]));
-  }
-  return repairMojibakeText(value);
 }
 const DIA_INDEX={'lunes':0,'martes':1,'miercoles':2,'mi\u00e9rcoles':2,'jueves':3,'viernes':4};
 const HORA_INDEX=Object.fromEntries(Object.entries(HORA_MAP).map(([hora,info])=>[info.rango,+hora]));
@@ -396,6 +347,79 @@ const SUPERADMIN_ENABLED=APP_URL_PARAMS.get('panel')==='superadmin';
 const requestedDay=Number(APP_URL_PARAMS.get('day'));
 const requestedWeekOffset=Number(APP_URL_PARAMS.get('weekOffset'));
 let superAdminRoutePrompted=false;
+const teacherState={
+  get teacherName(){return teacherName;},
+  set teacherName(value){teacherName=value||'';},
+  get teacherDay(){return teacherDay;},
+  set teacherDay(value){teacherDay=Number.isInteger(Number(value))?Number(value):0;},
+  get teacherAccessMatches(){return teacherAccessMatches;},
+  set teacherAccessMatches(value){teacherAccessMatches=Array.isArray(value)?value:[];},
+  get teacherAccessActiveIndex(){return teacherAccessActiveIndex;},
+  set teacherAccessActiveIndex(value){teacherAccessActiveIndex=Number.isInteger(Number(value))?Number(value):-1;},
+  get teacherRecents(){return teacherRecents;},
+  set teacherRecents(value){teacherRecents=Array.isArray(value)?value:[];},
+  get teacherIdentityConfirmedFor(){return teacherIdentityConfirmedFor;},
+  set teacherIdentityConfirmedFor(value){teacherIdentityConfirmedFor=String(value||'');},
+  get teacherMoodEntries(){return teacherMoodEntries;},
+  set teacherMoodEntries(value){teacherMoodEntries=value&&typeof value==='object'&&!Array.isArray(value)?value:{};},
+  get teacherSubstitutions(){return teacherSubstitutions;},
+  set teacherSubstitutions(value){teacherSubstitutions=value&&typeof value==='object'&&!Array.isArray(value)?value:{};},
+  get teacherPracticasGuardias(){return teacherPracticasGuardias;},
+  set teacherPracticasGuardias(value){teacherPracticasGuardias=Array.isArray(value)?value:[];},
+  get teacherPracticasGuardiasTramos(){return teacherPracticasGuardiasTramos;},
+  set teacherPracticasGuardiasTramos(value){teacherPracticasGuardiasTramos=Array.isArray(value)?value:[];},
+  get teacherDutyFocusTimer(){return teacherDutyFocusTimer;},
+  set teacherDutyFocusTimer(value){teacherDutyFocusTimer=value??null;},
+  get teacherFutureAbsences(){return teacherFutureAbsences;},
+  set teacherFutureAbsences(value){teacherFutureAbsences=Array.isArray(value)?value:[];},
+  get futureAbsenceAdminStatusFilter(){return futureAbsenceAdminStatusFilter;},
+  set futureAbsenceAdminStatusFilter(value){futureAbsenceAdminStatusFilter=String(value||'all')||'all';},
+  get futureAbsenceAdminTeacherFilter(){return futureAbsenceAdminTeacherFilter;},
+  set futureAbsenceAdminTeacherFilter(value){futureAbsenceAdminTeacherFilter=String(value||'');},
+  get teacherWeekOffset(){return teacherWeekOffset;},
+  set teacherWeekOffset(value){teacherWeekOffset=Number.isInteger(Number(value))?Number(value):0;}
+};
+function getTeacherStateSnapshot(){
+  return {
+    teacherName:teacherState.teacherName,
+    teacherDay:teacherState.teacherDay,
+    teacherAccessMatches:[...teacherState.teacherAccessMatches],
+    teacherAccessActiveIndex:teacherState.teacherAccessActiveIndex,
+    teacherRecents:[...teacherState.teacherRecents],
+    teacherIdentityConfirmedFor:teacherState.teacherIdentityConfirmedFor,
+    teacherMoodEntries:cloneJson(teacherState.teacherMoodEntries),
+    teacherSubstitutions:{...teacherState.teacherSubstitutions},
+    teacherPracticasGuardias:[...teacherState.teacherPracticasGuardias],
+    teacherPracticasGuardiasTramos:cloneJson(teacherState.teacherPracticasGuardiasTramos),
+    teacherFutureAbsences:cloneJson(teacherState.teacherFutureAbsences),
+    futureAbsenceAdminStatusFilter:teacherState.futureAbsenceAdminStatusFilter,
+    futureAbsenceAdminTeacherFilter:teacherState.futureAbsenceAdminTeacherFilter,
+    teacherWeekOffset:teacherState.teacherWeekOffset
+  };
+}
+function applyTeacherStatePatch(patch={}){
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherName')) teacherState.teacherName=patch.teacherName;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherDay')) teacherState.teacherDay=patch.teacherDay;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherAccessMatches')) teacherState.teacherAccessMatches=patch.teacherAccessMatches;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherAccessActiveIndex')) teacherState.teacherAccessActiveIndex=patch.teacherAccessActiveIndex;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherRecents')) teacherState.teacherRecents=patch.teacherRecents;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherIdentityConfirmedFor')) teacherState.teacherIdentityConfirmedFor=patch.teacherIdentityConfirmedFor;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherMoodEntries')) teacherState.teacherMoodEntries=patch.teacherMoodEntries;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherSubstitutions')) teacherState.teacherSubstitutions=patch.teacherSubstitutions;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherPracticasGuardias')) teacherState.teacherPracticasGuardias=patch.teacherPracticasGuardias;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherPracticasGuardiasTramos')) teacherState.teacherPracticasGuardiasTramos=patch.teacherPracticasGuardiasTramos;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherDutyFocusTimer')) teacherState.teacherDutyFocusTimer=patch.teacherDutyFocusTimer;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherFutureAbsences')) teacherState.teacherFutureAbsences=patch.teacherFutureAbsences;
+  if(Object.prototype.hasOwnProperty.call(patch,'futureAbsenceAdminStatusFilter')) teacherState.futureAbsenceAdminStatusFilter=patch.futureAbsenceAdminStatusFilter;
+  if(Object.prototype.hasOwnProperty.call(patch,'futureAbsenceAdminTeacherFilter')) teacherState.futureAbsenceAdminTeacherFilter=patch.futureAbsenceAdminTeacherFilter;
+  if(Object.prototype.hasOwnProperty.call(patch,'teacherWeekOffset')) teacherState.teacherWeekOffset=patch.teacherWeekOffset;
+  return getTeacherStateSnapshot();
+}
+window.GuardiasTeacherState={
+  getSnapshot:getTeacherStateSnapshot,
+  patch:applyTeacherStatePatch,
+  state:teacherState
+};
 document.body.classList.toggle('tv-mode',TV_MODE);
 document.body.classList.toggle('print-mode',PRINT_MODE);
 document.body.classList.toggle('superadmin-route',SUPERADMIN_ENABLED);
@@ -806,8 +830,8 @@ function renderTvAnnouncement(){
     return;
   }
   const tickerText=activeItems
-    .map(item=>`${item.priority==='urgent'?'URGENTE':item.priority==='important'?'IMPORTANTE':'AVISO'} \u00b7 ${item.text}`)
-    .join('  \u2022  ');
+    .map(item=>`${item.priority==='urgent'?'URGENTE':item.priority==='important'?'IMPORTANTE':'AVISO'} · ${item.text}`)
+    .join('  •  ');
   if(textNode.dataset.tickerText===tickerText&&textNode.querySelector('.tv-announcement-track')){
     return;
   }
@@ -1491,7 +1515,6 @@ let historialCambios=loadHistorial();
 let tvAnnouncement=loadTvAnnouncement();
 let guardiaMonthlyLoad=loadGuardiaMonthlyLoad();
 let historyFilter='all';
-let dialogResolver=null;
 let backendSyncInFlight=false;
 let backendSyncPendingAdmin=false;
 let backendSyncPendingTeacher=false;
@@ -1526,7 +1549,175 @@ teacherFutureAbsences=loadTeacherFutureAbsences();
 teacherMoodEntries=loadTeacherMoods();
 teacherName=getProfesorNombreSeleccionado(loadTeacherUser())||'';
 teacherDay=day;
+applyTeacherStatePatch({
+  teacherRecents,
+  teacherSubstitutions,
+  teacherPracticasGuardias,
+  teacherPracticasGuardiasTramos,
+  teacherFutureAbsences,
+  teacherMoodEntries,
+  teacherName,
+  teacherDay
+});
 initRealtimeSync();
+const futureAbsencesDomain=window.GuardiasFutureAbsences?.init({
+  storage,
+  DIAS,
+  HORAS_PATIO,
+  getTeacherName:()=>teacherState.teacherName,
+  getVisibleTeacherName,
+  ensureTeacherIdentityConfirmed,
+  showToast,
+  resolveTeacherSession,
+  askConfirm,
+  askText,
+  isAdmin:()=>isAdmin,
+  normalizeTeacherSearch,
+  sameNormalizedText,
+  makeTeacherUsername,
+  escapeHtml,
+  getHorasLectivasProfesorDia,
+  getCurrentSchoolWeekKey,
+  getAbsenceRows:()=>data,
+  setAbsenceRows:rows=>{data=rows;},
+  claimNextAbsenceRowId:()=>nid++,
+  getCurrentDay:()=>day,
+  buildUndoState,
+  normalizeStoredRows,
+  reassignAllGuardias,
+  persistGuardias:rows=>persist(rows),
+  renderGuardiaBoard:()=>renderGuardiaBoard(),
+  renderTable:()=>renderTable(),
+  getHistoryRows:()=>historialCambios,
+  setHistoryRows:rows=>{historialCambios=rows;},
+  persistHistorial:rows=>persistHistorial(rows),
+  renderHistoryList:()=>renderHistoryList(),
+  syncAdminState:()=>syncAdminState(),
+  getAulaProfesor,
+  assignGuardiasForRows,
+  clearSuperAdminError,
+  setSuperAdminError,
+  pushSuperAdminEvent,
+  renderSuperAdminMonitor,
+  onFutureAbsenceStateChange:snapshot=>{
+    applyTeacherStatePatch({
+      teacherFutureAbsences:snapshot.rows.slice(),
+      futureAbsenceAdminStatusFilter:snapshot.adminStatusFilter,
+      futureAbsenceAdminTeacherFilter:snapshot.adminTeacherFilter
+    });
+    futureAbsenceSyncFlags=new Set(snapshot.syncFlags);
+  }
+},{
+  loadFromLocalCache:false,
+  renderOnInit:false,
+  bindDom:false
+})||null;
+if(futureAbsencesDomain){
+  futureAbsencesDomain.setRows(teacherFutureAbsences,{render:false});
+  futureAbsencesDomain.setAdminFilters({
+    status:futureAbsenceAdminStatusFilter,
+    teacher:futureAbsenceAdminTeacherFilter
+  });
+}
+const auxPanelsSuite=window.GuardiasAuxPanels?.createSuite({
+  core:window.GuardiasCore,
+  ui:window.GuardiasUi,
+  storage,
+  horaMap:HORA_MAP,
+  horasPatio:HORAS_PATIO,
+  dias:DIAS,
+  cleanText,
+  normalizeText,
+  sameNormalizedText,
+  formatNowParts,
+  formatWeekRangeLabel,
+  getCurrentMonthKey,
+  getMonthKeyFromDateKey,
+  getSchoolWeekDateFromKey
+})||null;
+const tvAnnouncementsDomain=auxPanelsSuite?.createTvAnnouncementsDomain({
+  getState:()=>tvAnnouncement,
+  setState:nextState=>{tvAnnouncement=nextState;},
+  saveRemote:payload=>storage.hasBackend()?storage.saveTvAnnouncement(payload):payload,
+  renderTvPanel:()=>renderTvPanel(),
+  notifyRealtimeSync,
+  updatedBy:'Jefatura'
+})||null;
+const tvPanelDomain=auxPanelsSuite?.createTvPanelDomain({
+  getDay:()=>day,
+  getWeekOffset:()=>weekOffset,
+  getRowsForWeekOffset,
+  getVisibleTeacherName,
+  resolveAulaRegistro,
+  assignGuardiasForRows,
+  getBibliotecaAsignada,
+  getBanosAsignado,
+  getTvRouteUrl,
+  getPrintRouteUrl,
+  getMainRouteUrl,
+  printMode:()=>PRINT_MODE
+})||null;
+const historyDomain=auxPanelsSuite?.createHistoryDomain({
+  getEntries:()=>historialCambios,
+  setEntries:rows=>{historialCambios=rows;},
+  isAdmin:()=>isAdmin,
+  getData:()=>data,
+  getDay:()=>day,
+  getOrden:()=>ordenGuardias,
+  buildUndoState,
+  restoreUndoState,
+  renderAdminWorkspace:()=>renderAdminWorkspace(),
+  syncAdminState:()=>syncAdminState(),
+  onUndoApplied:()=>renderTable()
+})||null;
+const substitutionsDomain=auxPanelsSuite?.createSubstitutionsDomain({
+  getSubstitutions:()=>teacherState.teacherSubstitutions,
+  setSubstitutions:nextMap=>{applyTeacherStatePatch({teacherSubstitutions:{...nextMap}});},
+  isAdmin:()=>isAdmin,
+  allTeachers:ALL_PROFESORES,
+  getTeacher:getProfesor,
+  getVisibleTeacherName,
+  resolveTeacherCanonicalName,
+  normalizeTeacherSearch,
+  teacherMatchesQuery,
+  validateSubstitutionName:validateTeacherSubstitutionName,
+  onSubstitutionsChanged:(nombre,nextMap)=>{
+    applyTeacherStatePatch({teacherSubstitutions:{...nextMap}});
+    if(sameNormalizedText(teacherState.teacherName,nombre)){
+      persistTeacherUser(nextMap[nombre]?getVisibleTeacherName(nombre):nombre);
+    }
+    syncTeacherIdentity();
+    renderGuardiaBoard();
+    renderTable();
+    if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
+  },
+  syncAdminState:()=>syncAdminState()
+})||null;
+const practicasGuardiasDomain=auxPanelsSuite?.createPracticasGuardiasDomain({
+  getEnabledTeachers:()=>teacherState.teacherPracticasGuardias,
+  setEnabledTeachers:nextList=>{applyTeacherStatePatch({teacherPracticasGuardias:[...nextList]});},
+  getManualSlots:()=>teacherState.teacherPracticasGuardiasTramos,
+  setManualSlots:nextRows=>{applyTeacherStatePatch({teacherPracticasGuardiasTramos:[...nextRows]});},
+  isAdmin:()=>isAdmin,
+  allTeachers:ALL_PROFESORES,
+  getTeacher:getProfesor,
+  getVisibleTeacherName,
+  resolveTeacherCanonicalName,
+  normalizeTeacherSearch,
+  teacherMatchesQuery,
+  makePracticasGuardiasSlotKey,
+  getHorarioProfesorDia,
+  resolveTeacherSession,
+  isPracticasSessionEligible,
+  onPracticasChanged:()=>{
+    refreshOrdenGuardias();
+    reassignAllGuardias();
+    persist(data);
+    renderGuardiaBoard();
+    renderTable();
+    syncAdminState();
+  }
+})||null;
 function serializeBibliotecaAssignments(){
   const rows=[];
   for(let dia=0;dia<5;dia++){
@@ -2516,9 +2707,20 @@ function getUpcomingSchoolSlotsForToday(limit=2){
 }
 function getTvSlotAssignments(slot,rowsSource){
   if(!slot) return [];
-  const assignedRows=assignGuardiasForRows(rowsSource||[]);
-  const rows=assignedRows
+  const slotRows=(rowsSource||[])
     .filter(row=>row.dia===slot.dia&&row.hora===slot.hora)
+    .sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
+  const fallbackAssignmentsById=new Map(
+    assignGuardiasForRows(rowsSource||[])
+      .filter(row=>row.dia===slot.dia&&row.hora===slot.hora)
+      .map(row=>[String(row.id||''),row])
+  );
+  const rows=slotRows
+    .map(row=>{
+      if(cleanText(row.guardia)) return row;
+      const fallback=fallbackAssignmentsById.get(String(row.id||''));
+      return fallback&&cleanText(fallback.guardia)?{...row,guardia:fallback.guardia}:row;
+    })
     .sort((a,b)=>String(getVisibleTeacherName(a.guardia||'')).localeCompare(getVisibleTeacherName(b.guardia||''),'es'));
   const assignments=rows.map(row=>({
     teacher:getVisibleTeacherName(row.guardia||'')||'Sin cubrir',
@@ -3152,82 +3354,12 @@ function refreshAccessUi(){
     refreshSuperAdminOps(false);
   }
 }
-function showToast(message,type){
-  const toastStack=document.getElementById('toastStack');
-  if(!toastStack||!message) return;
-  const toast=document.createElement('div');
-  toast.className=`toast is-${type||'info'}`;
-  toast.textContent=message;
-  toastStack.appendChild(toast);
-  window.setTimeout(()=>{
-    toast.remove();
-  },3200);
-}
 function setSuperAdminHint(message,type){
   const hint=document.getElementById('superAdminHint');
   if(!hint) return;
   hint.textContent=message||'';
   hint.classList.remove('is-success','is-error','is-info');
   if(type) hint.classList.add(`is-${type}`);
-}
-function openDialog(config){
-  const dialogOverlay=document.getElementById('dialogOverlay');
-  const dialogTitle=document.getElementById('dialogTitle');
-  const dialogText=document.getElementById('dialogText');
-  const dialogInput=document.getElementById('dialogInput');
-  const dialogCancel=document.getElementById('dialogCancel');
-  const dialogConfirm=document.getElementById('dialogConfirm');
-  if(!dialogOverlay||!dialogTitle||!dialogText||!dialogInput||!dialogCancel||!dialogConfirm){
-    return Promise.resolve({confirmed:false,value:''});
-  }
-  dialogTitle.textContent=config?.title||'Aviso';
-  dialogText.textContent=config?.message||'';
-  dialogConfirm.textContent=config?.confirmText||'Aceptar';
-  dialogCancel.textContent=config?.cancelText||'Cancelar';
-  dialogCancel.style.display=config?.showCancel?'':'none';
-  dialogInput.style.display=config?.input?'block':'none';
-  dialogInput.type=config?.inputType||'text';
-  dialogInput.value=config?.defaultValue||'';
-  dialogInput.placeholder=config?.placeholder||'';
-  dialogInput.onkeydown=config?.input?event=>{
-    if(event.key==='Enter'){
-      event.preventDefault();
-      closeDialog(true);
-    }
-  }:null;
-  dialogOverlay.classList.add('open');
-  if(config?.input){
-    window.setTimeout(()=>{
-      dialogInput.focus();
-      dialogInput.select();
-    },0);
-  }else{
-    window.setTimeout(()=>dialogConfirm.focus(),0);
-  }
-  return new Promise(resolve=>{
-    dialogResolver=resolve;
-  });
-}
-function closeDialog(confirmed){
-  const dialogOverlay=document.getElementById('dialogOverlay');
-  const dialogInput=document.getElementById('dialogInput');
-  if(dialogOverlay) dialogOverlay.classList.remove('open');
-  const resolver=dialogResolver;
-  dialogResolver=null;
-  if(resolver) resolver({confirmed:!!confirmed,value:dialogInput?dialogInput.value:''});
-}
-function bgDialogClose(e){if(e.target.id==='dialogOverlay') closeDialog(false);}
-async function askConfirm(title,message,confirmText){
-  const result=await openDialog({title,message,confirmText:confirmText||'Aceptar',showCancel:true});
-  return result.confirmed;
-}
-async function askPassword(title,message){
-  const result=await openDialog({title,message,confirmText:'Entrar',showCancel:true,input:true,inputType:'password',placeholder:'Introduce la contrase\u00f1a'});
-  return result.confirmed?result.value:'';
-}
-async function askText(title,message,defaultValue,placeholder,confirmText){
-  const result=await openDialog({title,message,confirmText:confirmText||'Guardar',showCancel:true,input:true,inputType:'text',defaultValue:defaultValue||'',placeholder:placeholder||''});
-  return result.confirmed?result.value:'';
 }
 async function loadAuthSession(){
   if(!storage.hasBackend()){
@@ -5506,6 +5638,85 @@ async function del(){
   renderTable();
   showToast('Registro eliminado.','success');
   syncAdminState();
+}
+if(tvAnnouncementsDomain){
+  renderTvAnnouncement=()=>tvAnnouncementsDomain.render();
+  addTvAnnouncement=()=>tvAnnouncementsDomain.add();
+  deactivateAllTvAnnouncements=()=>tvAnnouncementsDomain.deactivateAll();
+  toggleTvAnnouncementItem=id=>tvAnnouncementsDomain.toggleItem(id);
+  removeTvAnnouncementItem=id=>tvAnnouncementsDomain.removeItem(id);
+  moveTvAnnouncementItem=(id,direction)=>tvAnnouncementsDomain.moveItem(id,direction);
+}
+if(tvPanelDomain){
+  openTvPanel=()=>tvPanelDomain.openTvPanel();
+  closeTvPanel=()=>tvPanelDomain.closeTvPanel();
+  openPrintableSchedule=()=>tvPanelDomain.openPrintableSchedule();
+  renderTvPanel=()=>tvPanelDomain.renderTvPanel();
+  renderPrintSchedule=()=>tvPanelDomain.renderPrintSchedule();
+}
+if(historyDomain){
+  renderHistoryList=()=>{historyDomain.setFilter(historyFilter);return historyDomain.renderList();};
+  setHistoryFilter=filter=>{historyFilter=filter||'all';historyDomain.setFilter(historyFilter);};
+  openHistoryModal=()=>historyDomain.openModal();
+  closeHistoryModal=()=>historyDomain.closeModal();
+  bgHistoryClose=e=>historyDomain.bgClose(e);
+  clearHistory=()=>historyDomain.clear();
+  undoLastHistoryChange=()=>historyDomain.undoLastChange();
+}
+if(substitutionsDomain){
+  renderSubstitutionList=()=>{substitutionsDomain.setFilter(substitutionFilter);return substitutionsDomain.renderList();};
+  openSubstitutionModal=()=>substitutionsDomain.openModal();
+  closeSubstitutionModal=()=>substitutionsDomain.closeModal();
+  bgSubstitutionClose=e=>substitutionsDomain.bgClose(e);
+  assignTeacherSubstitution=nombre=>substitutionsDomain.assign(nombre);
+  clearTeacherSubstitution=nombre=>substitutionsDomain.clear(nombre);
+}
+if(practicasGuardiasDomain){
+  renderPracticasGuardiasList=()=>{practicasGuardiasDomain.setFilter(practicasGuardiasFilter);return practicasGuardiasDomain.renderList();};
+  openPracticasGuardiasModal=()=>practicasGuardiasDomain.openModal();
+  closePracticasGuardiasModal=()=>practicasGuardiasDomain.closeModal();
+  bgPracticasGuardiasClose=e=>practicasGuardiasDomain.bgClose(e);
+  openPracticasGuardiasTeacherConfig=nombre=>{practicasGuardiasConfigTeacher=nombre||'';return practicasGuardiasDomain.openTeacherConfig(practicasGuardiasConfigTeacher);};
+  closePracticasGuardiasTeacherConfig=()=>{practicasGuardiasConfigTeacher='';return practicasGuardiasDomain.closeTeacherConfig();};
+  renderPracticasGuardiasConfig=()=>{
+    if(practicasGuardiasConfigTeacher){
+      return practicasGuardiasDomain.openTeacherConfig(practicasGuardiasConfigTeacher);
+    }
+    return practicasGuardiasDomain.closeTeacherConfig();
+  };
+  toggleTeacherPracticasGuardias=nombre=>practicasGuardiasDomain.toggleTeacher(nombre);
+  toggleTeacherPracticasGuardiasSlot=(nombre,dia,hora)=>practicasGuardiasDomain.toggleSlot(nombre,dia,hora);
+}
+if(futureAbsencesDomain){
+  hydrateTeacherFutureAbsences=()=>futureAbsencesDomain.hydrateFromBackend();
+  normalizeTeacherFutureAbsence=row=>futureAbsencesDomain.normalizeTeacherFutureAbsence(row);
+  sortTeacherFutureAbsences=rows=>futureAbsencesDomain.sortTeacherFutureAbsences(rows);
+  getFutureAbsenceStatusLabel=status=>futureAbsencesDomain.getFutureAbsenceStatusLabel(status);
+  getFutureAbsenceStatusClass=status=>futureAbsencesDomain.getFutureAbsenceStatusClass(status);
+  getFutureAbsenceHoursForEntry=item=>futureAbsencesDomain.getFutureAbsenceHoursForEntry(item);
+  findOverlappingFutureAbsence=(entry,options={})=>futureAbsencesDomain.findOverlapping(entry,options);
+  formatHourListLabel=hours=>futureAbsencesDomain.formatHourListLabel(hours);
+  buildProjectedRowsForWeek=weekKey=>futureAbsencesDomain.buildProjectedRowsForWeek(weekKey);
+  renderFutureAbsenceAdminList=()=>futureAbsencesDomain.setAdminFilters({
+    status:futureAbsenceAdminStatusFilter,
+    teacher:futureAbsenceAdminTeacherFilter
+  });
+  renderTeacherFutureAbsenceOwnList=()=>futureAbsencesDomain.renderTeacherOwnList();
+  handleTeacherFutureAbsenceDateChange=()=>futureAbsencesDomain.handleTeacherDateChange();
+  openTeacherFutureAbsenceModal=()=>futureAbsencesDomain.openTeacherModal();
+  closeTeacherFutureAbsenceModal=()=>futureAbsencesDomain.closeTeacherModal();
+  bgTeacherFutureAbsenceClose=e=>futureAbsencesDomain.handleTeacherOverlayBackgroundClick(e);
+  submitTeacherFutureAbsence=()=>futureAbsencesDomain.submitTeacherAbsence();
+  openFutureAbsenceAdminModal=()=>futureAbsencesDomain.openAdminModal();
+  closeFutureAbsenceAdminModal=()=>futureAbsencesDomain.closeAdminModal();
+  bgFutureAbsenceAdminClose=e=>futureAbsencesDomain.handleAdminOverlayBackgroundClick(e);
+  handleFutureAbsenceAdminDelete=id=>futureAbsencesDomain.handleAdminDelete(id);
+  reviewTeacherFutureAbsence=(id,status)=>futureAbsencesDomain.reviewEntry(id,status);
+  updateTeacherFutureAbsenceEntry=entry=>futureAbsencesDomain.updateEntry(entry);
+  applyApprovedFutureAbsencesForCurrentWeek=()=>futureAbsencesDomain.applyApprovedForCurrentWeek();
+  createTeacherFutureAbsenceEntry=entry=>futureAbsencesDomain.createEntry(entry);
+  deleteTeacherFutureAbsenceEntry=id=>futureAbsencesDomain.deleteEntry(id);
+  getTeacherFutureAbsenceStats=nombre=>futureAbsencesDomain.getTeacherStats(nombre);
 }
 document.getElementById('fDia').addEventListener('change',()=>{renderAbsenceHourChoices();populateProfesoresGuardia();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);setFieldError('fDia','');});
 document.getElementById('fHora').addEventListener('change',()=>{setAbsenceSelectedHours([Number(document.getElementById('fHora').value)]);syncAbsencePrimaryHour();renderAbsenceHourChoices();populateProfesoresGuardia();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);setFieldError('fHora','');});

@@ -74,6 +74,7 @@ horario-ies-alcalans/
 |-- imagenes/
 |-- js/
 |   |-- app/
+|   |   |-- guardias-core.js
 |   |   |-- guardias.js
 |   |   `-- storage.js
 |   `-- data/
@@ -95,12 +96,20 @@ horario-ies-alcalans/
 |   |   |-- guardias.js
 |   |   |-- historial.js
 |   |   |-- profesorado.js
+|   |   |-- profesorado/
+|   |   |   |-- alumnos-fuera-aula.js
+|   |   |   |-- annual-import.js
+|   |   |   |-- session-overrides.js
+|   |   |   |-- shared.js
+|   |   |   |-- state-collections.js
+|   |   |   `-- tareas.js
 |   |   |-- report.js
 |   |   `-- validation.js
 |   `-- scripts/
 |       |-- build-profesorado-source.js
 |       |-- init-db.js
 |       |-- reset-course.js
+|       |-- run-tests.js
 |       `-- smoke-test.js
 |-- .env.example
 |-- package.json
@@ -221,6 +230,14 @@ start-local.cmd
 $env:GUARDIAS_SESSION_SECRET="pon-aqui-un-secreto"
 npm.cmd start
 ```
+
+### Test rapido local
+
+```powershell
+npm.cmd test
+```
+
+Ese comando ejecuta el runner ligero `server/scripts/run-tests.js` sin dependencias extra.
 
 ### URLs locales
 
@@ -411,6 +428,16 @@ $env:GUARDIAS_BASE_URL="http://127.0.0.1:3000"
 npm.cmd run smoke
 ```
 
+### Test unitarios ligeros
+
+Sin levantar servidor:
+
+```powershell
+npm.cmd test
+```
+
+Cubre validacion basica de autenticacion, sesion y fuente anual. Los tests viven en `server/tests/`.
+
 ## Que revisar si falla
 
 ## 1. El backend no arranca
@@ -452,7 +479,7 @@ pm2 logs guardias --lines 200
 
 Comprobar:
 
-- que `guardias.html`, `css/guardias.css` y `js/app/guardias.js` existen
+- que `guardias.html`, `css/guardias.css`, `js/app/guardias-core.js` y `js/app/guardias.js` existen
 - que `nginx` no sirve una copia antigua
 - que el navegador no esta cacheando una version vieja
 
@@ -503,8 +530,9 @@ Si alguien retoma el proyecto y "no funciona", seguir este orden:
 
 ## Notas para quien venga detras
 
-- El proyecto no usa framework frontend; casi toda la logica cliente esta en `js/app/guardias.js`.
-- Si algo "visual" falla, normalmente el problema estara en `guardias.html`, `css/guardias.css` o `js/app/guardias.js`.
+- El proyecto no usa framework frontend; la logica cliente sigue concentrada en `js/app/guardias.js`, pero las utilidades puras ya se estan sacando a `js/app/guardias-core.js`.
+- El router `server/routes/profesorado.js` ahora actua como punto de entrada y delega en modulos bajo `server/routes/profesorado/`.
+- Si algo "visual" falla, normalmente el problema estara en `guardias.html`, `css/guardias.css`, `js/app/guardias-core.js` o `js/app/guardias.js`.
 - Si algo "de datos" falla, normalmente estara en `server/routes/*`, `server/db.js` o la propia `BD/guardias.sqlite`.
 - Antes de tocar logica anual, revisar el flujo `json_profes -> annual:build -> js/data/profesorado_horarios_guardias.js`.
 - Antes de tocar despliegue, revisar si el servidor real sigue levantando con `pm2` y no con otro mecanismo.
