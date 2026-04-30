@@ -237,6 +237,9 @@ body.tv-mode .header-center {
   background: rgba(255,248,240,.94);
   box-shadow: 0 16px 34px rgba(191,93,32,.08);
 }
+.tv-announcement[hidden] {
+  display: none !important;
+}
 .tv-announcement-label {
   font-size: .78rem;
   font-weight: 800;
@@ -604,12 +607,19 @@ header {
   justify-content: center;
   gap: .55rem;
   text-align: center;
+  z-index: 1;
+  pointer-events: none;
+}
+.header-center > * {
+  pointer-events: auto;
 }
 .header-actions {
   display: flex;
   align-items: center;
   gap: .75rem;
   margin-left: auto;
+  position: relative;
+  z-index: 2;
 }
 .logo { margin: 0; }
 .logo-link { display: flex; align-items: center; color: var(--text); text-decoration: none; }

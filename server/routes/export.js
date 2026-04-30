@@ -33,6 +33,12 @@ const PRACTICAS_GUARDIAS_STATE_KEY = 'teacher_practicas_guardias';
 const PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY = 'teacher_practicas_guardias_tramos';
 const MONTHLY_GUARDIA_LOAD_STATE_KEY = 'guardia_monthly_load';
 
+router.use((_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Pragma', 'no-cache');
+  next();
+});
+
 function badRequest(message, details) {
   const error = new Error(message);
   error.status = 400;

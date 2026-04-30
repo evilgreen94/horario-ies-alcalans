@@ -81,10 +81,26 @@ function isBlockedStaticRequest(req) {
   ].includes(lowerPath);
 }
 
+function applySecurityHeaders(req, res, next) {
+  const isSecure = req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase() === 'https';
+  res.setHeader('Referrer-Policy', 'same-origin');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (isSecure) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+}
+
 getSessionSecret();
 configureTrustProxy(TRUST_PROXY);
 
+app.disable('x-powered-by');
 app.use(cors(createCorsOptions()));
+app.use(applySecurityHeaders);
 app.use(express.json({ limit: '5mb' }));
 app.use(requestTelemetryMiddleware);
 app.use('/api', rejectWritesDuringRestore);

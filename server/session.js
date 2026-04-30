@@ -45,12 +45,12 @@ function serializeSessionCookie(role, req) {
   }));
   const signature = signPayload(payload);
   const secureFlag = isSecureRequest(req) ? '; Secure' : '';
-  return `${COOKIE_NAME}=${payload}.${signature}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}${secureFlag}`;
+  return `${COOKIE_NAME}=${payload}.${signature}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}; Priority=High${secureFlag}`;
 }
 
 function clearSessionCookieHeader(req) {
   const secureFlag = isSecureRequest(req) ? '; Secure' : '';
-  return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secureFlag}`;
+  return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Priority=High${secureFlag}`;
 }
 
 function parseCookies(headerValue) {
@@ -94,7 +94,7 @@ function requireRole(role) {
   return (req, res, next) => {
     const session = readSessionFromRequest(req);
     if (!session) {
-      return res.status(401).json({ error: 'Sesión no válida.' });
+      return res.status(401).json({ error: 'Sesion no valida.' });
     }
     if (role === 'admin' && !session.isAdmin) {
       return res.status(403).json({ error: 'Permisos insuficientes.' });
