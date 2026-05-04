@@ -13,6 +13,11 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 10;
 const loginAttempts = new Map();
 
+router.use((_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
 function badRequest(message) {
   const error = new Error(message);
   error.status = 400;
@@ -22,7 +27,7 @@ function badRequest(message) {
 function normalizeRole(value) {
   const role = String(value || '').trim().toLowerCase();
   if (role !== 'admin' && role !== 'superadmin') {
-    throw badRequest('role inválido.');
+    throw badRequest('role invalido.');
   }
   return role;
 }
@@ -115,16 +120,16 @@ router.post('/change-password', requireRole('admin'), async (req, res, next) => 
     const requestedRole = normalizeRole(req.body?.role || sessionRole);
 
     if (requestedRole !== sessionRole) {
-      throw badRequest('No puedes cambiar la contraseña de otro rol.');
+      throw badRequest('No puedes cambiar la contrasena de otro rol.');
     }
     if (currentPassword === newPassword) {
-      throw badRequest('La nueva contraseña debe ser distinta de la actual.');
+      throw badRequest('La nueva contrasena debe ser distinta de la actual.');
     }
 
     const db = await getDatabase();
     const row = await db.get('SELECT password_hash, salt FROM auth_credentials WHERE role = ?', [sessionRole]);
     if (!row || !verifyPassword(currentPassword, row.salt, row.password_hash)) {
-      return res.status(401).json({ ok: false, error: 'La contraseña actual no es correcta.' });
+      return res.status(401).json({ ok: false, error: 'La contrasena actual no es correcta.' });
     }
 
     const { salt, hash } = hashPassword(newPassword);

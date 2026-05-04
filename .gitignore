@@ -2,6 +2,8 @@ node_modules/
 /.env
 /.env.local.ps1
 /.env.local.cmd
+.codex-*/
+.codex-*
 server/data/
 /BD/
 *.sqlite
