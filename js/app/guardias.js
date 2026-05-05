@@ -1003,7 +1003,7 @@ function getSpecialAssignments(dia,hora,rowsSource=data){
   const biblioteca=orderedNames[0]||'';
   const banos=orderedNames.find(nombre=>nombre!==biblioteca)||'';
   const specialCount=(biblioteca?1:0)+(banos?1:0);
-  const uncoveredIfReserved=(rowsSource||[]).filter(row=>row.dia===dia&&row.hora===hora).length>Math.max(orderedNames.length-specialCount,0);
+  const uncoveredIfReserved=(rowsSource||[]).filter(row=>row.dia===dia&&row.hora===hora&&rowNeedsCoverage(row)).length>Math.max(orderedNames.length-specialCount,0);
   return {
     biblioteca: uncoveredIfReserved?'':biblioteca,
     banos: uncoveredIfReserved?'':banos
@@ -1075,6 +1075,16 @@ function isTeacherAbsentAllDay(nombre,dia,rowsSource=data){
   );
   return scheduledHours.every(hora=>absentHours.has(hora));
 }
+function getAbsentTeacherSetForSlot(dia,hora,rowsSource=data){
+  const blocked=new Set(getDayLongAbsentTeacherSet(dia,rowsSource));
+  (rowsSource||[])
+    .filter(row=>row.dia===dia&&row.hora===hora)
+    .forEach(row=>{
+      const canonical=resolveTeacherCanonicalName(row?.ausente);
+      if(canonical) blocked.add(canonical);
+    });
+  return blocked;
+}
 function getDayLongAbsentTeacherSet(dia,rowsSource=data){
   const teacherNames=[...new Set(
     Object.keys(HORARIO_GUARDIAS[dia]||{}).flatMap(hora=>getProfesHora(dia,Number(hora)))
@@ -1092,7 +1102,7 @@ function getBalancedGuardiaOrder(dia,hora,options={}){
   const rowsSource=Array.isArray(options.rowsSource)?options.rowsSource:data;
   const blocked=new Set([
     ...(excludeNames||[]).filter(Boolean),
-    ...getDayLongAbsentTeacherSet(dia,rowsSource)
+    ...getAbsentTeacherSetForSlot(dia,hora,rowsSource)
   ]);
   const monthCounter=buildMonthlyGuardiaCoverageCounter({excludeDia,excludeHora,rowsSource,weekKey});
   const totalCounter=buildGuardiaCoverageCounter({excludeDia,excludeHora,rowsSource});
@@ -1127,6 +1137,9 @@ function assignGuardiasForRows(rowsSource){
 function reassignGuardiasForSlot(dia,hora,rowsSource=data){
   const rows=rowsSource.filter(row=>row.dia===dia&&row.hora===hora).sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
   if(!rows.length) return;
+  const rowsNeedingCoverage=rows.filter(row=>rowNeedsCoverage(row));
+  rows.filter(row=>!rowNeedsCoverage(row)).forEach(row=>{row.guardia='';});
+  if(!rowsNeedingCoverage.length) return;
   const ausentes=new Set(rows.map(row=>resolveTeacherCanonicalName(row.ausente)).filter(Boolean));
   const weekKey=getCurrentSchoolWeekKey();
   const biblioteca=getBibliotecaAsignada(dia,hora,rowsSource);
@@ -1147,7 +1160,7 @@ function reassignGuardiasForSlot(dia,hora,rowsSource=data){
     totalCounter[nombre]=(totalCounter[nombre]||0)+1;
     dayCounter[nombre]=(dayCounter[nombre]||0)+1;
   }
-  rows.forEach(row=>{
+  rowsNeedingCoverage.forEach(row=>{
     const siguientePrincipal=principales
       .filter(nombre=>!assigned.has(nombre))
       .sort((a,b)=>{
@@ -1278,7 +1291,7 @@ function validateTeacherSubstitutionName(nombre,rawValue){
   return '';
 }
 function getGuardiasDisponibles(dia,hora,rowsSource=data){
-  const blocked=getDayLongAbsentTeacherSet(+dia,rowsSource);
+  const blocked=getAbsentTeacherSetForSlot(+dia,+hora,rowsSource);
   return getProfesHora(+dia,+hora).filter(nombre=>!blocked.has(nombre));
 }
 function getAusenteInputElement(){
@@ -1432,6 +1445,14 @@ function resolveTeacherSession(nombre,dia,hora){
   const override=getSessionOverride(nombre,dia,hora);
   return override?{...base,...override}:base;
 }
+function doesAbsenceNeedCoverage(ausente,dia,hora){
+  const session=resolveTeacherSession(ausente,dia,hora);
+  return session?.tipo!=='guardia';
+}
+function rowNeedsCoverage(row){
+  if(!row||typeof row!=='object') return false;
+  return doesAbsenceNeedCoverage(row.ausente,row.dia,row.hora);
+}
 function resolveAulaRegistro(row){
   if(!row||typeof row!=='object') return '';
   return getAulaProfesor(row.ausente,row.dia,row.hora)||row.aula||'';
@@ -1449,7 +1470,7 @@ function normalizeStoredRows(rows){
       changed=true;
       return [];
     }
-    const guardiaValida=row.guardia?getGuardiaNombreSeleccionado(row.guardia,row.dia,row.hora):'';
+    const guardiaValida=rowNeedsCoverage(row)&&row.guardia?getGuardiaNombreSeleccionado(row.guardia,row.dia,row.hora):'';
     const aulaReal=getAulaProfesor(ausente,row.dia,row.hora);
     const aula=aulaReal||'';
     const normalizedRow={
@@ -1831,7 +1852,7 @@ function formatStatusTimestamp(value){
 function getAdminFilteredRows(rows){
   switch(adminTableFilter){
     case 'uncovered':
-      return rows.filter(row=>!((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,getRowsForWeekOffset(weekOffset))));
+      return rows.filter(row=>rowNeedsCoverage(row)&&!((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,getRowsForWeekOffset(weekOffset))));
     case 'pending':
       return rows.filter(row=>row.futurePlanned&&row.futureStatus==='pending');
     case 'notask':
@@ -1839,7 +1860,7 @@ function getAdminFilteredRows(rows){
     case 'attention':
       return rows.filter(row=>
         (row.futurePlanned&&row.futureStatus==='pending')||
-        !((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,getRowsForWeekOffset(weekOffset)))||
+        (rowNeedsCoverage(row)&&!((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,getRowsForWeekOffset(weekOffset))))||
         (!row.futurePlanned&&!resolveFaena(row).faena)
       );
     default:
@@ -1848,10 +1869,10 @@ function getAdminFilteredRows(rows){
 }
 function getAdminDayInsight(rows){
   const rowsSource=getRowsForWeekOffset(weekOffset);
-  const uncovered=rows.filter(row=>!((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,rowsSource)));
+  const uncovered=rows.filter(row=>rowNeedsCoverage(row)&&!((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,rowsSource)));
   const withoutTask=rows.filter(row=>!row.futurePlanned&&!resolveFaena(row).faena);
   const pendingFuture=rows.filter(row=>row.futurePlanned&&row.futureStatus==='pending');
-  const covered=rows.filter(row=>(row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,rowsSource));
+  const covered=rows.filter(row=>rowNeedsCoverage(row)&&((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,rowsSource)));
   const corredor=getAlumnosFueraSummary();
   return {uncovered,withoutTask,pendingFuture,covered,corredor};
 }
@@ -3599,7 +3620,7 @@ function buildDailyReportText(){
   const cuerpo=rows.map(g=>{
     const h=HORA_MAP[g.hora]||{rango:''};
     const cub=g.guardia&&g.guardia.trim();
-    const sugerido=cub||getGuardiaSugerida(day,g.hora,1)||'Sin asignar';
+    const sugerido=rowNeedsCoverage(g)?(cub||getGuardiaSugerida(day,g.hora,1)||'Sin asignar'):'No requiere cobertura';
     const biblioteca=getBibliotecaAsignada(day,g.hora)||'Sin asignar';
     const banos=getBanosAsignado(day,g.hora)||'Sin asignar';
     const faenaInfo=resolveFaena(g);
@@ -3622,11 +3643,12 @@ function buildDailyReportHtml(){
   const fecha=formatNowParts().date.toLocaleDateString('es-ES');
   const totalAusencias=rows.length;
   const totalConTarea=rows.filter(g=>resolveFaena(g).faena).length;
-  const totalCubiertas=rows.filter(g=>(g.guardia&&g.guardia.trim())||getGuardiaSugerida(day,g.hora,1)).length;
+  const totalCubiertas=rows.filter(g=>rowNeedsCoverage(g)&&((g.guardia&&g.guardia.trim())||getGuardiaSugerida(day,g.hora,1))).length;
   const cards=rows.length?rows.map(g=>{
     const h=HORA_MAP[g.hora]||{label:`${g.hora}a`,rango:''};
     const cub=g.guardia&&g.guardia.trim();
-    const sugerido=cub||getGuardiaSugerida(day,g.hora,1)||'';
+    const needsCoverage=rowNeedsCoverage(g);
+    const sugerido=needsCoverage?(cub||getGuardiaSugerida(day,g.hora,1)||''):'';
     const biblioteca=getBibliotecaAsignada(day,g.hora)||'Sin asignar';
     const banos=getBanosAsignado(day,g.hora)||'Sin asignar';
     const faenaInfo=resolveFaena(g);
@@ -3638,7 +3660,7 @@ function buildDailyReportHtml(){
             <div class="item-eyebrow">${escapeHtml(h.label)} hora</div>
             <div class="item-head">${escapeHtml(h.rango.replace('-', ' - '))}</div>
           </div>
-          <span class="pill ${sugerido?(cub?'pill-ok':'pill-warn'):'pill-bad'}">${sugerido?(cub?'Cubierta':'Prevista'):'Sin cubrir'}</span>
+          <span class="pill ${!needsCoverage?'pill-ok':(sugerido?(cub?'pill-ok':'pill-warn'):'pill-bad')}">${!needsCoverage?'No aplica':(sugerido?(cub?'Cubierta':'Prevista'):'Sin cubrir')}</span>
         </div>
         <div class="person-block person-block-absent">
           <div class="person-label">Profesor ausente</div>
@@ -3646,7 +3668,7 @@ function buildDailyReportHtml(){
         </div>
         <div class="person-block person-block-guard">
           <div class="person-label">Profesor de guardia</div>
-          <div class="person-name">${escapeHtml(sugerido?getVisibleTeacherName(sugerido):'Sin asignar')}</div>
+          <div class="person-name">${escapeHtml(!needsCoverage?'No requiere cobertura':(sugerido?getVisibleTeacherName(sugerido):'Sin asignar'))}</div>
         </div>
         <div class="meta-grid">
           <div class="meta-card"><span class="meta-k">Aula</span><span class="meta-v">${escapeHtml(aula)}</span></div>
@@ -4597,26 +4619,27 @@ function renderTable(){
     tb.innerHTML=filteredRows.map(g=>{
       const h=HORA_MAP[g.hora]||{label:g.hora+'a',rango:''};
       const cub=g.guardia&&g.guardia.trim();
-      const sugerido=cub||getGuardiaSugerida(day,g.hora,1,getRowsForWeekOffset(weekOffset));
+      const needsCoverage=rowNeedsCoverage(g);
+      const sugerido=needsCoverage?(cub||getGuardiaSugerida(day,g.hora,1,getRowsForWeekOffset(weekOffset))):'';
       const faenaInfo=resolveFaena(g);
       const aula=resolveAulaRegistro(g)||'-';
       const ausenteNombre=getVisibleTeacherName(g.ausente);
       const guardiaNombre=sugerido?getVisibleTeacherName(sugerido):'';
       const ausenteMood=getTeacherMoodForToday(g.ausente);
       const guardiaMood=sugerido?getTeacherMoodForToday(sugerido):null;
-      const guardiaEstado=g.futurePlanned?(g.futureStatus==='approved'||g.futureStatus==='applied'?(cub?'Guardia planificada':'Cobertura prevista'):'Pendiente de validar'):(sugerido?(cub?'':'Guardia prevista'):'Sin cobertura');
+      const guardiaEstado=!needsCoverage?'No requiere cobertura':(g.futurePlanned?(g.futureStatus==='approved'||g.futureStatus==='applied'?(cub?'Guardia planificada':'Cobertura prevista'):'Pendiente de validar'):(sugerido?(cub?'':'Guardia prevista'):'Sin cobertura'));
       const guardiaBadgeClass=g.futurePlanned
         ?(g.futureStatus==='approved'||g.futureStatus==='applied'?'b-ok status-pill':'status-pill teacher-duty-badge')
-        :(sugerido?(cub?'b-ok status-pill':'status-pill teacher-duty-badge'):'b-nok status-pill');
+        :(!needsCoverage?'b-ok status-pill':(sugerido?(cub?'b-ok status-pill':'status-pill teacher-duty-badge'):'b-nok status-pill'));
       const guardiaChipClass=sugerido?`${cub?'guardia-chip guardia-chip-assigned chip-strong':'guardia-chip guardia-chip-suggested chip-strong'}${guardiaMood?` chip-mood chip-mood-${guardiaMood.tone}`:''}`:'';
       const ausenteChipClass=`chip chip-absence chip-strong${ausenteMood?` chip-mood chip-mood-${ausenteMood.tone}`:''}`;
       const statusText=g.futurePlanned
         ?(g.futureStatus==='approved'?'Validada':g.futureStatus==='applied'?'Aplicada':g.futureStatus==='pending'?'Pendiente':'Planificada')
-        :(sugerido?(cub?'Cubierta':'Pendiente de confirmar'):'Sin cubrir');
+        :(!needsCoverage?'No requiere cobertura':(sugerido?(cub?'Cubierta':'Pendiente de confirmar'):'Sin cubrir'));
       const planningMeta=g.futurePlanned?`<span class="badge future-plan-badge ${g.futureStatus==='pending'?'future-plan-badge-pending':'future-plan-badge-approved'}">${g.futureStatus==='pending'?'Falta futura pendiente':'Falta futura validada'}</span>`:'';
       const rowClasses=[
         g.futurePlanned?'future-planned-row':'',
-        !sugerido?'admin-row-urgent':(!faenaInfo.faena||g.futureStatus==='pending')?'admin-row-warning':''
+        (needsCoverage&&!sugerido)?'admin-row-urgent':(!faenaInfo.faena||g.futureStatus==='pending')?'admin-row-warning':''
       ].filter(Boolean).join(' ');
       return `<tr class="${rowClasses}">
         <td>
@@ -4636,7 +4659,7 @@ function renderTable(){
           </div>
         </td>
         <td>
-          ${sugerido?`<div class="cell-stack"><div class="cell-label">Cubre</div><div class="guardia-slot"><div class="chip ${guardiaChipClass}"><div class="avatar av-yellow">${initials(guardiaNombre)}</div>${escapeHtml(guardiaNombre)}${guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(guardiaMood.label)}">${guardiaMood.emoji}</span>`:''}</div></div><div class="cell-meta">${guardiaEstado}</div></div>`:`<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">Sin asignar</span><div class="cell-meta">No hay profesor disponible en este turno.</div></div>`}
+          ${sugerido?`<div class="cell-stack"><div class="cell-label">Cubre</div><div class="guardia-slot"><div class="chip ${guardiaChipClass}"><div class="avatar av-yellow">${initials(guardiaNombre)}</div>${escapeHtml(guardiaNombre)}${guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(guardiaMood.label)}">${guardiaMood.emoji}</span>`:''}</div></div><div class="cell-meta">${guardiaEstado}</div></div>`:`<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">${needsCoverage?'Sin asignar':'No aplica'}</span><div class="cell-meta">${needsCoverage?'No hay profesor disponible en este turno.':'La ausencia cae en una hora de guardia del propio profesor.'}</div></div>`}
         </td>
         <td>
           <div class="cell-stack cell-stack-compact">
@@ -4664,11 +4687,12 @@ function renderTable(){
   }
   const aus=rows.length;
   const rowsSource=getRowsForWeekOffset(weekOffset);
-  const asig=rows.filter(g=>(g.guardia&&g.guardia.trim())||getGuardiaSugerida(day,g.hora,1,rowsSource)).length;
+  const rowsNeedingCoverage=rows.filter(row=>rowNeedsCoverage(row));
+  const asig=rowsNeedingCoverage.filter(g=>(g.guardia&&g.guardia.trim())||getGuardiaSugerida(day,g.hora,1,rowsSource)).length;
   document.getElementById('thAcc').style.display=isAdmin?'':'none';
   document.getElementById('sAus').textContent=aus;
   document.getElementById('sAsig').textContent=asig;
-  document.getElementById('sSin').textContent=Math.max(aus-asig,0);
+  document.getElementById('sSin').textContent=Math.max(rowsNeedingCoverage.length-asig,0);
   const corredorStat=document.getElementById('sCorredor');
   if(corredorStat){
     const corredor=getAlumnosFueraSummary();
