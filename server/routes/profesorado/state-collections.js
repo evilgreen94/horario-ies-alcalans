@@ -2,6 +2,7 @@ const SUBSTITUTIONS_STATE_KEY = 'teacher_substitutions';
 const PRACTICAS_GUARDIAS_STATE_KEY = 'teacher_practicas_guardias';
 const PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY = 'teacher_practicas_guardias_tramos';
 const FUTURE_ABSENCES_STATE_KEY = 'teacher_future_absences';
+const PATIO_GUARDIAS_STATE_KEY = 'patio_guardias';
 
 async function getStateRows(db, key) {
   const row = await db.get('SELECT value FROM app_state WHERE key = ?', [key]);
@@ -26,6 +27,7 @@ function registerStateCollectionRoutes(router, deps) {
     sanitizeTeacherPracticeGuardia,
     sanitizeTeacherPracticeGuardiaSlot,
     sanitizeTeacherFutureAbsence,
+    sanitizePatioGuardia,
     requireRole
   } = deps;
 
@@ -83,6 +85,26 @@ function registerStateCollectionRoutes(router, deps) {
       const rows = ensureArray(req.body, 'Los tramos manuales por practicas para guardias').map(sanitizeTeacherPracticeGuardiaSlot);
       const db = await getDatabase();
       await replaceStateRows(db, PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY, rows);
+      res.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/patio-guardias', async (_req, res, next) => {
+    try {
+      const db = await getDatabase();
+      res.json(await getStateRows(db, PATIO_GUARDIAS_STATE_KEY));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.put('/patio-guardias/replace', requireRole('admin'), async (req, res, next) => {
+    try {
+      const rows = ensureArray(req.body, 'La cobertura de patio').map(sanitizePatioGuardia);
+      const db = await getDatabase();
+      await replaceStateRows(db, PATIO_GUARDIAS_STATE_KEY, rows);
       res.json({ ok: true });
     } catch (error) {
       next(error);

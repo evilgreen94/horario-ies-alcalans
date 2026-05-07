@@ -7,6 +7,7 @@ const {
   normalizeInteger,
   normalizeString,
   sanitizeBiblioteca,
+  sanitizePatioGuardia,
   sanitizeSessionOverride,
   sanitizeTeacherFutureAbsence,
   sanitizeTeacherPracticeGuardia,
@@ -21,6 +22,7 @@ const WEEK_STATE_KEY = 'school_week_key';
 const PRACTICAS_GUARDIAS_STATE_KEY = 'teacher_practicas_guardias';
 const PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY = 'teacher_practicas_guardias_tramos';
 const MONTHLY_GUARDIA_LOAD_STATE_KEY = 'guardia_monthly_load';
+const PATIO_GUARDIAS_STATE_KEY = 'patio_guardias';
 
 function badRequest(message, details) {
   const error = new Error(message);
@@ -116,6 +118,7 @@ function sanitizeBackupPayload(payload) {
     teacherSubstitutions: ensureOptionalBackupSection(input, 'teacherSubstitutions', 'teacherSubstitutions', sanitizeTeacherSubstitution),
     teacherPracticasGuardias: ensureOptionalBackupSection(input, 'teacherPracticasGuardias', 'teacherPracticasGuardias', sanitizeTeacherPracticeGuardia),
     teacherPracticasGuardiasTramos: ensureOptionalBackupSection(input, 'teacherPracticasGuardiasTramos', 'teacherPracticasGuardiasTramos', sanitizeTeacherPracticeGuardiaSlot),
+    patioGuardias: ensureOptionalBackupSection(input, 'patioGuardias', 'patioGuardias', sanitizePatioGuardia),
     monthlyGuardiaLoad: input.monthlyGuardiaLoad && typeof input.monthlyGuardiaLoad === 'object' && !Array.isArray(input.monthlyGuardiaLoad)
       ? input.monthlyGuardiaLoad
       : null
@@ -125,6 +128,7 @@ function sanitizeBackupPayload(payload) {
 module.exports = {
   FUTURE_ABSENCES_STATE_KEY,
   MONTHLY_GUARDIA_LOAD_STATE_KEY,
+  PATIO_GUARDIAS_STATE_KEY,
   PRACTICAS_GUARDIAS_STATE_KEY,
   PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY,
   SUBSTITUTIONS_STATE_KEY,

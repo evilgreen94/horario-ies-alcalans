@@ -15,6 +15,7 @@
     <div class="pulse-badge"><div class="pulse-dot"></div>En directo</div>
   </div>
   <div class="header-center">
+    <div class="app-mobile-day" id="appMobileDay">Guardias - Lunes</div>
     <div class="tv-header-top" id="tvHeaderTop">
       <div class="logo">
         <a class="logo-link" href="https://portal.edu.gva.es/iesalcalans/es/" target="_blank" rel="noopener noreferrer">
@@ -87,7 +88,7 @@
   <section class="guardia-board">
     <div class="guardia-board-head">
       <div class="guardia-board-title">Guardias previstas por hora</div>
-      <div class="guardia-board-note">Biblioteca y ba&ntilde;os se asignan autom&aacute;ticamente por hora. Si faltan coberturas, ambas reservas se liberan.</div>
+      <div class="guardia-board-note">Biblioteca y ba&ntilde;os se asignan autom&aacute;ticamente por hora. La 4.&ordf; hora se trata como patio con cobertura manual por sectores.</div>
       <button class="btn-mini" id="btnSorteo" type="button" onclick="sortearGuardiasDia()" style="display:none">Sortear orden del d&iacute;a</button>
     </div>
     <div class="guardia-grid" id="guardiaGrid"></div>
@@ -554,6 +555,7 @@
   </div>
 </div>
 <script src="js/data/profesorado_horarios_guardias.js"></script>
+<script src="js/data/patio_guardias.js"></script>
 <script src="js/app/storage.js"></script>
 <script src="js/app/guardias-core.js"></script>
 <script src="js/app/guardias-ui.js"></script>

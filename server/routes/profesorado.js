@@ -7,6 +7,7 @@ const {
   sanitizeSessionOverride,
   sanitizeAlumnosFueraAula,
   sanitizeTeacherFutureAbsence,
+  sanitizePatioGuardia,
   sanitizeTeacherPracticeGuardia,
   sanitizeTeacherPracticeGuardiaSlot,
   sanitizeTeacherSubstitution,
@@ -59,6 +60,7 @@ registerStateCollectionRoutes(router, {
   sanitizeTeacherPracticeGuardia,
   sanitizeTeacherPracticeGuardiaSlot,
   sanitizeTeacherFutureAbsence,
+  sanitizePatioGuardia,
   requireRole
 });
 

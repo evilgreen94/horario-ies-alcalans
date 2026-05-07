@@ -364,6 +364,9 @@
 
   function createTvPanelDomain(options){
     const shared=createSharedHost(options||{});
+    const urlParams=new URLSearchParams(shared.window.location.search||'');
+    const forcedTvHora=Number(urlParams.get('forceTvHora'));
+    const forcedTvDia=Number(urlParams.get('forceTvDia'));
     const getDay=()=>Number(getValue(options.getDay,0))||0;
     const getWeekOffset=()=>Number(getValue(options.getWeekOffset,0))||0;
     const getRowsForWeekOffset=requireFn('getRowsForWeekOffset',options.getRowsForWeekOffset);
@@ -372,8 +375,18 @@
     const assignGuardiasForRows=requireFn('assignGuardiasForRows',options.assignGuardiasForRows);
     const getBibliotecaAsignada=requireFn('getBibliotecaAsignada',options.getBibliotecaAsignada);
     const getBanosAsignado=requireFn('getBanosAsignado',options.getBanosAsignado);
+    const getPatioCoverageSummary=isFn(options.getPatioCoverageSummary)?options.getPatioCoverageSummary:null;
+    const getPatioSectors=isFn(options.getPatioSectors)?options.getPatioSectors:()=>Array.isArray(options.patioSectors)?options.patioSectors:[];
+    const getPatioExtraPosts=isFn(options.getPatioExtraPosts)?options.getPatioExtraPosts:null;
 
     function getCurrentSchoolSlot(){
+      if(Number.isInteger(forcedTvHora)&&forcedTvHora>=1&&forcedTvHora<=9){
+        const todayIndex=getTodaySchoolDayIndex();
+        const safeDay=Number.isInteger(forcedTvDia)&&forcedTvDia>=0&&forcedTvDia<=4
+          ? forcedTvDia
+          : (todayIndex==null?0:todayIndex);
+        return {dia:safeDay,hora:forcedTvHora,forced:true};
+      }
       const now=shared.formatNowParts();
       const total=(now.hours*60)+now.minutes;
       const weekday=now.date.getDay();
@@ -395,7 +408,6 @@
       });
       if(!found) return null;
       const hora=Number(found[0]);
-      if(shared.horasPatio.has(hora)) return null;
       return {dia:weekday-1,hora};
     }
     function getTodaySchoolDayIndex(){
@@ -404,13 +416,14 @@
     }
     function getUpcomingSchoolSlotsForToday(limit){
       const max=Math.max(0,Number(limit||2));
+      if(Number.isInteger(forcedTvHora)&&forcedTvHora>=1&&forcedTvHora<=9) return [];
       const now=shared.formatNowParts();
       const total=(now.hours*60)+now.minutes;
       const weekday=now.date.getDay();
       if(weekday<1||weekday>5) return [];
       const upcoming=[];
       Object.keys(shared.horaMap).map(Number).sort((a,b)=>a-b).forEach(hora=>{
-        if(shared.horasPatio.has(hora)||upcoming.length>=max) return;
+        if(upcoming.length>=max) return;
         const start=String(shared.horaMap[hora]&&shared.horaMap[hora].rango||'').split('-')[0]||'';
         const parts=start.split(':').map(Number);
         const sh=parts[0];
@@ -520,6 +533,109 @@
           assignments:getTvSlotAssignments({dia:targetDay,hora},rowsSource)
         }));
     }
+    function normalizePatioExtraPost(item,index){
+      const row=item&&typeof item==='object'&&!Array.isArray(item)?item:{label:item};
+      const label=shared.cleanText(row.label||row.name||row.title||row.puesto||row.post||row.id||`Extra ${index+1}`);
+      if(!label) return null;
+      const responsible=shared.cleanText(row.responsable||row.teacher||row.profesor||row.assignedTo||row.person||row.coveredBy);
+      const coveredRaw=row.covered;
+      const fallbackCovered=row.isCovered;
+      const covered=typeof coveredRaw==='boolean'
+        ? coveredRaw
+        : (typeof fallbackCovered==='boolean'?fallbackCovered:!!responsible);
+      return {
+        id:shared.cleanText(row.id||row.code||row.slug||label).toLowerCase(),
+        label,
+        responsible,
+        covered,
+        note:shared.cleanText(row.note||row.notes||row.meta||row.description)
+      };
+    }
+    function normalizePatioExtraPosts(items){
+      return [...new Map((Array.isArray(items)?items:[])
+        .map(normalizePatioExtraPost)
+        .filter(Boolean)
+        .map(item=>[item.id,item])).values()];
+    }
+    function resolvePatioExtraPosts(slot,summary){
+      const direct=getPatioExtraPosts?getPatioExtraPosts(slot.dia,slot.hora):null;
+      if(Array.isArray(direct)) return normalizePatioExtraPosts(direct);
+      const summaryExtras=summary?.extraPosts||summary?.extras||summary?.puestosExtra;
+      return normalizePatioExtraPosts(summaryExtras);
+    }
+    function renderTvPatioPanel(container,slot,renderOptions){
+      const localOptions=renderOptions||{};
+      const sectors=getPatioSectors();
+      const summary=getPatioCoverageSummary?getPatioCoverageSummary(slot.dia,slot.hora):null;
+      const states=summary&&Array.isArray(summary.states)?summary.states:[];
+      const extraPosts=resolvePatioExtraPosts(slot,summary);
+      if(!summary||!sectors.length){
+        container.innerHTML='<div class="tv-empty">No hay configuracion de patio disponible para este tramo.</div>';
+        return;
+      }
+      const legendMarkup=sectors.map(sector=>{
+        const state=states.find(item=>item.sectorId===sector.id)||null;
+        const covered=!!state?.covered;
+        return `<div class="tv-patio-legend-item ${covered?'is-covered':'is-pending'}">
+          <span class="tv-patio-legend-dot">${escapeHtml(sector.shortLabel||sector.id||'')}</span>
+          <div class="tv-patio-legend-copy">
+            <div class="tv-patio-legend-row">
+              <span class="tv-patio-legend-text">${escapeHtml(sector.label||sector.id||'Sector')}</span>
+              <span class="tv-patio-legend-state">${covered?'Cubierto':'Pendiente'}</span>
+            </div>
+            <div class="tv-patio-legend-person">${escapeHtml(state?.responsable||'Rotacion sin asignar')}</div>
+          </div>
+        </div>`;
+      }).join('');
+      const extrasMarkup=extraPosts.length?`<div class="tv-patio-extras">
+        <div class="tv-patio-extras-head">
+          <span class="tv-patio-extras-title">Puestos extra</span>
+          <span class="tv-patio-extras-count">${extraPosts.length}</span>
+        </div>
+        <div class="tv-patio-extras-list">
+          ${extraPosts.map(item=>`<div class="tv-patio-extra ${item.covered?'is-covered':'is-pending'}">
+            <div class="tv-patio-extra-row">
+              <span class="tv-patio-extra-name">${escapeHtml(item.label)}</span>
+              <span class="tv-patio-extra-state">${item.covered?'Cubierto':'Pendiente'}</span>
+            </div>
+            <div class="tv-patio-extra-person">${escapeHtml(item.responsible||item.note||'Sin asignar')}</div>
+          </div>`).join('')}
+        </div>
+      </div>`:'';
+      if(localOptions.compact){
+        container.innerHTML=`<div class="tv-patio-shell tv-patio-shell-preview">
+          <div class="tv-patio-status ${summary.pending?'is-pending':'is-covered'}">${summary.covered}/${summary.total} sectores cubiertos</div>
+          <div class="tv-patio-side">
+            <div class="tv-patio-legend">${legendMarkup}</div>
+            ${extrasMarkup}
+          </div>
+        </div>`;
+        return;
+      }
+      container.innerHTML=`<div class="tv-patio-shell">
+        <div class="tv-patio-status ${summary.pending?'is-pending':'is-covered'}">${summary.covered}/${summary.total} sectores cubiertos</div>
+        <div class="tv-patio-layout">
+          <div class="tv-patio-side">
+            <div class="tv-patio-legend">${legendMarkup}</div>
+            ${extrasMarkup}
+          </div>
+          <div class="tv-patio-map">
+            ${sectors.map(sector=>{
+            const state=states.find(item=>item.sectorId===sector.id)||null;
+            const covered=!!state?.covered;
+            return `<article class="tv-patio-sector ${sector.mapClass||''} ${covered?'is-covered':'is-pending'}">
+              <div class="tv-patio-sector-top">
+                <span class="tv-patio-sector-badge">${escapeHtml(sector.shortLabel||sector.id||'')}</span>
+                <span class="tv-patio-sector-state">${covered?'Cubierto':'Pendiente'}</span>
+              </div>
+              <div class="tv-patio-sector-name">${escapeHtml(sector.label||sector.id||'Sector')}</div>
+              <div class="tv-patio-sector-person">${escapeHtml(state?.responsable||'Rotacion sin asignar')}</div>
+            </article>`;
+          }).join('')}
+          </div>
+        </div>
+      </div>`;
+    }
     function renderTvSlotPanel(containerId,slot,badgeId,rowsSource,renderOptions){
       const localOptions=renderOptions||{};
       const container=shared.document.getElementById(containerId);
@@ -531,6 +647,10 @@
         return;
       }
       badge.textContent=`${shared.horaMap[slot.hora].label} hora · ${shared.horaMap[slot.hora].rango.replace('-', ' - ')}`;
+      if(shared.horasPatio.has(slot.hora)){
+        renderTvPatioPanel(container,slot,{compact:!localOptions.isCurrentSlot});
+        return;
+      }
       const assignments=getTvSlotAssignments(slot,rowsSource);
       if(!assignments.length){
         container.innerHTML='<div class="tv-empty">No hay guardias registradas para este tramo.</div>';
@@ -546,25 +666,35 @@
     }
     function renderTvPanel(){
       const shell=shared.document.getElementById((options.elements&&options.elements.shellId)||'tvShell');
+      const grid=shared.document.querySelector('.tv-grid');
+      const nextPanel=shared.document.querySelector('.tv-panel-next');
+      const laterPanel=shared.document.querySelector('.tv-panel-later');
       if(!shell) return;
       const rowsSource=getRowsForWeekOffset(0);
       const currentSlot=getCurrentSchoolSlot();
+      const currentIsPatio=!!(currentSlot&&shared.horasPatio.has(currentSlot.hora));
       const upcomingSlots=getUpcomingSchoolSlotsForToday(2);
       const nextSlot=upcomingSlots[0]||null;
       const laterSlot=upcomingSlots[1]||null;
+      if(grid) grid.classList.toggle('tv-grid-patio-focus',currentIsPatio);
+      if(nextPanel) nextPanel.hidden=currentIsPatio;
+      if(laterPanel) laterPanel.hidden=currentIsPatio;
       renderTvSlotPanel((options.elements&&options.elements.currentPanelId)||'tvCurrentPanel',currentSlot,(options.elements&&options.elements.currentBadgeId)||'tvCurrentSlotBadge',rowsSource,{
+        isCurrentSlot:true,
         emptyBadge:'Sin tramo lectivo',
         emptyMessage:getTodaySchoolDayIndex()==null
           ? 'Hoy no hay jornada lectiva. El panel volvera a activarse en el proximo dia de clase.'
           : 'Ahora mismo no hay un tramo lectivo activo.'
       });
       renderTvSlotPanel((options.elements&&options.elements.nextPanelId)||'tvNextPanel',nextSlot,(options.elements&&options.elements.nextBadgeId)||'tvNextSlotBadge',rowsSource,{
+        isCurrentSlot:false,
         emptyBadge:'Sin siguiente tramo',
         emptyMessage:getTodaySchoolDayIndex()==null
           ? 'No hay siguiente tramo programado para hoy.'
           : 'No queda ningun tramo lectivo por delante en la jornada de hoy.'
       });
       renderTvSlotPanel((options.elements&&options.elements.laterPanelId)||'tvLaterPanel',laterSlot,(options.elements&&options.elements.laterBadgeId)||'tvLaterSlotBadge',rowsSource,{
+        isCurrentSlot:false,
         emptyBadge:'Sin siguiente tramo',
         emptyMessage:getTodaySchoolDayIndex()==null
           ? 'No hay mas tramos programados para hoy.'

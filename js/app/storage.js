@@ -208,6 +208,15 @@
         body: JSON.stringify(rows)
       });
     },
+    fetchPatioGuardias(){
+      return request('/profesorado/patio-guardias');
+    },
+    replacePatioGuardias(rows){
+      return request('/profesorado/patio-guardias/replace', {
+        method: 'PUT',
+        body: JSON.stringify(rows)
+      });
+    },
     fetchTeacherFutureAbsences(){
       return request('/profesorado/future-absences');
     },
