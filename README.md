@@ -1,215 +1,134 @@
 # Horario IES Alcalans
 
-Aplicacion interna para gestionar ausencias del profesorado, reparto de guardias, avisos para sala de profesores, tareas dejadas por el docente ausente, faltas futuras e informes PDF.
+Aplicacion interna para gestionar ausencias, guardias, avisos de profesorado, TV de sala de profesores e informes.
 
-El proyecto esta pensado para uso en red local del centro. Frontend y backend se sirven desde la misma aplicacion Node.js.
+La app sirve frontend y backend desde el mismo proyecto Node.js y trabaja con SQLite.
 
-## Resumen rapido
+## Estado actual
 
-- Frontend: `HTML + CSS + JavaScript` sin framework
-- Backend: `Node.js + Express`
-- Base de datos: `SQLite`
-- Puerto por defecto: `3000`
-- Entrada principal: `guardias.html`
-- API: prefijo `/api`
-- Modos principales:
-  - Jefatura
-  - Profesorado
-  - Sala de profesores / TV
-  - Superadmin
+- Rama de trabajo habitual: `preproduccion`
+- IP provisional del servidor: `10.185.39.94`
+- Ruta del proyecto en servidor: `/srv/guardias/horario-ies-alcalans`
+- Puerto habitual: `3000`
+- URL principal local de red: `http://10.185.39.94:3000`
+- URL superadmin: `http://10.185.39.94:3000/?panel=superadmin`
 
-## Que hace la aplicacion
+Si el servicio se publica sin puerto por proxy inverso, las URLs pasarian a:
 
-### Jefatura
+- `http://10.185.39.94/`
+- `http://10.185.39.94/?panel=superadmin`
 
-- Alta, edicion y borrado de ausencias por dia y hora
-- Reparto automatico de guardias
-- Gestion de biblioteca y banos
-- Sustituciones temporales
-- Validacion de faltas futuras comunicadas por profesorado
-- Avisos para sala de profesores
-- Informes PDF diario y semanal
+## Para que sirve cada modo
 
-### Profesorado
+- `Principal`: tabla de ausencias y guardias del dia.
+- `Jefatura`: alta y edicion de ausencias, faltas futuras, historial, sustituciones, avisos e impresion.
+- `Profesorado`: consulta de horario, guardias y gestion de faena o faltas futuras.
+- `TV`: muestra el tramo actual y los siguientes para sala de profesores.
+- `Superadmin`: exportacion, restauracion, salud del sistema y operaciones tecnicas.
 
-- Acceso por seleccion de profesor
-- Vista de horario diario
-- Consulta de guardias asignadas
-- Edicion de tarea dejada para el grupo
-- Aviso de faltas futuras por fecha y horas lectivas
-- Consulta del estado de sus avisos
-
-### Sala de profesores / TV
-
-- Vista pensada para pantalla compartida
-- Muestra guardias del tramo actual, siguiente y posterior
-- Puede mostrar un aviso activo en cabecera
-
-### Superadmin
-
-- Exportacion y restauracion
-- Estado tecnico del sistema
-- Monitor de sincronizacion
-- Operaciones de mantenimiento
-
-## Estructura del proyecto
+## Estructura que importa
 
 ```text
 horario-ies-alcalans/
-|-- BD/
-|   `-- guardias.sqlite
-|-- css/
-|   `-- guardias.css
-|-- deploy/
-|   `-- linux/
-|       |-- backup-guardias.sh
-|       |-- guardias.service
-|       |-- guardias-backup-daily.service
-|       |-- guardias-backup-daily.timer
-|       |-- guardias-backup-weekly.service
-|       |-- guardias-backup-weekly.timer
-|       |-- guardias-backup-monthly.service
-|       `-- guardias-backup-monthly.timer
+|-- BD/guardias.sqlite
+|-- css/guardias.css
 |-- guardias.html
 |-- imagenes/
 |-- js/
 |   |-- app/
-|   |   |-- guardias-core.js
 |   |   |-- guardias.js
+|   |   |-- guardias-aux-panels.js
+|   |   |-- guardias-core.js
 |   |   `-- storage.js
 |   `-- data/
-|       `-- profesorado_horarios_guardias.js
-|-- json_profes/
+|       |-- profesorado_horarios_guardias.js
+|       `-- patio_guardias.js
 |-- server/
 |   |-- app.js
-|   |-- auth.js
 |   |-- db.js
-|   |-- maintenance.js
-|   |-- schema.sql
 |   |-- session.js
 |   |-- telemetry.js
-|   |-- routes/
-|   |   |-- auth.js
-|   |   |-- avisos.js
-|   |   |-- biblioteca.js
-|   |   |-- export.js
-|   |   |-- guardias.js
-|   |   |-- historial.js
-|   |   |-- profesorado.js
-|   |   |-- profesorado/
-|   |   |   |-- alumnos-fuera-aula.js
-|   |   |   |-- annual-import.js
-|   |   |   |-- session-overrides.js
-|   |   |   |-- shared.js
-|   |   |   |-- state-collections.js
-|   |   |   `-- tareas.js
-|   |   |-- report.js
-|   |   `-- validation.js
-|   `-- scripts/
-|       |-- build-profesorado-source.js
-|       |-- init-db.js
-|       |-- reset-course.js
-|       |-- run-tests.js
-|       `-- smoke-test.js
+|   `-- routes/
+|       |-- auth.js
+|       |-- export.js
+|       |-- guardias.js
+|       |-- historial.js
+|       |-- profesorado.js
+|       |-- report.js
+|       `-- validation.js
+|-- deploy/linux/
 |-- .env.example
-|-- package.json
-|-- start-local.cmd
-`-- start-local.ps1
+`-- package.json
 ```
 
-## Rutas importantes
+## Como funciona el proyecto
 
 ### Frontend
 
-- `/` -> vista principal
-- `/tv` -> modo sala de profesores / TV
-- `/print` -> vista preparada para impresion
-- `/?panel=superadmin` -> acceso al panel superadmin
+- La entrada principal es `guardias.html`.
+- El comportamiento visual y gran parte de la logica estan en `js/app/guardias.js`.
+- El modo TV y la vista imprimible dependen tambien de `js/app/guardias-aux-panels.js`.
+- Los estilos globales estan en `css/guardias.css`.
 
-### API
+### Backend
 
-- `/api/health`
-- `/api/auth/*`
-- `/api/guardias/*`
-- `/api/biblioteca/*`
-- `/api/historial/*`
-- `/api/profesorado/*`
-- `/api/avisos/*`
-- `/api/report/*`
-- `/api/export/*`
+- El servidor arranca desde `server/app.js`.
+- La API cuelga de `/api`.
+- La autenticacion de `admin` y `superadmin` va por sesion.
+- La persistencia operativa va a SQLite.
 
-## Datos y persistencia
+### Datos
 
-### Base de datos
+- Horario anual del profesorado: `js/data/profesorado_horarios_guardias.js`
+- Configuracion de patio: `js/data/patio_guardias.js`
+- Base de datos operativa: `BD/guardias.sqlite`
 
-Por defecto la aplicacion usa:
-
-- local Windows: `BD/guardias.sqlite`
-- servidor Linux: `/srv/guardias/horario-ies-alcalans/BD/guardias.sqlite`
-
-### Datos anuales
-
-La web consume:
-
-- `js/data/profesorado_horarios_guardias.js`
-
-Ese fichero se genera a partir de una fuente JSON anual. La fuente habitual es:
-
-- `json_profes/profesorado_horarios_guardias_con_guardias_updated.json`
-
-Si cambias la fuente anual, hay que regenerar el JS:
-
-```powershell
-npm.cmd run annual:build
-```
-
-### Datos operativos
-
-Se guardan en SQLite:
+En SQLite se guardan:
 
 - ausencias
-- guardias asignadas
+- guardias
 - biblioteca
 - historial
 - tareas
 - sustituciones
 - faltas futuras
 - avisos TV
-- estado tecnico
+- configuraciones operativas auxiliares
+
+## URLs utiles
+
+- Principal: `/`
+- TV: `/?view=tv`
+- Impresion: `/?view=print&day=0&weekOffset=0`
+- Superadmin: `/?panel=superadmin`
+- Healthcheck: `/api/health`
 
 ## Variables de entorno
 
-La plantilla base esta en:
-
-- `.env.example`
-
-### Obligatorias
+Minimo necesario:
 
 ```text
 GUARDIAS_SESSION_SECRET=<secreto-largo-y-estable>
 ```
 
-Si falta esta variable, el backend no arranca.
-
-### Recomendadas
+Variables habituales:
 
 ```text
 PORT=3000
 GUARDIAS_DB_PATH=/srv/guardias/horario-ies-alcalans/BD/guardias.sqlite
 GUARDIAS_TRUST_PROXY=1
-GUARDIAS_CORS_ORIGINS=
 ```
 
-### Solo para inicializar una base vacia
+Solo para inicializacion de una base nueva:
 
 ```text
-GUARDIAS_ADMIN_PASSWORD=<clave-admin-inicial>
-GUARDIAS_SUPERADMIN_PASSWORD=<clave-superadmin-inicial>
+GUARDIAS_ADMIN_PASSWORD=<clave-inicial>
+GUARDIAS_SUPERADMIN_PASSWORD=<clave-inicial>
 ```
 
 ## Arranque local
 
-### PowerShell
+PowerShell:
 
 ```powershell
 cd "C:\Users\usuario\Documents\GitHub\horario-ies-alcalans"
@@ -217,323 +136,97 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\start-local.ps1
 ```
 
-### CMD
-
-```bat
-cd /d "C:\Users\usuario\Documents\GitHub\horario-ies-alcalans"
-start-local.cmd
-```
-
-### Arranque manual
+Manual:
 
 ```powershell
+cd "C:\Users\usuario\Documents\GitHub\horario-ies-alcalans"
 $env:GUARDIAS_SESSION_SECRET="pon-aqui-un-secreto"
 npm.cmd start
 ```
 
-### Test rapido local
+Tests:
 
 ```powershell
 npm.cmd test
 ```
-
-Ese comando ejecuta el runner ligero `server/scripts/run-tests.js` sin dependencias extra.
-
-### URLs locales
-
-- principal: `http://localhost:3000`
-- superadmin: `http://localhost:3000/?panel=superadmin`
-- healthcheck: `http://localhost:3000/api/health`
 
 ## Despliegue en servidor
 
-## Estado actual del servidor
-
-Actualizar estos datos cuando cambien:
-
-- IP interna actual: `172.28.244.260`
-- Ruta del proyecto en servidor: `/srv/guardias/horario-ies-alcalans`
-- Usuario operativo: `superadmin`
-
-La contrasena no debe guardarse en este repositorio.
-
-## Como se levanta en servidor
-
-La aplicacion se levanta con `pm2`.
-
-Los timers de backup estan preparados con `systemd`.
-
-### Requisitos minimos en Linux
-
-```bash
-sudo apt update
-sudo apt install -y git nginx sqlite3 ufw curl
-```
-
-Node.js y `pm2` deben estar instalados.
-
-Ejemplo:
-
-```bash
-sudo npm install -g pm2
-```
-
-### Preparacion del proyecto
-
-```bash
-cd /srv/guardias
-git clone <REPO_URL> horario-ies-alcalans
-cd /srv/guardias/horario-ies-alcalans
-npm install
-```
-
-### Archivo `.env` del servidor
-
-Ejemplo minimo:
-
-```text
-PORT=3000
-GUARDIAS_SESSION_SECRET=<secreto-largo>
-GUARDIAS_DB_PATH=/srv/guardias/horario-ies-alcalans/BD/guardias.sqlite
-GUARDIAS_TRUST_PROXY=1
-GUARDIAS_CORS_ORIGINS=
-```
-
-### Arranque con pm2
-
-Desde la carpeta del proyecto:
+Ruta de trabajo:
 
 ```bash
 cd /srv/guardias/horario-ies-alcalans
+```
+
+Actualizacion por git:
+
+```bash
+git fetch origin
+git switch preproduccion
+git pull origin preproduccion
+pm2 restart guardias
+```
+
+Si se suben archivos manualmente por SSH o `rsync`, hay que respetar la estructura interna del repo.
+
+Ejemplo local:
+
+```bash
+cd "C:/Users/usuario/Documents/GitHub/horario-ies-alcalans"
+rsync -avz guardias.html css/guardias.css js/app/guardias.js usuario@10.185.39.94:/srv/guardias/horario-ies-alcalans/
+```
+
+## PM2
+
+Arranque:
+
+```bash
 pm2 start server/app.js --name guardias
 pm2 save
-pm2 status
 ```
 
-Si prefieres arrancar usando el script de `npm`:
-
-```bash
-pm2 start npm --name guardias -- start
-pm2 save
-```
-
-### Comandos utiles de pm2
+Comandos utiles:
 
 ```bash
 pm2 status
-pm2 logs guardias
+pm2 logs guardias --lines 100
 pm2 restart guardias
 pm2 stop guardias
-pm2 delete guardias
-pm2 save
 ```
-
-### Nginx
-
-El uso esperado es:
-
-- `nginx` delante
-- Node escuchando en `127.0.0.1:3000`
-- acceso desde red interna
-
-Si algo falla por cabeceras o cookies detras del proxy, revisar:
-
-- `GUARDIAS_TRUST_PROXY=1`
 
 ## Backups
 
-Los backups de SQLite estan preparados en:
+Los timers y scripts estan en `deploy/linux/`.
+
+Ficheros importantes:
 
 - `deploy/linux/backup-guardias.sh`
-- `deploy/linux/guardias-backup-daily.service`
 - `deploy/linux/guardias-backup-daily.timer`
-- `deploy/linux/guardias-backup-weekly.service`
 - `deploy/linux/guardias-backup-weekly.timer`
-- `deploy/linux/guardias-backup-monthly.service`
 - `deploy/linux/guardias-backup-monthly.timer`
 
-### Que hacen
+## Accesos que hay que recordar
 
-- copia diaria
-- copia semanal
-- copia mensual
-- rotacion automatica
-- opcion de exportar tambien snapshot JSON
+- Jefatura y superadmin requieren contraseña.
+- El modo superadmin no aparece como vista normal: se entra con `?panel=superadmin`.
+- La contraseña no debe guardarse en este repositorio.
 
-### Rutas previstas
+## Si entra otra persona al proyecto
 
-```text
-BD principal:
-/srv/guardias/horario-ies-alcalans/BD/guardias.sqlite
+Orden recomendado para entenderlo rapido:
 
-Backups:
-/var/backups/guardias
-```
+1. Leer este `README.md`.
+2. Abrir `guardias.html`.
+3. Revisar `js/app/guardias.js`.
+4. Revisar `js/app/guardias-aux-panels.js`.
+5. Revisar `server/app.js` y `server/routes/`.
+6. Confirmar en servidor que rama, `.env`, base de datos y `pm2` coinciden.
 
-### Activacion de timers
+## Nota de mantenimiento
 
-```bash
-chmod +x /srv/guardias/horario-ies-alcalans/deploy/linux/backup-guardias.sh
-sudo cp /srv/guardias/horario-ies-alcalans/deploy/linux/guardias-backup-*.service /etc/systemd/system/
-sudo cp /srv/guardias/horario-ies-alcalans/deploy/linux/guardias-backup-*.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now guardias-backup-daily.timer
-sudo systemctl enable --now guardias-backup-weekly.timer
-sudo systemctl enable --now guardias-backup-monthly.timer
-```
+Cuando cambien estos datos, actualizar este README:
 
-### Revision de backups
-
-```bash
-systemctl status guardias-backup-daily.timer
-systemctl status guardias-backup-weekly.timer
-systemctl status guardias-backup-monthly.timer
-ls -la /var/backups/guardias
-```
-
-## Operaciones habituales
-
-### Regenerar datos anuales
-
-```powershell
-npm.cmd run annual:build
-```
-
-En Linux:
-
-```bash
-npm run annual:build
-```
-
-### Reinicio de curso
-
-```powershell
-npm.cmd run course:reset -- --yes
-```
-
-Esto borra datos operativos temporales del curso y deja snapshot.
-
-### Smoke test
-
-Con servidor levantado:
-
-```powershell
-npm.cmd run smoke
-```
-
-Si quieres probar otro host:
-
-```powershell
-$env:GUARDIAS_BASE_URL="http://127.0.0.1:3000"
-npm.cmd run smoke
-```
-
-### Test unitarios ligeros
-
-Sin levantar servidor:
-
-```powershell
-npm.cmd test
-```
-
-Cubre validacion basica de autenticacion, sesion y fuente anual. Los tests viven en `server/tests/`.
-
-## Que revisar si falla
-
-## 1. El backend no arranca
-
-Comprobar:
-
-- existe `.env`
-- `GUARDIAS_SESSION_SECRET` esta definido
-- la ruta de `GUARDIAS_DB_PATH` existe
-- `node_modules` esta instalado
-
-Comandos:
-
-```bash
-cd /srv/guardias/horario-ies-alcalans
-pm2 logs guardias --lines 100
-cat .env
-ls -la BD
-```
-
-## 2. La web abre pero no guarda cambios
-
-Comprobar:
-
-- que la API responde
-- que el usuario tiene sesion
-- que SQLite es escribible
-- que no hay restauracion en curso
-
-Comandos:
-
-```bash
-curl http://127.0.0.1:3000/api/health
-ls -la /srv/guardias/horario-ies-alcalans/BD
-pm2 logs guardias --lines 200
-```
-
-## 3. La web carga mal o faltan estilos/scripts
-
-Comprobar:
-
-- que `guardias.html`, `css/guardias.css`, `js/app/guardias-core.js` y `js/app/guardias.js` existen
-- que `nginx` no sirve una copia antigua
-- que el navegador no esta cacheando una version vieja
-
-## 4. El panel TV no muestra avisos
-
-Comprobar:
-
-- que existe al menos un aviso activo
-- que `/tv` apunta al proyecto actual
-- que no se esta sirviendo una rama antigua
-
-## 5. Los informes PDF fallan
-
-Comprobar:
-
-- logs del backend
-- permisos de lectura de la base
-- estado de `pdfkit`
-
-## 6. Los backups no aparecen
-
-Comprobar:
-
-- timers de systemd activos
-- permisos sobre `/var/backups/guardias`
-- `sqlite3` instalado
-
-Comandos:
-
-```bash
-systemctl list-timers | grep guardias
-journalctl -u guardias-backup-daily.service -n 100 --no-pager
-which sqlite3
-```
-
-## Checklist rapida de diagnostico
-
-Si alguien retoma el proyecto y "no funciona", seguir este orden:
-
-1. `pm2 status`
-2. `pm2 logs guardias --lines 100`
-3. `curl http://127.0.0.1:3000/api/health`
-4. revisar `.env`
-5. revisar que existe `BD/guardias.sqlite`
-6. comprobar permisos de escritura en `BD/`
-7. verificar que la rama desplegada es la correcta
-8. si hay cambios anuales, regenerar `js/data/profesorado_horarios_guardias.js`
-
-## Notas para quien venga detras
-
-- El proyecto no usa framework frontend; la logica cliente sigue concentrada en `js/app/guardias.js`, pero las utilidades puras ya se estan sacando a `js/app/guardias-core.js`.
-- El router `server/routes/profesorado.js` ahora actua como punto de entrada y delega en modulos bajo `server/routes/profesorado/`.
-- Si algo "visual" falla, normalmente el problema estara en `guardias.html`, `css/guardias.css`, `js/app/guardias-core.js` o `js/app/guardias.js`.
-- Si algo "de datos" falla, normalmente estara en `server/routes/*`, `server/db.js` o la propia `BD/guardias.sqlite`.
-- Antes de tocar logica anual, revisar el flujo `json_profes -> annual:build -> js/data/profesorado_horarios_guardias.js`.
-- Antes de tocar despliegue, revisar si el servidor real sigue levantando con `pm2` y no con otro mecanismo.
-- Si cambias IP, ruta del proyecto o usuario operativo, actualiza este README.
+- IP del servidor
+- ruta real del proyecto
+- forma de arranque (`pm2`, proxy, puerto)
+- rama operativa de despliegue

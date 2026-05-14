@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDatabase } = require('../db');
+const { getDatabase, withImmediateTransaction } = require('../db');
 const { ensureArray, normalizeText, sanitizeAusencia } = require('./validation');
 const { requireRole } = require('../session');
 const {
@@ -69,14 +69,20 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
   try {
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
     const db = await getDatabase();
-    const { ausente_key, guardia_key } = await ensureNoDuplicateAbsence(db, { dia, hora, ausente, guardia });
-    const result = await db.run(
-      `INSERT INTO ausencias (dia, hora, ausente, guardia, aula, faena, obs)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [dia, hora, ausente, guardia, aula, faena ? 1 : 0, obs]
-    );
-    await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
-    const row = await db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]);
+    let ausente_key = '';
+    let guardia_key = '';
+    const row = await withImmediateTransaction(db, async () => {
+      const keys = await ensureNoDuplicateAbsence(db, { dia, hora, ausente, guardia });
+      ausente_key = keys.ausente_key;
+      guardia_key = keys.guardia_key;
+      const result = await db.run(
+        `INSERT INTO ausencias (dia, hora, ausente, guardia, aula, faena, obs)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [dia, hora, ausente, guardia, aula, faena ? 1 : 0, obs]
+      );
+      await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
+      return db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]);
+    });
     res.status(201).json({ ...row, ausente_key, guardia_key });
   } catch (error) {
     next(error);
@@ -95,27 +101,29 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
       duplicateKeys.add(key);
     });
     const db = await getDatabase();
-    await db.exec('DELETE FROM ausencias');
+    const persisted = await withImmediateTransaction(db, async () => {
+      await db.exec('DELETE FROM ausencias');
 
-    for (const row of rows) {
-      await db.run(
-        `INSERT INTO ausencias (id, dia, hora, ausente, guardia, aula, faena, obs, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        [
-          row.id,
-          row.dia,
-          row.hora,
-          row.ausente,
-          row.guardia || '',
-          row.aula || '',
-          row.faena ? 1 : 0,
-          row.obs || ''
-        ]
-      );
-    }
+      for (const row of rows) {
+        await db.run(
+          `INSERT INTO ausencias (id, dia, hora, ausente, guardia, aula, faena, obs, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [
+            row.id,
+            row.dia,
+            row.hora,
+            row.ausente,
+            row.guardia || '',
+            row.aula || '',
+            row.faena ? 1 : 0,
+            row.obs || ''
+          ]
+        );
+      }
 
-    const persisted = await db.all('SELECT * FROM ausencias ORDER BY dia, hora, id');
-    await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
+      await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
+      return db.all('SELECT * FROM ausencias ORDER BY dia, hora, id');
+    });
     res.json(persisted);
   } catch (error) {
     next(error);
@@ -127,18 +135,24 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
     const { id } = req.params;
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
     const db = await getDatabase();
-    const { ausente_key, guardia_key } = await ensureNoDuplicateAbsence(db, { dia, hora, ausente, guardia }, id);
-    const result = await db.run(
-      `UPDATE ausencias
-       SET dia = ?, hora = ?, ausente = ?, guardia = ?, aula = ?, faena = ?, obs = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [dia, hora, ausente, guardia, aula, faena ? 1 : 0, obs, id]
-    );
-    if (!result.changes) {
-      throw notFound('No existe una ausencia con ese id.');
-    }
-    await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
-    const row = await db.get('SELECT * FROM ausencias WHERE id = ?', [id]);
+    let ausente_key = '';
+    let guardia_key = '';
+    const row = await withImmediateTransaction(db, async () => {
+      const keys = await ensureNoDuplicateAbsence(db, { dia, hora, ausente, guardia }, id);
+      ausente_key = keys.ausente_key;
+      guardia_key = keys.guardia_key;
+      const result = await db.run(
+        `UPDATE ausencias
+         SET dia = ?, hora = ?, ausente = ?, guardia = ?, aula = ?, faena = ?, obs = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [dia, hora, ausente, guardia, aula, faena ? 1 : 0, obs, id]
+      );
+      if (!result.changes) {
+        throw notFound('No existe una ausencia con ese id.');
+      }
+      await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
+      return db.get('SELECT * FROM ausencias WHERE id = ?', [id]);
+    });
     res.json({ ...row, ausente_key, guardia_key });
   } catch (error) {
     next(error);
@@ -148,11 +162,13 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
 router.delete('/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const db = await getDatabase();
-    const result = await db.run('DELETE FROM ausencias WHERE id = ?', [req.params.id]);
-    if (!result.changes) {
-      throw notFound('No existe una ausencia con ese id.');
-    }
-    await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
+    await withImmediateTransaction(db, async () => {
+      const result = await db.run('DELETE FROM ausencias WHERE id = ?', [req.params.id]);
+      if (!result.changes) {
+        throw notFound('No existe una ausencia con ese id.');
+      }
+      await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
+    });
     res.status(204).end();
   } catch (error) {
     next(error);

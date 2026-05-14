@@ -378,6 +378,7 @@
     const getPatioCoverageSummary=isFn(options.getPatioCoverageSummary)?options.getPatioCoverageSummary:null;
     const getPatioSectors=isFn(options.getPatioSectors)?options.getPatioSectors:()=>Array.isArray(options.patioSectors)?options.patioSectors:[];
     const getPatioExtraPosts=isFn(options.getPatioExtraPosts)?options.getPatioExtraPosts:null;
+    const getPrintScheduleSnapshot=isFn(options.getPrintScheduleSnapshot)?options.getPrintScheduleSnapshot:()=>null;
 
     function getCurrentSchoolSlot(){
       if(Number.isInteger(forcedTvHora)&&forcedTvHora>=1&&forcedTvHora<=9){
@@ -481,8 +482,7 @@
     function openPrintableSchedule(){
       if(getValue(options.isAdmin,false)!==true) return;
       const destination=getPrintRouteUrl(getDay(),getWeekOffset());
-      const opened=shared.window.open(destination,'_blank','noopener,noreferrer');
-      if(!opened) shared.window.location.href=destination;
+      shared.window.location.href=destination;
     }
     function getTvSlotAssignments(slot,rowsSource){
       if(!slot) return [];
@@ -533,6 +533,35 @@
           assignments:getTvSlotAssignments({dia:targetDay,hora},rowsSource)
         }));
     }
+    function normalizePrintSnapshot(raw){
+      if(!raw||typeof raw!=='object'||!Array.isArray(raw.slots)) return null;
+      const safeSlots=raw.slots.map(slot=>{
+        const hora=Number(slot?.hora);
+        if(!Number.isInteger(hora)||!shared.horaMap[hora]) return null;
+        const info=slot.info&&typeof slot.info==='object'?slot.info:shared.horaMap[hora];
+        return {
+          hora,
+          info:{
+            label:shared.cleanText(info.label)||shared.horaMap[hora].label,
+            rango:shared.cleanText(info.rango)||shared.horaMap[hora].rango
+          },
+          assignments:(Array.isArray(slot.assignments)?slot.assignments:[]).map(item=>({
+            teacher:shared.cleanText(item?.teacher),
+            location:shared.cleanText(item?.location),
+            meta:shared.cleanText(item?.meta),
+            tone:shared.cleanText(item?.tone)||'general'
+          }))
+        };
+      }).filter(Boolean);
+      if(!safeSlots.length) return null;
+      return {
+        slots:safeSlots,
+        dayLabel:shared.cleanText(raw.dayLabel),
+        dateLabel:shared.cleanText(raw.dateLabel),
+        weekLabel:shared.cleanText(raw.weekLabel),
+        createdAt:shared.cleanText(raw.createdAt)
+      };
+    }
     function normalizePatioExtraPost(item,index){
       const row=item&&typeof item==='object'&&!Array.isArray(item)?item:{label:item};
       const label=shared.cleanText(row.label||row.name||row.title||row.puesto||row.post||row.id||`Extra ${index+1}`);
@@ -576,14 +605,15 @@
       const legendMarkup=sectors.map(sector=>{
         const state=states.find(item=>item.sectorId===sector.id)||null;
         const covered=!!state?.covered;
-        return `<div class="tv-patio-legend-item ${covered?'is-covered':'is-pending'}">
+        const stateClass=state?.statusKind==='blocked'?'is-blocked':state?.statusKind==='partial'?'is-partial':covered?'is-covered':'is-pending';
+        return `<div class="tv-patio-legend-item ${stateClass}">
           <span class="tv-patio-legend-dot">${escapeHtml(sector.shortLabel||sector.id||'')}</span>
           <div class="tv-patio-legend-copy">
             <div class="tv-patio-legend-row">
               <span class="tv-patio-legend-text">${escapeHtml(sector.label||sector.id||'Sector')}</span>
-              <span class="tv-patio-legend-state">${covered?'Cubierto':'Pendiente'}</span>
+              <span class="tv-patio-legend-state">${escapeHtml(state?.statusLabel||(covered?'Cubierto':'Pendiente'))}</span>
             </div>
-            <div class="tv-patio-legend-person">${escapeHtml(state?.responsable||'Rotacion sin asignar')}</div>
+            <div class="tv-patio-legend-person">${escapeHtml(state?.responsable||state?.note||'Rotacion sin asignar')}</div>
           </div>
         </div>`;
       }).join('');
@@ -593,10 +623,10 @@
           <span class="tv-patio-extras-count">${extraPosts.length}</span>
         </div>
         <div class="tv-patio-extras-list">
-          ${extraPosts.map(item=>`<div class="tv-patio-extra ${item.covered?'is-covered':'is-pending'}">
+          ${extraPosts.map(item=>`<div class="tv-patio-extra ${item.statusKind==='blocked'?'is-blocked':item.statusKind==='partial'?'is-partial':item.covered?'is-covered':'is-pending'}">
             <div class="tv-patio-extra-row">
               <span class="tv-patio-extra-name">${escapeHtml(item.label)}</span>
-              <span class="tv-patio-extra-state">${item.covered?'Cubierto':'Pendiente'}</span>
+              <span class="tv-patio-extra-state">${escapeHtml(item.statusLabel||(item.covered?'Cubierto':'Pendiente'))}</span>
             </div>
             <div class="tv-patio-extra-person">${escapeHtml(item.responsible||item.note||'Sin asignar')}</div>
           </div>`).join('')}
@@ -623,13 +653,14 @@
             ${sectors.map(sector=>{
             const state=states.find(item=>item.sectorId===sector.id)||null;
             const covered=!!state?.covered;
-            return `<article class="tv-patio-sector ${sector.mapClass||''} ${covered?'is-covered':'is-pending'}">
+            const stateClass=state?.statusKind==='blocked'?'is-blocked':state?.statusKind==='partial'?'is-partial':covered?'is-covered':'is-pending';
+            return `<article class="tv-patio-sector ${sector.mapClass||''} ${stateClass}">
               <div class="tv-patio-sector-top">
                 <span class="tv-patio-sector-badge">${escapeHtml(sector.shortLabel||sector.id||'')}</span>
-                <span class="tv-patio-sector-state">${covered?'Cubierto':'Pendiente'}</span>
+                <span class="tv-patio-sector-state">${escapeHtml(state?.statusLabel||(covered?'Cubierto':'Pendiente'))}</span>
               </div>
               <div class="tv-patio-sector-name">${escapeHtml(sector.label||sector.id||'Sector')}</div>
-              <div class="tv-patio-sector-person">${escapeHtml(state?.responsable||'Rotacion sin asignar')}</div>
+              <div class="tv-patio-sector-person">${escapeHtml(state?.responsable||state?.note||'Rotacion sin asignar')}</div>
             </article>`;
           }).join('')}
           </div>
@@ -714,13 +745,21 @@
       const weekOffset=getWeekOffset();
       const targetDate=getDateForSchoolWeekDay(weekKey,day);
       const rowsSource=getRowsForWeekOffset(weekOffset);
-      const slots=getPrintableSlotsForDay(day,rowsSource);
+      const snapshot=normalizePrintSnapshot(getPrintScheduleSnapshot());
+      const slots=snapshot?.slots||getPrintableSlotsForDay(day,rowsSource);
       const generatedAt=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      const snapshotCreated=snapshot?.createdAt?new Date(snapshot.createdAt):null;
+      const snapshotTime=snapshotCreated instanceof Date&&!Number.isNaN(snapshotCreated.getTime())
+        ? snapshotCreated.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})
+        : generatedAt;
+      const dayLabel=snapshot?.dayLabel||shared.dias[day]||'Jornada lectiva';
+      const dateLabel=snapshot?.dateLabel||formatPrintableDateLabel(targetDate);
+      const weekLabel=snapshot?.weekLabel||shared.formatWeekRangeLabel(weekKey,weekOffset);
       shell.innerHTML=`
         <div class="print-toolbar no-print">
           <div class="print-toolbar-copy">
             <strong>Vista imprimible de contingencia</strong>
-            <span>Revisa el parte y lanza la impresion en A4 horizontal.</span>
+            <span>Instantanea estatica generada a las ${escapeHtml(snapshotTime)}.</span>
           </div>
           <div class="print-toolbar-actions">
             <button class="btn-add btn-add-secondary" type="button" data-guardias-aux-print="native">Imprimir horario</button>
@@ -732,12 +771,12 @@
             <div>
               <div class="print-sheet-kicker">IES Alcalans · Parte de guardias</div>
               <h1 class="print-sheet-title">Horario de contingencia</h1>
-              <div class="print-sheet-meta">Generado a las ${escapeHtml(generatedAt)}</div>
+              <div class="print-sheet-meta">Generado a las ${escapeHtml(snapshotTime)}</div>
             </div>
             <div class="print-sheet-date">
-              <div class="print-sheet-day">${escapeHtml(shared.dias[day]||'Jornada lectiva')}</div>
-              <div class="print-sheet-date-text">${escapeHtml(formatPrintableDateLabel(targetDate))}</div>
-              <div class="print-sheet-week">${escapeHtml(shared.formatWeekRangeLabel(weekKey,weekOffset))}</div>
+              <div class="print-sheet-day">${escapeHtml(dayLabel)}</div>
+              <div class="print-sheet-date-text">${escapeHtml(dateLabel)}</div>
+              <div class="print-sheet-week">${escapeHtml(weekLabel)}</div>
             </div>
           </header>
           <div class="print-slot-grid">

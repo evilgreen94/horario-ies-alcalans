@@ -184,6 +184,23 @@ function sanitizePatioGuardia(row) {
   };
 }
 
+function sanitizePatioTeacherBlock(row) {
+  const input = ensureObject(row, 'Bloqueo de patio');
+  const reason = normalizeString(input.reason || input.motivo, 'equipo-docente') || 'equipo-docente';
+  const hora = normalizeInteger(input.hora, 'hora', 1, 9);
+  if (![4, 8].includes(hora)) {
+    throw badRequest('hora debe ser una guardia de patio valida.');
+  }
+  return {
+    weekKey: ensureRequiredString(input.weekKey, 'weekKey'),
+    dia: normalizeInteger(input.dia, 'dia', 0, 4),
+    hora,
+    profesor: ensureRequiredString(input.profesor, 'profesor'),
+    reason,
+    note: normalizeString(input.note || input.nota)
+  };
+}
+
 function sanitizeTeacherFutureAbsence(row) {
   const input = ensureObject(row, 'Aviso de ausencia futura');
   const status = normalizeString(input.status, 'pending') || 'pending';
@@ -221,6 +238,7 @@ module.exports = {
   sanitizeBiblioteca,
   sanitizeTeacherFutureAbsence,
   sanitizePatioGuardia,
+  sanitizePatioTeacherBlock,
   sanitizeTeacherPracticeGuardia,
   sanitizeTeacherPracticeGuardiaSlot,
   sanitizeHistorial,

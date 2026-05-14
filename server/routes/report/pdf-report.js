@@ -42,7 +42,12 @@ function formatReportDate() {
 
 async function loadTeacherSubstitutionMap(db) {
   const row = await db.get('SELECT value FROM app_state WHERE key = ?', [SUBSTITUTIONS_STATE_KEY]);
-  const parsed = row?.value ? JSON.parse(row.value) : [];
+  let parsed = [];
+  try {
+    parsed = row?.value ? JSON.parse(row.value) : [];
+  } catch (_error) {
+    parsed = [];
+  }
   if (!Array.isArray(parsed)) return {};
 
   return Object.fromEntries(

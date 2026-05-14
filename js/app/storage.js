@@ -217,6 +217,15 @@
         body: JSON.stringify(rows)
       });
     },
+    fetchPatioTeacherBlocks(){
+      return request('/profesorado/patio-teacher-blocks');
+    },
+    replacePatioTeacherBlocks(rows){
+      return request('/profesorado/patio-teacher-blocks/replace', {
+        method: 'PUT',
+        body: JSON.stringify(rows)
+      });
+    },
     fetchTeacherFutureAbsences(){
       return request('/profesorado/future-absences');
     },

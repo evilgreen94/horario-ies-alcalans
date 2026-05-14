@@ -1,5 +1,14 @@
+const { withImmediateTransaction: defaultWithImmediateTransaction } = require('../../db');
+
 function registerTareasRoutes(router, deps) {
-  const { getDatabase, sanitizeTareaProfesorado, ensureArray, ensureRequiredString, requireRole } = deps;
+  const {
+    getDatabase,
+    sanitizeTareaProfesorado,
+    ensureArray,
+    ensureRequiredString,
+    requireRole,
+    withImmediateTransaction = defaultWithImmediateTransaction
+  } = deps;
 
   router.get('/tareas', async (_req, res, next) => {
     try {
@@ -24,15 +33,17 @@ function registerTareasRoutes(router, deps) {
     try {
       const rows = ensureArray(req.body, 'Las tareas de profesorado').map(sanitizeTareaProfesorado);
       const db = await getDatabase();
-      await db.exec('DELETE FROM tareas_profesorado');
+      await withImmediateTransaction(db, async () => {
+        await db.exec('DELETE FROM tareas_profesorado');
 
-      for (const row of rows) {
-        await db.run(
-          `INSERT INTO tareas_profesorado (id, profesor, dia, hora, dejada, tarea, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-          [row.id, row.profesor, row.dia, row.hora, row.dejada ? 1 : 0, row.tarea || '']
-        );
-      }
+        for (const row of rows) {
+          await db.run(
+            `INSERT INTO tareas_profesorado (id, profesor, dia, hora, dejada, tarea, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [row.id, row.profesor, row.dia, row.hora, row.dejada ? 1 : 0, row.tarea || '']
+          );
+        }
+      });
 
       res.json({ ok: true });
     } catch (error) {

@@ -118,6 +118,19 @@ app.use((req, res, next) => {
   }
   next();
 });
+app.use((req, res, next) => {
+  const pathname = decodeURIComponent((req.path || '').replace(/\\/g, '/')).toLowerCase();
+  if (
+    pathname === '/' ||
+    pathname === '/guardias.html' ||
+    pathname.startsWith('/js/app/') ||
+    pathname.startsWith('/js/data/') ||
+    pathname.startsWith('/css/')
+  ) {
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, '..'), {
   dotfiles: 'deny',
   index: false

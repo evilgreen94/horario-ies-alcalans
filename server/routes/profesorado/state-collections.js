@@ -3,6 +3,7 @@ const PRACTICAS_GUARDIAS_STATE_KEY = 'teacher_practicas_guardias';
 const PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY = 'teacher_practicas_guardias_tramos';
 const FUTURE_ABSENCES_STATE_KEY = 'teacher_future_absences';
 const PATIO_GUARDIAS_STATE_KEY = 'patio_guardias';
+const PATIO_TEACHER_BLOCKS_STATE_KEY = 'patio_teacher_blocks';
 
 async function getStateRows(db, key) {
   const row = await db.get('SELECT value FROM app_state WHERE key = ?', [key]);
@@ -28,7 +29,9 @@ function registerStateCollectionRoutes(router, deps) {
     sanitizeTeacherPracticeGuardiaSlot,
     sanitizeTeacherFutureAbsence,
     sanitizePatioGuardia,
-    requireRole
+    sanitizePatioTeacherBlock,
+    requireRole,
+    withImmediateTransaction
   } = deps;
 
   router.get('/substitutions', async (_req, res, next) => {
@@ -111,6 +114,26 @@ function registerStateCollectionRoutes(router, deps) {
     }
   });
 
+  router.get('/patio-teacher-blocks', async (_req, res, next) => {
+    try {
+      const db = await getDatabase();
+      res.json(await getStateRows(db, PATIO_TEACHER_BLOCKS_STATE_KEY));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.put('/patio-teacher-blocks/replace', requireRole('admin'), async (req, res, next) => {
+    try {
+      const rows = ensureArray(req.body, 'Los bloqueos de patio').map(sanitizePatioTeacherBlock);
+      const db = await getDatabase();
+      await replaceStateRows(db, PATIO_TEACHER_BLOCKS_STATE_KEY, rows);
+      res.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get('/future-absences', async (_req, res, next) => {
     try {
       const db = await getDatabase();
@@ -124,9 +147,11 @@ function registerStateCollectionRoutes(router, deps) {
     try {
       const entry = sanitizeTeacherFutureAbsence(req.body);
       const db = await getDatabase();
-      const current = await getStateRows(db, FUTURE_ABSENCES_STATE_KEY);
-      const nextRows = [...current.filter(row => row?.id !== entry.id), entry];
-      await replaceStateRows(db, FUTURE_ABSENCES_STATE_KEY, nextRows);
+      await withImmediateTransaction(db, async () => {
+        const current = await getStateRows(db, FUTURE_ABSENCES_STATE_KEY);
+        const nextRows = [...current.filter(row => row?.id !== entry.id), entry];
+        await replaceStateRows(db, FUTURE_ABSENCES_STATE_KEY, nextRows);
+      });
       res.json({ ok: true, entry });
     } catch (error) {
       next(error);
@@ -138,9 +163,11 @@ function registerStateCollectionRoutes(router, deps) {
       const id = String(req.params.id || '').trim();
       const entry = sanitizeTeacherFutureAbsence({ ...req.body, id });
       const db = await getDatabase();
-      const current = await getStateRows(db, FUTURE_ABSENCES_STATE_KEY);
-      const nextRows = [...current.filter(row => row?.id !== id), entry];
-      await replaceStateRows(db, FUTURE_ABSENCES_STATE_KEY, nextRows);
+      await withImmediateTransaction(db, async () => {
+        const current = await getStateRows(db, FUTURE_ABSENCES_STATE_KEY);
+        const nextRows = [...current.filter(row => row?.id !== id), entry];
+        await replaceStateRows(db, FUTURE_ABSENCES_STATE_KEY, nextRows);
+      });
       res.json({ ok: true, entry });
     } catch (error) {
       next(error);
@@ -151,9 +178,11 @@ function registerStateCollectionRoutes(router, deps) {
     try {
       const id = String(req.params.id || '').trim();
       const db = await getDatabase();
-      const current = await getStateRows(db, FUTURE_ABSENCES_STATE_KEY);
-      const nextRows = current.filter(row => String(row?.id || '') !== id);
-      await replaceStateRows(db, FUTURE_ABSENCES_STATE_KEY, nextRows);
+      await withImmediateTransaction(db, async () => {
+        const current = await getStateRows(db, FUTURE_ABSENCES_STATE_KEY);
+        const nextRows = current.filter(row => String(row?.id || '') !== id);
+        await replaceStateRows(db, FUTURE_ABSENCES_STATE_KEY, nextRows);
+      });
       res.json({ ok: true });
     } catch (error) {
       next(error);

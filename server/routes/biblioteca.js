@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDatabase } = require('../db');
+const { getDatabase, withImmediateTransaction } = require('../db');
 const { ensureArray, sanitizeBiblioteca } = require('./validation');
 const { requireRole } = require('../session');
 
@@ -39,17 +39,19 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
   try {
     const rows = ensureArray(req.body, 'Las guardias de biblioteca').map(sanitizeBiblioteca);
     const db = await getDatabase();
-    await db.exec('DELETE FROM biblioteca_guardias');
+    const persisted = await withImmediateTransaction(db, async () => {
+      await db.exec('DELETE FROM biblioteca_guardias');
 
-    for (const row of rows) {
-      await db.run(
-        `INSERT INTO biblioteca_guardias (dia, hora, profesor, updated_at)
-         VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
-        [row.dia, row.hora, row.profesor]
-      );
-    }
+      for (const row of rows) {
+        await db.run(
+          `INSERT INTO biblioteca_guardias (dia, hora, profesor, updated_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+          [row.dia, row.hora, row.profesor]
+        );
+      }
 
-    const persisted = await db.all('SELECT dia, hora, profesor FROM biblioteca_guardias ORDER BY dia, hora');
+      return db.all('SELECT dia, hora, profesor FROM biblioteca_guardias ORDER BY dia, hora');
+    });
     res.json(persisted);
   } catch (error) {
     next(error);

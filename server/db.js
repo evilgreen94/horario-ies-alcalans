@@ -61,10 +61,31 @@ async function getDatabase() {
     databasePromise = open({
       filename: DB_PATH,
       driver: sqlite3.Database
+    }).then(async db => {
+      await db.exec('PRAGMA journal_mode = WAL');
+      await db.exec('PRAGMA synchronous = NORMAL');
+      await db.exec('PRAGMA busy_timeout = 5000');
+      return db;
     });
   }
 
   return databasePromise;
+}
+
+async function withImmediateTransaction(db, callback) {
+  await db.exec('BEGIN IMMEDIATE TRANSACTION');
+  try {
+    const result = await callback();
+    await db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    try {
+      await db.exec('ROLLBACK');
+    } catch (_rollbackError) {
+      // Keep the original failure; rollback can fail if SQLite already closed the transaction.
+    }
+    throw error;
+  }
 }
 
 async function initializeDatabase() {
@@ -164,8 +185,7 @@ async function ensureWeeklyResetIfNeeded(dbInstance) {
     return false;
   }
 
-  await db.exec('BEGIN TRANSACTION');
-  try {
+  await withImmediateTransaction(db, async () => {
     await db.exec('DELETE FROM ausencias');
     await db.exec('DELETE FROM biblioteca_guardias');
     await db.exec('DELETE FROM historial');
@@ -178,11 +198,7 @@ async function ensureWeeklyResetIfNeeded(dbInstance) {
        WHERE key = ?`,
       [currentWeekKey, WEEK_STATE_KEY]
     );
-    await db.exec('COMMIT');
-  } catch (error) {
-    await db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 
   lastWeekCheckKey = currentWeekKey;
   return true;
@@ -215,5 +231,6 @@ module.exports = {
   getDatabase,
   getMadridNow,
   getCurrentSchoolWeekKey,
-  initializeDatabase
+  initializeDatabase,
+  withImmediateTransaction
 };

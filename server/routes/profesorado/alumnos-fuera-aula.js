@@ -1,3 +1,5 @@
+const { withImmediateTransaction: defaultWithImmediateTransaction } = require('../../db');
+
 const ALUMNOS_FUERA_AULA_LIMIT = 10;
 
 function serializeAlumnosFueraAulaRow(row) {
@@ -136,8 +138,7 @@ function makeSlotResponse(entry, rows) {
 }
 
 async function applyAlumnosFueraAulaMovement(db, inputRow, direction, badRequest) {
-  await db.exec('BEGIN IMMEDIATE TRANSACTION');
-  try {
+  return defaultWithImmediateTransaction(db, async () => {
     const existingRow = await db.get(
       'SELECT * FROM alumnos_fuera_aula WHERE profesor = ? AND dia = ? AND hora = ?',
       [inputRow.profesor, inputRow.dia, inputRow.hora]
@@ -184,16 +185,21 @@ async function applyAlumnosFueraAulaMovement(db, inputRow, direction, badRequest
       'SELECT * FROM alumnos_fuera_aula WHERE dia = ? AND hora = ? ORDER BY dia, hora, profesor, id',
       [inputRow.dia, inputRow.hora]
     );
-    await db.exec('COMMIT');
     return makeSlotResponse(entry, persistedRows);
-  } catch (error) {
-    await db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 }
 
 function registerAlumnosFueraAulaRoutes(router, deps) {
-  const { getDatabase, sanitizeAlumnosFueraAula, ensureArray, requireRole, requireSameOriginWrite, badRequest, notFound } = deps;
+  const {
+    getDatabase,
+    sanitizeAlumnosFueraAula,
+    ensureArray,
+    requireRole,
+    requireSameOriginWrite,
+    badRequest,
+    notFound,
+    withImmediateTransaction = defaultWithImmediateTransaction
+  } = deps;
 
   router.get('/alumnos-fuera-aula', async (_req, res, next) => {
     try {
@@ -263,17 +269,19 @@ function registerAlumnosFueraAulaRoutes(router, deps) {
       ensureReplacementSlotLimits(rows, badRequest);
 
       const db = await getDatabase();
-      await db.exec('DELETE FROM alumnos_fuera_aula');
+      const persisted = await withImmediateTransaction(db, async () => {
+        await db.exec('DELETE FROM alumnos_fuera_aula');
 
-      for (const row of rows) {
-        await db.run(
-          `INSERT INTO alumnos_fuera_aula (id, profesor, dia, hora, cantidad, last_exit_at, last_return_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-          [row.id ?? null, row.profesor, row.dia, row.hora, row.cantidad, row.lastExitAt || '', row.lastReturnAt || '']
-        );
-      }
+        for (const row of rows) {
+          await db.run(
+            `INSERT INTO alumnos_fuera_aula (id, profesor, dia, hora, cantidad, last_exit_at, last_return_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [row.id ?? null, row.profesor, row.dia, row.hora, row.cantidad, row.lastExitAt || '', row.lastReturnAt || '']
+          );
+        }
 
-      const persisted = await getAlumnosFueraAulaRows(db);
+        return getAlumnosFueraAulaRows(db);
+      });
       res.json(persisted.map(serializeAlumnosFueraAulaRow));
     } catch (error) {
       next(error);
@@ -284,37 +292,40 @@ function registerAlumnosFueraAulaRoutes(router, deps) {
     try {
       const inputRow = sanitizeAlumnosFueraAula(req.body);
       const db = await getDatabase();
-      const existingRow = await db.get(
-        'SELECT * FROM alumnos_fuera_aula WHERE profesor = ? AND dia = ? AND hora = ?',
-        [inputRow.profesor, inputRow.dia, inputRow.hora]
-      );
-      const rows = await db.all('SELECT * FROM alumnos_fuera_aula WHERE dia = ? AND hora = ?', [inputRow.dia, inputRow.hora]);
-      const candidate = buildNextAlumnosFueraAulaRecord(existingRow, inputRow);
+      let existingRow = null;
+      const row = await withImmediateTransaction(db, async () => {
+        existingRow = await db.get(
+          'SELECT * FROM alumnos_fuera_aula WHERE profesor = ? AND dia = ? AND hora = ?',
+          [inputRow.profesor, inputRow.dia, inputRow.hora]
+        );
+        const rows = await db.all('SELECT * FROM alumnos_fuera_aula WHERE dia = ? AND hora = ?', [inputRow.dia, inputRow.hora]);
+        const candidate = buildNextAlumnosFueraAulaRecord(existingRow, inputRow);
 
-      ensureSlotLimit(rows, candidate, badRequest, existingRow?.id ?? null);
+        ensureSlotLimit(rows, candidate, badRequest, existingRow?.id ?? null);
 
-      await db.run(
-        `INSERT INTO alumnos_fuera_aula (profesor, dia, hora, cantidad, last_exit_at, last_return_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-         ON CONFLICT(profesor, dia, hora) DO UPDATE SET
-           cantidad = excluded.cantidad,
-           last_exit_at = excluded.last_exit_at,
-           last_return_at = excluded.last_return_at,
-           updated_at = CURRENT_TIMESTAMP`,
-        [
-          candidate.profesor,
-          candidate.dia,
-          candidate.hora,
-          candidate.cantidad,
-          candidate.last_exit_at || '',
-          candidate.last_return_at || ''
-        ]
-      );
+        await db.run(
+          `INSERT INTO alumnos_fuera_aula (profesor, dia, hora, cantidad, last_exit_at, last_return_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(profesor, dia, hora) DO UPDATE SET
+             cantidad = excluded.cantidad,
+             last_exit_at = excluded.last_exit_at,
+             last_return_at = excluded.last_return_at,
+             updated_at = CURRENT_TIMESTAMP`,
+          [
+            candidate.profesor,
+            candidate.dia,
+            candidate.hora,
+            candidate.cantidad,
+            candidate.last_exit_at || '',
+            candidate.last_return_at || ''
+          ]
+        );
 
-      const row = await db.get(
-        'SELECT * FROM alumnos_fuera_aula WHERE profesor = ? AND dia = ? AND hora = ?',
-        [inputRow.profesor, inputRow.dia, inputRow.hora]
-      );
+        return db.get(
+          'SELECT * FROM alumnos_fuera_aula WHERE profesor = ? AND dia = ? AND hora = ?',
+          [inputRow.profesor, inputRow.dia, inputRow.hora]
+        );
+      });
       res.status(existingRow ? 200 : 201).json({ ok: true, entry: serializeAlumnosFueraAulaRow(row) });
     } catch (error) {
       next(error);
@@ -329,45 +340,47 @@ function registerAlumnosFueraAulaRoutes(router, deps) {
       }
 
       const db = await getDatabase();
-      const existingRow = await db.get('SELECT * FROM alumnos_fuera_aula WHERE id = ?', [id]);
-      if (!existingRow) {
-        throw notFound('No existe un registro con ese id.');
-      }
-
       const inputRow = sanitizeAlumnosFueraAula({ ...req.body, id });
-      const rows = await db.all('SELECT * FROM alumnos_fuera_aula WHERE dia = ? AND hora = ?', [inputRow.dia, inputRow.hora]);
-      const candidate = buildNextAlumnosFueraAulaRecord(existingRow, inputRow);
+      const row = await withImmediateTransaction(db, async () => {
+        const existingRow = await db.get('SELECT * FROM alumnos_fuera_aula WHERE id = ?', [id]);
+        if (!existingRow) {
+          throw notFound('No existe un registro con ese id.');
+        }
 
-      ensureSlotLimit(rows, candidate, badRequest, id);
+        const rows = await db.all('SELECT * FROM alumnos_fuera_aula WHERE dia = ? AND hora = ?', [inputRow.dia, inputRow.hora]);
+        const candidate = buildNextAlumnosFueraAulaRecord(existingRow, inputRow);
 
-      const conflictingRow = await db.get(
-        'SELECT id FROM alumnos_fuera_aula WHERE profesor = ? AND dia = ? AND hora = ? AND id <> ?',
-        [candidate.profesor, candidate.dia, candidate.hora, id]
-      );
-      if (conflictingRow) {
-        throw badRequest('Ya existe un registro para ese profesor, dia y hora.');
-      }
+        ensureSlotLimit(rows, candidate, badRequest, id);
 
-      const result = await db.run(
-        `UPDATE alumnos_fuera_aula
-         SET profesor = ?, dia = ?, hora = ?, cantidad = ?, last_exit_at = ?, last_return_at = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?`,
-        [
-          candidate.profesor,
-          candidate.dia,
-          candidate.hora,
-          candidate.cantidad,
-          candidate.last_exit_at || '',
-          candidate.last_return_at || '',
-          id
-        ]
-      );
+        const conflictingRow = await db.get(
+          'SELECT id FROM alumnos_fuera_aula WHERE profesor = ? AND dia = ? AND hora = ? AND id <> ?',
+          [candidate.profesor, candidate.dia, candidate.hora, id]
+        );
+        if (conflictingRow) {
+          throw badRequest('Ya existe un registro para ese profesor, dia y hora.');
+        }
 
-      if (!result.changes) {
-        throw notFound('No existe un registro con ese id.');
-      }
+        const result = await db.run(
+          `UPDATE alumnos_fuera_aula
+           SET profesor = ?, dia = ?, hora = ?, cantidad = ?, last_exit_at = ?, last_return_at = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [
+            candidate.profesor,
+            candidate.dia,
+            candidate.hora,
+            candidate.cantidad,
+            candidate.last_exit_at || '',
+            candidate.last_return_at || '',
+            id
+          ]
+        );
 
-      const row = await db.get('SELECT * FROM alumnos_fuera_aula WHERE id = ?', [id]);
+        if (!result.changes) {
+          throw notFound('No existe un registro con ese id.');
+        }
+
+        return db.get('SELECT * FROM alumnos_fuera_aula WHERE id = ?', [id]);
+      });
       res.json({ ok: true, entry: serializeAlumnosFueraAulaRow(row) });
     } catch (error) {
       next(error);

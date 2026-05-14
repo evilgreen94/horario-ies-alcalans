@@ -8,6 +8,7 @@ const {
   normalizeString,
   sanitizeBiblioteca,
   sanitizePatioGuardia,
+  sanitizePatioTeacherBlock,
   sanitizeSessionOverride,
   sanitizeTeacherFutureAbsence,
   sanitizeTeacherPracticeGuardia,
@@ -23,6 +24,7 @@ const PRACTICAS_GUARDIAS_STATE_KEY = 'teacher_practicas_guardias';
 const PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY = 'teacher_practicas_guardias_tramos';
 const MONTHLY_GUARDIA_LOAD_STATE_KEY = 'guardia_monthly_load';
 const PATIO_GUARDIAS_STATE_KEY = 'patio_guardias';
+const PATIO_TEACHER_BLOCKS_STATE_KEY = 'patio_teacher_blocks';
 
 function badRequest(message, details) {
   const error = new Error(message);
@@ -119,6 +121,7 @@ function sanitizeBackupPayload(payload) {
     teacherPracticasGuardias: ensureOptionalBackupSection(input, 'teacherPracticasGuardias', 'teacherPracticasGuardias', sanitizeTeacherPracticeGuardia),
     teacherPracticasGuardiasTramos: ensureOptionalBackupSection(input, 'teacherPracticasGuardiasTramos', 'teacherPracticasGuardiasTramos', sanitizeTeacherPracticeGuardiaSlot),
     patioGuardias: ensureOptionalBackupSection(input, 'patioGuardias', 'patioGuardias', sanitizePatioGuardia),
+    patioTeacherBlocks: ensureOptionalBackupSection(input, 'patioTeacherBlocks', 'patioTeacherBlocks', sanitizePatioTeacherBlock),
     monthlyGuardiaLoad: input.monthlyGuardiaLoad && typeof input.monthlyGuardiaLoad === 'object' && !Array.isArray(input.monthlyGuardiaLoad)
       ? input.monthlyGuardiaLoad
       : null
@@ -129,6 +132,7 @@ module.exports = {
   FUTURE_ABSENCES_STATE_KEY,
   MONTHLY_GUARDIA_LOAD_STATE_KEY,
   PATIO_GUARDIAS_STATE_KEY,
+  PATIO_TEACHER_BLOCKS_STATE_KEY,
   PRACTICAS_GUARDIAS_STATE_KEY,
   PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY,
   SUBSTITUTIONS_STATE_KEY,

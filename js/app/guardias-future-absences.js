@@ -282,6 +282,23 @@
     return getRows();
   }
 
+  function mergeBackendRowsWithPendingLocalRows(rows){
+    const merged = new Map((rows || []).map(normalizeTeacherFutureAbsence).map(row => [row.id, row]));
+    state.syncFlags.forEach(flag => {
+      const [kind, id] = String(flag || '').split(':');
+      if(!id) return;
+      if(kind === 'delete'){
+        merged.delete(id);
+        return;
+      }
+      if(kind === 'upsert'){
+        const localRow = state.rows.find(item => item.id === id);
+        if(localRow) merged.set(id, normalizeTeacherFutureAbsence(localRow));
+      }
+    });
+    return [...merged.values()];
+  }
+
   function getRows(){
     return state.rows.slice();
   }
@@ -731,7 +748,11 @@
       const fetchTeacherFutureAbsences = requireStorageMethod('fetchTeacherFutureAbsences', 'future absence hydration');
       const rows = await fetchTeacherFutureAbsences();
       if(!Array.isArray(rows)) return false;
-      setRows(rows, { clearSyncFlags: true });
+      const hasPendingLocalChanges = state.syncFlags.size > 0;
+      setRows(
+        hasPendingLocalChanges ? mergeBackendRowsWithPendingLocalRows(rows) : rows,
+        { clearSyncFlags: !hasPendingLocalChanges }
+      );
       clearSuperAdminError();
       pushSuperAdminEvent('Hydrate', 'Faltas futuras recargadas desde backend.');
       return true;
@@ -931,7 +952,20 @@
       persistRows();
       renderAll();
       if(readHostValue('storage') && typeof readHostValue('storage').hasBackend === 'function' && readHostValue('storage').hasBackend() && isAdmin()){
-        await Promise.allSettled(state.rows.filter(item => item.appliedAt).map(item => requireStorageMethod('updateTeacherFutureAbsence', 'future absence apply sync')(item.id, normalizeTeacherFutureAbsence(item))));
+        const appliedRows = state.rows.filter(item => item.appliedAt);
+        const syncResults = await Promise.allSettled(appliedRows.map(item => requireStorageMethod('updateTeacherFutureAbsence', 'future absence apply sync')(item.id, normalizeTeacherFutureAbsence(item))));
+        syncResults.forEach((result, index) => {
+          const item = appliedRows[index];
+          if(result.status === 'rejected' && item?.id){
+            state.syncFlags.add(`upsert:${item.id}`);
+          }else if(item?.id){
+            state.syncFlags.delete(`upsert:${item.id}`);
+          }
+        });
+        if(syncResults.some(result => result.status === 'rejected')){
+          setSuperAdminError('Hay faltas futuras aplicadas pendientes de sincronizar.');
+          renderSuperAdminMonitor();
+        }
       }
     }
     if(appliedSummaries.length){

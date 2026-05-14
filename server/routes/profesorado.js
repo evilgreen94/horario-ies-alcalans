@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDatabase } = require('../db');
+const { getDatabase, withImmediateTransaction } = require('../db');
 const { parseAnnualXml, writeAnnualSourceArtifacts } = require('../annual-source');
 const {
   ensureArray,
@@ -8,6 +8,7 @@ const {
   sanitizeAlumnosFueraAula,
   sanitizeTeacherFutureAbsence,
   sanitizePatioGuardia,
+  sanitizePatioTeacherBlock,
   sanitizeTeacherPracticeGuardia,
   sanitizeTeacherPracticeGuardiaSlot,
   sanitizeTeacherSubstitution,
@@ -32,7 +33,8 @@ registerTareasRoutes(router, {
   sanitizeTareaProfesorado,
   ensureArray,
   ensureRequiredString,
-  requireRole
+  requireRole,
+  withImmediateTransaction
 });
 
 registerAlumnosFueraAulaRoutes(router, {
@@ -42,7 +44,8 @@ registerAlumnosFueraAulaRoutes(router, {
   requireRole,
   requireSameOriginWrite,
   badRequest,
-  notFound
+  notFound,
+  withImmediateTransaction
 });
 
 registerSessionOverridesRoutes(router, {
@@ -50,7 +53,8 @@ registerSessionOverridesRoutes(router, {
   sanitizeSessionOverride,
   ensureArray,
   ensureRequiredString,
-  requireRole
+  requireRole,
+  withImmediateTransaction
 });
 
 registerStateCollectionRoutes(router, {
@@ -61,7 +65,9 @@ registerStateCollectionRoutes(router, {
   sanitizeTeacherPracticeGuardiaSlot,
   sanitizeTeacherFutureAbsence,
   sanitizePatioGuardia,
-  requireRole
+  sanitizePatioTeacherBlock,
+  requireRole,
+  withImmediateTransaction
 });
 
 registerAnnualImportRoutes(router, {

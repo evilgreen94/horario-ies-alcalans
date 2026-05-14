@@ -1,5 +1,14 @@
+const { withImmediateTransaction: defaultWithImmediateTransaction } = require('../../db');
+
 function registerSessionOverridesRoutes(router, deps) {
-  const { getDatabase, sanitizeSessionOverride, ensureArray, ensureRequiredString, requireRole } = deps;
+  const {
+    getDatabase,
+    sanitizeSessionOverride,
+    ensureArray,
+    ensureRequiredString,
+    requireRole,
+    withImmediateTransaction = defaultWithImmediateTransaction
+  } = deps;
 
   router.get('/session-overrides', async (_req, res, next) => {
     try {
@@ -26,15 +35,17 @@ function registerSessionOverridesRoutes(router, deps) {
     try {
       const rows = ensureArray(req.body, 'Los overrides de sesión').map(sanitizeSessionOverride);
       const db = await getDatabase();
-      await db.exec('DELETE FROM session_overrides');
+      await withImmediateTransaction(db, async () => {
+        await db.exec('DELETE FROM session_overrides');
 
-      for (const row of rows) {
-        await db.run(
-          `INSERT INTO session_overrides (id, profesor, dia, hora, materia, grupo, detalle, aula, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-          [row.id, row.profesor, row.dia, row.hora, row.materia || '', row.grupo || '', row.detalle || '', row.aula || '']
-        );
-      }
+        for (const row of rows) {
+          await db.run(
+            `INSERT INTO session_overrides (id, profesor, dia, hora, materia, grupo, detalle, aula, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [row.id, row.profesor, row.dia, row.hora, row.materia || '', row.grupo || '', row.detalle || '', row.aula || '']
+          );
+        }
+      });
 
       res.json({ ok: true });
     } catch (error) {

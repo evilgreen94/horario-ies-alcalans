@@ -1,3 +1,5 @@
+const { withImmediateTransaction = async (_db, callback) => callback() } = require('../../db');
+
 function serializeHistorialRow(row) {
   return {
     ...row,
@@ -19,25 +21,27 @@ async function saveHistorialEntry(db, row) {
 }
 
 async function replaceHistorial(db, rows) {
-  await db.exec('DELETE FROM historial');
+  return withImmediateTransaction(db, async () => {
+    await db.exec('DELETE FROM historial');
 
-  for (const row of rows) {
-    await db.run(
-      `INSERT INTO historial (id, title, detail, type, actor, ts, undo_state)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        row.id,
-        row.title,
-        row.detail || '',
-        row.type || 'other',
-        row.actor || 'Jefatura',
-        row.ts,
-        row.undoState ? JSON.stringify(row.undoState) : null
-      ]
-    );
-  }
+    for (const row of rows) {
+      await db.run(
+        `INSERT INTO historial (id, title, detail, type, actor, ts, undo_state)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.id,
+          row.title,
+          row.detail || '',
+          row.type || 'other',
+          row.actor || 'Jefatura',
+          row.ts,
+          row.undoState ? JSON.stringify(row.undoState) : null
+        ]
+      );
+    }
 
-  return listHistorial(db);
+    return listHistorial(db);
+  });
 }
 
 module.exports = {
