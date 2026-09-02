@@ -14,6 +14,7 @@ const reportRouter = require('./routes/report');
 const exportRouter = require('./routes/export');
 const authRouter = require('./routes/auth');
 const avisosRouter = require('./routes/avisos');
+const gruposRouter = require('./routes/grupos');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -148,6 +149,7 @@ app.use('/api/report', reportRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/avisos', avisosRouter);
+app.use('/api/grupos', gruposRouter);
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'guardias.html'));

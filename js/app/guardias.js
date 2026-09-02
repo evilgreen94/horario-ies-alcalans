@@ -22,6 +22,7 @@ const KEY_WEEK='IES_Alcalans_School_Week_Key';
 const KEY_ANNUAL_DATASET='IES_Alcalans_Annual_Dataset_Id';
 const KEY_TV_ANNOUNCEMENT='IES_Alcalans_TV_Announcement';
 const KEY_GUARDIA_MONTHLY_LOAD='IES_Alcalans_Guardias_Monthly_Load';
+const KEY_GROUP_STATES='IES_Alcalans_Grupos_Estado';
 const MAX_ALUMNOS_FUERA_AULA=10;
 const PATIO_PRIMARY_HORA=4;
 const PATIO_AUTO_HORARIOS={'11:00-11:25':4,'14:10-14:25':8};
@@ -98,7 +99,18 @@ function getCurrentSchoolSlot(){
 }
 const DIA_INDEX={'lunes':0,'martes':1,'miercoles':2,'mi\u00e9rcoles':2,'jueves':3,'viernes':4};
 const HORA_INDEX=Object.fromEntries(Object.entries(HORA_MAP).map(([hora,info])=>[info.rango,+hora]));
-function normalizaHora(franja){return HORA_INDEX[cleanText(franja)] ?? null;}
+function esHoraValida(hora){return Number.isInteger(Number(hora))&&Number(hora)>=1&&Number(hora)<=9;}
+function logInvalidAbsenceHour(context,details={}){
+  try{
+    console.warn(`[ausencias] ${context}`,details);
+  }catch(_error){
+    console.warn(`[ausencias] ${context}`);
+  }
+}
+function normalizaHora(franja){
+  const hora=HORA_INDEX[cleanText(franja)] ?? null;
+  return esHoraValida(hora)?hora:null;
+}
 function formatTeacherName(value){return cleanText(value).toLowerCase().split(/([\s(\/-]+)/).map(token=>/^[\s(\/-]+$/.test(token)?token:token.charAt(0).toUpperCase()+token.slice(1)).join('');}
 function resolveDiaIndex(value){return {'lunes':0,'martes':1,'miercoles':2,'jueves':3,'viernes':4}[stripDiacritics(value).toLowerCase()] ?? null;}
 function isGuardiaTexto(texto){return cleanText(texto).toLowerCase().includes('guardia');}
@@ -337,6 +349,7 @@ const TEACHER_MOOD_OPTIONS = [
   }
 ];
 let isAdmin=false,day=0,editId=null;
+let editAbsenceGroupIds=[];
 let isSuperAdmin=false;
 let teacherName='';
 let teacherDay=0;
@@ -359,10 +372,12 @@ let teacherDutyFocusTimer=null;
 let teacherFutureAbsences=[];
 let futureAbsenceAdminStatusFilter='all';
 let futureAbsenceAdminTeacherFilter='';
+let groupStateFilter='';
 let weekOffset=0;
 let teacherWeekOffset=0;
 let adminTableFilter='all';
 let absenceSelectedHours=[];
+let selectedAbsenceIds=new Set();
 const demo=[];
 const APP_URL_PARAMS=new URLSearchParams(window.location.search||'');
 const APP_PATHNAME=(window.location.pathname||'').toLowerCase();
@@ -711,6 +726,45 @@ function normalizeGuardiaMonthlyLoadState(value){
 }
 function loadGuardiaMonthlyLoad(){return normalizeGuardiaMonthlyLoadState(storage.readJson(KEY_GUARDIA_MONTHLY_LOAD,{}));}
 function persistGuardiaMonthlyLoad(value){storage.writeJson(KEY_GUARDIA_MONTHLY_LOAD,normalizeGuardiaMonthlyLoadState(value));}
+function normalizeGroupStateRow(row){
+  const grupo=cleanText(row?.grupo);
+  if(!grupo) return null;
+  return {
+    grupo,
+    activo:row?.activo!==false&&row?.activo!==0&&row?.activo!=='0',
+    updatedAt:cleanText(row?.updatedAt||row?.updated_at)
+  };
+}
+function getDetectedGroupNames(){
+  return Object.keys(GRUPOS_PROFESORADO).sort((a,b)=>a.localeCompare(b,'es'));
+}
+function mergeGroupStatesWithDetected(rows){
+  const merged=new Map();
+  (Array.isArray(rows)?rows:[]).map(normalizeGroupStateRow).filter(Boolean).forEach(row=>{
+    merged.set(normalizeText(row.grupo),row);
+  });
+  getDetectedGroupNames().forEach(grupo=>{
+    const key=normalizeText(grupo);
+    if(!merged.has(key)){
+      merged.set(key,{grupo,activo:true,updatedAt:''});
+    }
+  });
+  return [...merged.values()].sort((a,b)=>a.grupo.localeCompare(b.grupo,'es'));
+}
+function loadGroupStates(){
+  return mergeGroupStatesWithDetected(storage.readJson(KEY_GROUP_STATES,[]));
+}
+function persistGroupStates(rows){
+  storage.writeJson(KEY_GROUP_STATES,mergeGroupStatesWithDetected(rows));
+}
+function getGroupStateByName(grupo){
+  const key=normalizeText(grupo);
+  return groupStates.find(row=>normalizeText(row?.grupo)===key)||null;
+}
+function isGroupCurrentlyActive(grupo){
+  const state=getGroupStateByName(grupo);
+  return state?state.activo!==false:true;
+}
 function loadSessionOverrides(){return storage.readJson(KEY_SESSION_OVERRIDES,{});}
 function persistSessionOverrides(d){storage.writeJson(KEY_SESSION_OVERRIDES,d);}
 function makeAlumnosFueraKey(nombre,dia,hora){return `${normalizeText(resolveTeacherCanonicalName(nombre)||nombre)}|${dia}|${hora}`;}
@@ -783,7 +837,8 @@ function resetAnnualLocalStateIfNeeded(){
     KEY_PATIO_TEACHER_BLOCKS,
     KEY_PATIO_CONFIG_VERSION,
     KEY_WEEK,
-    KEY_GUARDIA_MONTHLY_LOAD
+    KEY_GUARDIA_MONTHLY_LOAD,
+    KEY_GROUP_STATES
   ].forEach(key=>storage.writeText(key,''));
   persistAnnualDatasetId(ANNUAL_DATASET_ID);
   return true;
@@ -976,9 +1031,11 @@ async function hydrateAlumnosFueraAula(){
     const rows=await storage.fetchAlumnosFueraAula();
     const list=Array.isArray(rows)?rows:rows?.rows;
     if(!Array.isArray(list)) return false;
-    alumnosFueraAula=Object.fromEntries(list.map(normalizeAlumnosFueraRow).filter(Boolean).map(row=>[makeAlumnosFueraKey(row.profesor,row.dia,row.hora),row]));
+    const nextState=Object.fromEntries(list.map(normalizeAlumnosFueraRow).filter(Boolean).map(row=>[makeAlumnosFueraKey(row.profesor,row.dia,row.hora),row]));
+    const changed=JSON.stringify(alumnosFueraAula)!==JSON.stringify(nextState);
+    alumnosFueraAula=nextState;
     persistAlumnosFueraAula(alumnosFueraAula);
-    return true;
+    return changed;
   }catch(error){
     console.warn('Alumnos fuera hydration failed',error);
     return false;
@@ -1014,7 +1071,6 @@ function addHistoryEntry(title,detail,type,options){
   });
   historialCambios=historialCambios.slice(0,200);
   persistHistorial(historialCambios);
-  syncAdminState();
 }
 function formatHistoryTimestamp(value){
   const date=new Date(value);
@@ -1110,7 +1166,9 @@ function seededShuffle(list,seed){
 }
 function getSpecialAssignments(dia,hora,rowsSource=data){
   const blockedNames=getDayLongAbsentTeacherSet(dia,rowsSource);
-  const orderedNames=getBalancedGuardiaOrder(dia,hora,{excludeNames:[...blockedNames],rowsSource}).map(item=>item.nombre);
+  const orderedNames=getBalancedGuardiaOrder(dia,hora,{excludeNames:[...blockedNames],rowsSource})
+    .filter(item=>isProfesorDisponible(item.nombre,dia,hora,{rowsSource,ignoreAssignedGuardiasAtSlot:false}))
+    .map(item=>item.nombre);
   const biblioteca=orderedNames[0]||'';
   const banos=orderedNames.find(nombre=>nombre!==biblioteca)||'';
   const specialCount=(biblioteca?1:0)+(banos?1:0);
@@ -1233,7 +1291,9 @@ function getBalancedGuardiaOrder(dia,hora,options={}){
 }
 function getOrdenHoraDisponible(dia,hora,excluidos){
   const excluidosSet=new Set((excluidos||[]).filter(Boolean));
-  return getBalancedGuardiaOrder(dia,hora,{excludeNames:[...excluidosSet]}).map(item=>({nombre:item.nombre,numero:item.numero}));
+  return getBalancedGuardiaOrder(dia,hora,{excludeNames:[...excluidosSet]})
+    .filter(item=>isProfesorDisponible(item.nombre,dia,hora,{ignoreAssignedGuardiasAtSlot:false}))
+    .map(item=>({nombre:item.nombre,numero:item.numero}));
 }
 function assignGuardiasForRows(rowsSource){
   const rows=(rowsSource||[]).map(row=>({...row}));
@@ -1260,9 +1320,25 @@ function reassignGuardiasForSlot(dia,hora,rowsSource=data){
   const dayCounter=buildGuardiaCoverageCounter({excludeDia:dia,excludeHora:hora,dayOnly:dia,rowsSource});
   const tieBreaker=buildSlotTieBreakerMap(dia,hora,{weekKey});
   const orderedNames=getBalancedGuardiaOrder(dia,hora,{excludeNames:[...ausentes],rowsSource,weekKey}).map(item=>item.nombre);
-  const principales=orderedNames.filter(nombre=>nombre!==biblioteca&&nombre!==banos);
+  const shouldLogAssignments=rowsSource===data;
+  function logGuardiaDecision(event,details){
+    if(!shouldLogAssignments) return;
+    console.info(`[guardias] ${event}`,details);
+  }
+  const availabilityByTeacher=new Map(
+    orderedNames.map(nombre=>[
+      nombre,
+      getProfesorDisponibilidadDetalle(nombre,dia,hora,{
+        rowsSource,
+        weekKey,
+        ignoreAssignedGuardiasAtSlot:true
+      })
+    ])
+  );
+  const disponiblesOrdenados=orderedNames.filter(nombre=>availabilityByTeacher.get(nombre)?.available);
+  const principales=disponiblesOrdenados.filter(nombre=>nombre!==biblioteca&&nombre!==banos);
   const assigned=new Set();
-  const availableNames=new Map(getGuardiasDisponibles(dia,hora,rowsSource).map(nombre=>[normalizeText(nombre),nombre]));
+  const availableNames=new Map(disponiblesOrdenados.map(nombre=>[normalizeText(nombre),nombre]));
   function scoreNombre(nombre){
     return [(monthCounter[nombre]||0),(totalCounter[nombre]||0),(dayCounter[nombre]||0)];
   }
@@ -1278,23 +1354,50 @@ function reassignGuardiasForSlot(dia,hora,rowsSource=data){
     if(persistedKey&&availableNames.has(persistedKey)&&!assigned.has(availableNames.get(persistedKey))){
       row.guardia=availableNames.get(persistedKey);
       assignNombre(row.guardia);
+      logGuardiaDecision('asignado',{
+        dia,
+        hora,
+        ausente:row.ausente,
+        guardia:row.guardia,
+        source:'persistida-valida'
+      });
       return;
     }
     row.guardia='';
-    const siguientePrincipal=principales
+    const candidatosPrincipales=principales
       .filter(nombre=>!assigned.has(nombre))
       .sort((a,b)=>{
         const [aMonth,aTotal,aDay]=scoreNombre(a);
         const [bMonth,bTotal,bDay]=scoreNombre(b);
         return aMonth-bMonth||aTotal-bTotal||aDay-bDay||(tieBreaker.get(a)??999)-(tieBreaker.get(b)??999)||principales.indexOf(a)-principales.indexOf(b);
-      })[0];
+      });
+    orderedNames.forEach(nombre=>{
+      const detail=availabilityByTeacher.get(nombre)||{available:false,reason:'sin-evaluacion',nombre};
+      logGuardiaDecision('candidato',{dia,hora,ausente:row.ausente,candidato:nombre});
+      logGuardiaDecision('disponible',{dia,hora,candidato:nombre,available:detail.available,motivo:detail.reason});
+      if(!detail.available){
+        logGuardiaDecision('motivo de descarte',{dia,hora,candidato:nombre,motivo:detail.reason});
+        return;
+      }
+      if(assigned.has(nombre)){
+        logGuardiaDecision('motivo de descarte',{dia,hora,candidato:nombre,motivo:'ya-asignado-en-este-reparto'});
+      }
+    });
+    const siguientePrincipal=candidatosPrincipales[0];
     if(siguientePrincipal){
       row.guardia=siguientePrincipal;
       assignNombre(siguientePrincipal);
+      logGuardiaDecision('asignado',{
+        dia,
+        hora,
+        ausente:row.ausente,
+        guardia:siguientePrincipal,
+        source:'reparto-principal'
+      });
       return;
     }
     const especiales=[banos,biblioteca]
-      .filter(nombre=>nombre&&orderedNames.some(candidate=>sameNormalizedText(candidate,nombre))&&!assigned.has(nombre))
+      .filter(nombre=>nombre&&disponiblesOrdenados.some(candidate=>sameNormalizedText(candidate,nombre))&&!assigned.has(nombre))
       .sort((a,b)=>{
         const [aMonth,aTotal,aDay]=scoreNombre(a);
         const [bMonth,bTotal,bDay]=scoreNombre(b);
@@ -1303,9 +1406,23 @@ function reassignGuardiasForSlot(dia,hora,rowsSource=data){
     if(especiales[0]){
       row.guardia=especiales[0];
       assignNombre(especiales[0]);
+      logGuardiaDecision('asignado',{
+        dia,
+        hora,
+        ausente:row.ausente,
+        guardia:especiales[0],
+        source:'especial'
+      });
       return;
     }
     row.guardia='';
+    logGuardiaDecision('asignado',{
+      dia,
+      hora,
+      ausente:row.ausente,
+      guardia:'',
+      source:'sin-disponibles'
+    });
   });
 }
 function reassignGuardiasForDayHours(dia,horas){
@@ -1323,6 +1440,7 @@ function reassignAllGuardias(){
   }
 }
 function materializeMissingGuardiaAssignments(){
+  console.info('[autoassign triggered]',{origin:'materializeMissingGuardiaAssignments'});
   const before=JSON.stringify(data.map(row=>({id:row.id,dia:row.dia,hora:row.hora,ausente:row.ausente,guardia:row.guardia||''})));
   reassignAllGuardias();
   const after=JSON.stringify(data.map(row=>({id:row.id,dia:row.dia,hora:row.hora,ausente:row.ausente,guardia:row.guardia||''})));
@@ -1332,6 +1450,38 @@ function materializeMissingGuardiaAssignments(){
 }
 function makeAbsenceSyncKey(row){
   return `${Number(row?.dia)}|${Number(row?.hora)}|${normalizeText(row?.ausente)}`;
+}
+function dedupeAbsenceRowsByLogic(rows,options={}){
+  const preferLast=options.preferLast!==false;
+  const duplicates=[];
+  const byKey=new Map();
+  (Array.isArray(rows)?rows:[]).forEach((row,index)=>{
+    if(!row||typeof row!=='object') return;
+    const key=makeAbsenceSyncKey(row);
+    if(!key) return;
+    const existing=byKey.get(key);
+    if(!existing){
+      byKey.set(key,{row:{...row},index});
+      return;
+    }
+    duplicates.push({
+      key,
+      keptId:preferLast?Number(row?.id):Number(existing.row?.id),
+      droppedId:preferLast?Number(existing.row?.id):Number(row?.id)
+    });
+    const preferred=preferLast?{...row}:{...existing.row};
+    const fallback=preferLast?existing.row:row;
+    if(!Number.isInteger(Number(preferred.id))&&Number.isInteger(Number(fallback?.id))){
+      preferred.id=Number(fallback.id);
+    }
+    byKey.set(key,{row:preferred,index:preferLast?index:existing.index});
+  });
+  if(duplicates.length){
+    console.warn('[guardias] duplicate local absence rows deduped',duplicates);
+  }
+  return [...byKey.values()]
+    .sort((a,b)=>a.index-b.index)
+    .map(item=>item.row);
 }
 function mergeGuardiasForBackendSync(localRows,remoteRows){
   const merged=new Map();
@@ -1366,7 +1516,13 @@ function mergeGuardiasForBackendSync(localRows,remoteRows){
     });
 }
 function getGuardiaSugerida(dia,hora,turno,rowsSource=data){
-  return getBalancedGuardiaOrder(dia,hora,{excludeNames:[getBibliotecaAsignada(dia,hora,rowsSource),getBanosAsignado(dia,hora,rowsSource)],rowsSource,weekKey:getCurrentSchoolWeekKey()})[turno-1]?.nombre||'';
+  return getBalancedGuardiaOrder(dia,hora,{
+    excludeNames:[getBibliotecaAsignada(dia,hora,rowsSource),getBanosAsignado(dia,hora,rowsSource)],
+    rowsSource,
+    weekKey:getCurrentSchoolWeekKey()
+  })
+    .filter(item=>isProfesorDisponible(item.nombre,dia,hora,{rowsSource,ignoreAssignedGuardiasAtSlot:false}))
+    [turno-1]?.nombre||'';
 }
 function isPracticasSessionEligible(sesion){
   if(!sesion||sesion.tipo==='guardia') return false;
@@ -1402,8 +1558,13 @@ function getPracticasGuardiaTeachersForSlot(dia,hora){
     ])]
     .sort((a,b)=>a.localeCompare(b,'es'));
 }
+function getGuardiaBaseTeachersForSlot(dia,hora){
+  return [...new Set((HORARIO_GUARDIAS[dia]?.[hora]||[]).map(resolveTeacherCanonicalName).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,'es'));
+}
 function getProfesHora(dia,hora){
-  return [...new Set([...(HORARIO_GUARDIAS[dia]?.[hora]||[]),...getPracticasGuardiaTeachersForSlot(dia,hora)])].sort((a,b)=>a.localeCompare(b,'es'));
+  return [...new Set([...getGuardiaBaseTeachersForSlot(dia,hora),...getPracticasGuardiaTeachersForSlot(dia,hora)])]
+    .sort((a,b)=>a.localeCompare(b,'es'));
 }
 function resolveTeacherCanonicalName(nombre){
   const cleaned=cleanText(nombre);
@@ -1454,8 +1615,57 @@ function validateTeacherSubstitutionName(nombre,rawValue){
   return '';
 }
 function getGuardiasDisponibles(dia,hora,rowsSource=data){
-  const blocked=getAbsentTeacherSetForSlot(+dia,+hora,rowsSource);
-  return getProfesHora(+dia,+hora).filter(nombre=>!blocked.has(nombre));
+  return getProfesHora(+dia,+hora)
+    .filter(nombre=>isProfesorDisponible(nombre,+dia,+hora,{rowsSource,ignoreAssignedGuardiasAtSlot:false}));
+}
+function getProfesorDisponibilidadDetalle(profesor,dia,hora,options={}){
+  const nombre=resolveTeacherCanonicalName(profesor);
+  const safeDia=Number(dia);
+  const safeHora=Number(hora);
+  const rowsSource=Array.isArray(options.rowsSource)?options.rowsSource:data;
+  const weekKey=cleanText(options.weekKey)||getCurrentSchoolWeekKey();
+  const ignoreAssignedGuardiasAtSlot=options.ignoreAssignedGuardiasAtSlot===true;
+  const session=resolveTeacherSession(nombre,safeDia,safeHora);
+  const scheduledHours=getHorasProgramadasProfesorDia(nombre,safeDia);
+  const scheduledInCenter=scheduledHours.includes(safeHora);
+  const baseGuardiaCandidate=getGuardiaBaseTeachersForSlot(safeDia,safeHora).some(candidate=>sameNormalizedText(candidate,nombre));
+  const practicasCandidate=getPracticasGuardiaTeachersForSlot(safeDia,safeHora).some(candidate=>sameNormalizedText(candidate,nombre));
+  const blockedByAbsence=(rowsSource||[]).some(row=>row.dia===safeDia&&row.hora===safeHora&&sameNormalizedText(row.ausente,nombre));
+  const blockedAllDay=isTeacherAbsentAllDay(nombre,safeDia,rowsSource);
+  const blockedByManualFlag=!!getPatioTeacherBlock(nombre,safeDia,safeHora,weekKey);
+  const assignedGuardiaAtSlot=!ignoreAssignedGuardiasAtSlot&&(rowsSource||[]).some(row=>row.dia===safeDia&&row.hora===safeHora&&sameNormalizedText(row.guardia,nombre));
+  const hasTeachingSession=!!session&&session.tipo!=='guardia'&&!practicasCandidate;
+  if(!nombre||!getProfesor(nombre)){
+    return {available:false,reason:'profesor-desconocido',nombre};
+  }
+  if(!scheduledInCenter){
+    return {available:false,reason:'no-trabaja-en-ese-tramo',nombre,scheduledHours};
+  }
+  if(!baseGuardiaCandidate&&!practicasCandidate){
+    return {available:false,reason:'sin-disponibilidad-real-en-ese-tramo',nombre};
+  }
+  if(blockedByAbsence||blockedAllDay){
+    return {available:false,reason:blockedAllDay?'ausente-todo-el-dia':'ausente-en-ese-tramo',nombre};
+  }
+  if(blockedByManualFlag){
+    return {available:false,reason:'bloqueado-o-no-disponible',nombre};
+  }
+  if(hasTeachingSession){
+    return {available:false,reason:'ya-tiene-sesion-asignada',nombre,sessionType:session?.tipo||''};
+  }
+  if(assignedGuardiaAtSlot){
+    return {available:false,reason:'ya-tiene-otra-guardia',nombre};
+  }
+  return {
+    available:true,
+    reason:practicasCandidate?'practicas-habilitadas':'guardia-programada',
+    nombre,
+    sessionType:session?.tipo||'',
+    scheduledHours
+  };
+}
+function isProfesorDisponible(profesor,dia,hora,options={}){
+  return getProfesorDisponibilidadDetalle(profesor,dia,hora,options).available;
 }
 function makePatioPositionDefinition(position,orderIndex=0){
   const rawId=typeof position==='string'?position:position?.id;
@@ -1700,7 +1910,7 @@ async function togglePatioSectorCoverage(sectorId,dia=day,hora=PATIO_PRIMARY_HOR
   replacePatioSectorState({...current,covered:!current.covered});
   renderGuardiaBoard();
   renderTable();
-  syncAdminState();
+  syncAdminState({manual:true,origin:'patio-sector',reason:'toggle-coverage'});
 }
 async function editPatioSectorResponsible(sectorId,dia=day,hora=PATIO_PRIMARY_HORA){
   if(!isAdmin||!isCurrentWeekOffset(weekOffset)) return;
@@ -1710,7 +1920,7 @@ async function editPatioSectorResponsible(sectorId,dia=day,hora=PATIO_PRIMARY_HO
   const value=cleanText(await askText('Cobertura de patio',`Indica quién cubre ${sector.label}. Puedes dejarlo en blanco si solo quieres marcarlo como cubierto.`,current.responsable,'Profesor o anotación breve','Guardar'));
   replacePatioSectorState({...current,responsable:value,covered:current.covered||!!value});
   renderGuardiaBoard();
-  syncAdminState();
+  syncAdminState({manual:true,origin:'patio-sector',reason:'edit-responsable'});
 }
 function getPatioCardTitle(hora){
   return hora===8?`${HORA_MAP[hora].label} hora · Patio bachiller`:`${HORA_MAP[hora].label} hora · Patio`;
@@ -1822,10 +2032,12 @@ function resolveTeacherFromInputValue(value){
   const matches=getAbsenceMatches(texto);
   return matches.length===1?matches[0]:'';
 }
-function getProfesorNombreSeleccionado(valor){
-  const input=getAusenteInputElement();
-  const selected=resolveTeacherCanonicalName(input?.dataset?.selectedTeacher||'');
-  if(selected) return selected;
+function getProfesorNombreSeleccionado(valor,options={}){
+  const input=options.input||null;
+  if(options.allowSelectedInput&&input){
+    const selected=resolveTeacherCanonicalName(input.dataset?.selectedTeacher||'');
+    if(selected) return selected;
+  }
   return resolveTeacherFromInputValue(valor);
 }
 function normalizeTeacherSearch(value){return normalizeText(value);}
@@ -1892,11 +2104,15 @@ function getAbsenceMatches(value){
     .map(item=>item.nombre)
     .slice(0,8);
 }
-function getGuardiaNombreSeleccionado(valor,dia,hora,rowsSource=data){
+function getGuardiaNombreSeleccionado(valor,dia,hora,rowsSource=data,options={}){
   const texto=(valor||'').trim();
   if(!texto) return '';
   const normalized=normalizeTeacherSearch(texto);
-  return getGuardiasDisponibles(dia,hora,rowsSource).find(nombre=>
+  const candidateRows=Array.isArray(rowsSource)?rowsSource:[];
+  const filteredRows=options.excludeRow
+    ? candidateRows.filter(item=>item!==options.excludeRow&&String(item?.id??'')!==String(options.excludeRow?.id??''))
+    : candidateRows;
+  return getGuardiasDisponibles(dia,hora,filteredRows).find(nombre=>
     getTeacherSearchNames(nombre).some(candidate=>normalizeTeacherSearch(candidate)===normalized)||
     getTeacherUsernames(nombre).includes(normalized)
   )||'';
@@ -1915,19 +2131,73 @@ function getRawTeacherScheduledHours(nombre,dia){
     sesiones
       .filter(item=>resolveDiaIndex(item?.dia)===Number(dia))
       .map(item=>normalizaHora(item?.franja))
-      .filter(hora=>Number.isInteger(hora)&&!HORAS_PATIO.has(hora))
+      .filter(hora=>esHoraValida(hora)&&!HORAS_PATIO.has(hora))
   )].sort((a,b)=>a-b);
+}
+const NON_COVERABLE_SESSION_TOKENS=[
+  'reunion',
+  'reunión',
+  'atencion a familias',
+  'atención a familias',
+  'familias',
+  'tutoria individualizada',
+  'tutoría individualizada',
+  'tutoria individual',
+  'tutoría individual',
+  'guardia de patio',
+  'patio'
+];
+function isTeacherSessionCubrible(session,hora){
+  if(!session||!Number.isInteger(Number(hora))||HORAS_PATIO.has(Number(hora))) return false;
+  if(session.grupo&&!isGroupCurrentlyActive(session.grupo)) return false;
+  if(session.tipo==='guardia') return true;
+  const combined=normalizeText([session.materia,session.grupo,session.detalle,session.aula].filter(Boolean).join(' '));
+  if(!combined) return false;
+  return !NON_COVERABLE_SESSION_TOKENS.some(token=>combined.includes(normalizeText(token)));
+}
+function getSesionesCubriblesProfesor(nombre,dia){
+  const sesionesDia=getHorarioProfesorDia(nombre,dia)||{};
+  const sesiones=Object.keys(sesionesDia)
+    .map(Number)
+    .filter(hora=>esHoraValida(hora))
+    .filter(hora=>isTeacherSessionCubrible(resolveTeacherSession(nombre,dia,hora),hora))
+    .sort((a,b)=>a-b)
+    .map(hora=>{
+      const sesion=resolveTeacherSession(nombre,dia,hora);
+      return {
+        profesor:nombre,
+        dia,
+        hora,
+        tipo:sesion?.tipo||'',
+        materia:sesion?.materia||'',
+        grupo:sesion?.grupo||'',
+        detalle:sesion?.detalle||'',
+        aula:sesion?.aula||''
+      };
+    });
+  if(sesiones.length) return sesiones;
+  return getRawTeacherScheduledHours(nombre,dia)
+    .filter(hora=>esHoraValida(hora)&&!HORAS_PATIO.has(hora))
+    .map(hora=>({profesor:nombre,dia,hora,tipo:'clase',materia:'',grupo:'',detalle:'',aula:getAulaProfesor(nombre,dia,hora)||''}));
+}
+function getHorasCubriblesProfesorDia(nombre,dia){
+  return getSesionesCubriblesProfesor(nombre,dia)
+    .map(item=>Number(item.hora))
+    .filter(esHoraValida);
+}
+function tieneSesionCubrible(profesor,dia,hora){
+  return esHoraValida(hora)&&isTeacherSessionCubrible(resolveTeacherSession(profesor,dia,hora),hora);
 }
 function getHorasProgramadasProfesorDia(nombre,dia){
   const sesiones=getHorarioProfesorDia(nombre,dia);
   const horas=Object.keys(sesiones)
     .map(Number)
-    .filter(hora=>!HORAS_PATIO.has(hora)&&sesiones[hora])
+    .filter(hora=>esHoraValida(hora)&&!HORAS_PATIO.has(hora)&&sesiones[hora])
     .sort((a,b)=>a-b);
   return horas.length?horas:getRawTeacherScheduledHours(nombre,dia);
 }
 function getHorasLectivasProfesorDia(nombre,dia){
-  return getHorasProgramadasProfesorDia(nombre,dia)
+  return getHorasCubriblesProfesorDia(nombre,dia)
     .filter(hora=>getHorarioProfesorDia(nombre,dia)?.[hora]?.tipo!=='guardia');
 }
 function getAulaProfesor(nombre,dia,hora){
@@ -2247,6 +2517,7 @@ function resolveTeacherSession(nombre,dia,hora){
 }
 function doesAbsenceNeedCoverage(ausente,dia,hora){
   const session=resolveTeacherSession(ausente,dia,hora);
+  if(session?.grupo&&!isGroupCurrentlyActive(session.grupo)) return false;
   return session?.tipo!=='guardia';
 }
 function rowNeedsCoverage(row){
@@ -2260,8 +2531,14 @@ function resolveAulaRegistro(row){
 function normalizeStoredRows(rows){
   if(!Array.isArray(rows)) return [];
   let changed=false;
-  const normalized=rows.flatMap(row=>{
+  const normalized=dedupeAbsenceRowsByLogic(rows).flatMap(row=>{
     if(!row||typeof row!=='object'){
+      changed=true;
+      return [];
+    }
+    const hora=Number(row.hora);
+    if(!esHoraValida(hora)){
+      logInvalidAbsenceHour('skip hora inválida',{profesor:row.ausente||'',hora,origen:'normalizeStoredRows'});
       changed=true;
       return [];
     }
@@ -2270,11 +2547,14 @@ function normalizeStoredRows(rows){
       changed=true;
       return [];
     }
-    const guardiaValida=rowNeedsCoverage(row)&&row.guardia?getGuardiaNombreSeleccionado(row.guardia,row.dia,row.hora,rows):'';
+    const guardiaValida=rowNeedsCoverage(row)&&row.guardia
+      ?getGuardiaNombreSeleccionado(row.guardia,row.dia,row.hora,rows,{excludeRow:row})
+      :'';
     const aulaReal=getAulaProfesor(ausente,row.dia,row.hora);
     const aula=aulaReal||'';
     const normalizedRow={
       ...row,
+      hora,
       ausente,
       guardia:guardiaValida,
       aula
@@ -2329,6 +2609,7 @@ resetWeeklyLocalStateIfNeeded();
 resetPatioLocalStateIfNeeded();
 let sessionOverrides=loadSessionOverrides();
 let alumnosFueraAula=loadAlumnosFueraAula();
+let groupStates=loadGroupStates();
 let data=normalizeStoredRows(load());
 let nid=data.reduce((m,g)=>Math.max(m,g.id),0)+1;
 let ordenGuardias=loadOrden();
@@ -2349,6 +2630,11 @@ let absenceSaveInFlight=false;
 let futureAbsenceSyncFlags=new Set();
 let superAdminEvents=[];
 let lastBackendSnapshot='';
+let lastAdminPersistedHash='';
+let adminSyncTimer=null;
+let adminSyncScheduledDeferred=null;
+let lastRenderedGuardiasUiSnapshot='';
+let pendingAdminSyncRequest=null;
 let realtimeSyncChannel=null;
 let superAdminOpsInfo=null;
 let superAdminOpsLoading=false;
@@ -2363,6 +2649,7 @@ const superAdminStatus={
 };
 const BACKEND_POLL_INTERVAL_MS=IS_LOCAL_DEV_HOST?10000:45000;
 const SUPERADMIN_INFO_REFRESH_MS=30000;
+const ADMIN_SYNC_DEBOUNCE_MS=800;
 const REALTIME_SYNC_KEY='IES_Alcalans_Realtime_Sync';
 const REALTIME_SYNC_CHANNEL='ies-alcalans-guardias-sync';
 (function(){const wd=new Date().getDay();day=(wd>=1&&wd<=5)?wd-1:0;})();
@@ -2549,7 +2836,7 @@ const practicasGuardiasDomain=auxPanelsSuite?.createPracticasGuardiasDomain({
     persist(data);
     renderGuardiaBoard();
     renderTable();
-    syncAdminState();
+    syncAdminState({manual:true,origin:'practicas-domain',reason:'manual-practicas-change'});
   }
 })||null;
 function serializeBibliotecaAssignments(){
@@ -2718,6 +3005,42 @@ function setAdminTableFilter(filter){
   renderAdminWorkspace();
   renderTable();
 }
+async function toggleGroupState(grupo){
+  const current=getGroupStateByName(grupo);
+  const nextActivo=!(current?.activo!==false);
+  const nextRow={grupo:cleanText(grupo),activo:nextActivo,updatedAt:new Date().toISOString()};
+  groupStates=mergeGroupStatesWithDetected([
+    ...groupStates.filter(row=>normalizeText(row?.grupo)!==normalizeText(grupo)),
+    nextRow
+  ]);
+  persistGroupStates(groupStates);
+  renderGroupStatesPanel();
+  renderGuardiaBoard();
+  renderTable();
+  renderAbsenceHourChoices();
+  renderAbsenceDecisionBar();
+  if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
+  if(!storage.hasBackend()){
+    showToast(`Grupo ${nextActivo?'activado':'desactivado'} solo en local.`, 'info');
+    return;
+  }
+  try{
+    const saved=await storage.updateGroupState(grupo,nextActivo);
+    groupStates=mergeGroupStatesWithDetected([
+      ...groupStates.filter(row=>normalizeText(row?.grupo)!==normalizeText(grupo)),
+      saved
+    ]);
+    persistGroupStates(groupStates);
+    renderGroupStatesPanel();
+    renderGuardiaBoard();
+    renderTable();
+    showToast(`Grupo ${nextActivo?'activado':'desactivado'}.`, 'success');
+  }catch(error){
+    console.warn('Group state update failed',error);
+    await hydrateGroupStates();
+    showToast('No se pudo actualizar el estado del grupo.','error');
+  }
+}
 function renderAdminPasilloList(){
   const pasilloList=document.getElementById('adminPasilloList');
   if(!pasilloList) return;
@@ -2744,6 +3067,37 @@ function renderAdminPasilloList(){
       </article>
     `).join('')
     :'<div class="admin-activity-empty">No hay salidas registradas en el pasillo.</div>';
+}
+function renderGroupStatesPanel(){
+  const summary=document.getElementById('groupStatesSummary');
+  const list=document.getElementById('groupStatesList');
+  const search=document.getElementById('groupStatesSearch');
+  if(!summary||!list) return;
+  const rows=mergeGroupStatesWithDetected(groupStates);
+  const query=normalizeText(groupStateFilter);
+  const filtered=rows.filter(row=>!query||normalizeText(row.grupo).includes(query));
+  const activeCount=rows.filter(row=>row.activo).length;
+  const inactiveCount=Math.max(rows.length-activeCount,0);
+  if(search&&search.value!==groupStateFilter) search.value=groupStateFilter;
+  summary.textContent=rows.length
+    ?`${activeCount} activos · ${inactiveCount} inactivos`
+    :'No hay grupos detectados en el horario anual.';
+  list.innerHTML=filtered.length
+    ?filtered.map(row=>`
+      <article class="group-state-item ${row.activo?'is-active':'is-inactive'}">
+        <div class="group-state-copy">
+          <div class="group-state-title">${escapeHtml(row.grupo)}</div>
+          <div class="group-state-meta">${row.activo?'Genera guardias y cobertura':'Ignorado en ausencias, guardias y panel TV'}</div>
+        </div>
+        <div class="group-state-actions">
+          <span class="badge ${row.activo?'b-ok':'b-nok'}">${row.activo?'Activo':'Inactivo'}</span>
+          <button class="btn-substitution${row.activo?' btn-substitution-danger':''}" type="button" data-group-state-toggle="${escapeHtml(row.grupo)}" ${!isAdmin?'disabled':''}>
+            ${row.activo?'Desactivar':'Activar'}
+          </button>
+        </div>
+      </article>
+    `).join('')
+    :'<div class="admin-activity-empty">No hay grupos que coincidan con el filtro.</div>';
 }
 function renderAdminWorkspace(){
   const overviewGrid=document.getElementById('adminOverviewGrid');
@@ -2787,6 +3141,7 @@ function renderAdminWorkspace(){
   ];
   filterChips.innerHTML=filterOptions.map(item=>`<button class="admin-filter-chip${adminTableFilter===item.id?' active':''}" type="button" onclick="setAdminTableFilter('${item.id}')"><span class="admin-filter-chip-label">${item.label}</span><span class="admin-filter-chip-count">${item.count}</span></button>`).join('');
   renderAdminPasilloList();
+  renderGroupStatesPanel();
 }
 function formatBytes(value){
   const bytes=Number(value)||0;
@@ -3032,7 +3387,11 @@ function drainPendingBackendSync(){
   renderSuperAdminMonitor();
   if(backendSyncPendingAdmin){
     backendSyncPendingAdmin=false;
-    syncAdminState();
+    syncAdminState({
+      manual:true,
+      origin:pendingAdminSyncRequest?.origin||'manual-queued',
+      reason:pendingAdminSyncRequest?.reason||'queued-save'
+    });
     return true;
   }
   if(backendSyncPendingTeacher){
@@ -3070,16 +3429,129 @@ function waitForBackendSyncIdle(timeoutMs=8000){
     },100);
   });
 }
-async function syncAdminStateConfirmed(){
-  if(!storage.hasBackend()) return syncAdminState();
+function createDeferredPromise(){
+  let resolve;
+  let reject;
+  const promise=new Promise((res,rej)=>{
+    resolve=res;
+    reject=rej;
+  });
+  return {promise,resolve,reject};
+}
+function settleAdminSyncDeferred(method,payload){
+  if(!adminSyncScheduledDeferred) return;
+  const deferred=adminSyncScheduledDeferred;
+  adminSyncScheduledDeferred=null;
+  deferred[method](payload);
+}
+function serializeGuardiasForReplace(rows=data){
+  return dedupeAbsenceRowsByLogic(rows)
+    .filter(Boolean)
+    .filter(row=>{
+      const hora=Number(row?.hora);
+      if(esHoraValida(hora)) return true;
+      logInvalidAbsenceHour('skip hora inválida',{profesor:row?.ausente||'',hora,origen:'serializeGuardiasForReplace'});
+      return false;
+    })
+    .map(row=>({
+      dia:Number(row.dia),
+      hora:Number(row.hora),
+      ausente:String(row.ausente||'').trim(),
+      guardia:String(row.guardia||'').trim(),
+      aula:String(row.aula||'').trim(),
+      faena:!!row.faena,
+      obs:String(row.obs||'').trim()
+    }))
+    .sort((a,b)=>
+      a.dia-b.dia||
+      a.hora-b.hora||
+      normalizeText(a.ausente).localeCompare(normalizeText(b.ausente),'es')||
+      normalizeText(a.guardia).localeCompare(normalizeText(b.guardia),'es')||
+      a.aula.localeCompare(b.aula,'es')||
+      a.obs.localeCompare(b.obs,'es')
+    );
+}
+function buildAdminSyncPayload(){
+  return {
+    guardias:serializeGuardiasForReplace(data),
+    biblioteca:serializeBibliotecaAssignments(),
+    historial:historialCambios.map(entry=>({
+      id:entry.id,
+      title:entry.title,
+      detail:entry.detail,
+      type:entry.type,
+      actor:entry.actor,
+      ts:entry.ts,
+      undoState:entry.undoState||null
+    })),
+    patioGuardias:serializePatioGuardias(),
+    patioTeacherBlocks:serializePatioTeacherBlocks(),
+    gruposEstado:groupStates.map(row=>({grupo:row.grupo,activo:!!row.activo})),
+    substitutions:serializeTeacherSubstitutions(),
+    practicasGuardias:serializeTeacherPracticasGuardias(),
+    practicasGuardiasTramos:serializeTeacherPracticasGuardiasTramos()
+  };
+}
+function buildAdminSyncHash(payload=buildAdminSyncPayload()){
+  return JSON.stringify(payload);
+}
+function markAdminStatePersisted(){
+  lastAdminPersistedHash=buildAdminSyncHash();
+}
+function scheduleAdminStateSync(delayMs=ADMIN_SYNC_DEBOUNCE_MS){
+  if(!storage.hasBackend()) return Promise.resolve({ok:true,localOnly:true});
+  if(adminSyncTimer) window.clearTimeout(adminSyncTimer);
+  if(!adminSyncScheduledDeferred){
+    adminSyncScheduledDeferred=createDeferredPromise();
+  }
+  console.info('[save origin]',pendingAdminSyncRequest?.origin||'unknown');
+  console.info('[save reason]',pendingAdminSyncRequest?.reason||'unspecified');
+  adminSyncTimer=window.setTimeout(async ()=>{
+    adminSyncTimer=null;
+    try{
+      const result=await runAdminStateSync();
+      settleAdminSyncDeferred('resolve',result);
+    }catch(error){
+      settleAdminSyncDeferred('reject',error);
+    }
+  },Math.max(0,Number(delayMs)||0));
+  console.info('[guardias] admin sync scheduled');
+  return adminSyncScheduledDeferred.promise;
+}
+function clearScheduledAdminSync(){
+  if(adminSyncTimer){
+    window.clearTimeout(adminSyncTimer);
+    adminSyncTimer=null;
+  }
+}
+async function syncAdminStateConfirmed(options={}){
+  const origin=options.origin||'manual-confirmed';
+  const reason=options.reason||'confirmed-save';
+  if(!storage.hasBackend()) return syncAdminState({immediate:true,manual:true,origin,reason});
   const idle=await waitForBackendSyncIdle();
   if(!idle){
+    pendingAdminSyncRequest={origin,reason};
     backendSyncPendingAdmin=true;
     return {ok:true,queued:true};
   }
-  return syncAdminState();
+  return syncAdminState({immediate:true,manual:true,origin,reason});
 }
-async function syncAdminState(){
+async function refreshGuardiasFromBackend(options={}){
+  if(!storage.hasBackend()) return {ok:true,localOnly:true};
+  const guardiasRows=await storage.fetchGuardias();
+  if(Array.isArray(guardiasRows)){
+    data=normalizeStoredRows(guardiasRows.map(row=>({...row,faena:!!row.faena})));
+    nid=computeNextId(data);
+    persist(data);
+    if(options.render!==false){
+      renderTable();
+      renderGuardiaBoard();
+    }
+    return {ok:true,rows:data};
+  }
+  return {ok:false,rows:[]};
+}
+async function runAdminStateSync(){
   if(!storage.hasBackend()) return {ok:true,localOnly:true};
   if(backendSyncInFlight){
     backendSyncPendingAdmin=true;
@@ -3098,38 +3570,102 @@ async function syncAdminState(){
     }catch(mergeError){
       console.warn('Guardias merge before sync failed; syncing local state only',mergeError);
     }
-    await Promise.all([
-      storage.replaceGuardias(guardiasForSync),
-      storage.replaceBiblioteca(serializeBibliotecaAssignments()),
-      storage.replaceHistorial(historialCambios),
-      storage.replacePatioGuardias(serializePatioGuardias()),
-      storage.replacePatioTeacherBlocks(serializePatioTeacherBlocks()),
-      storage.replaceTeacherSubstitutions(serializeTeacherSubstitutions()),
-      storage.replaceTeacherPracticasGuardias(serializeTeacherPracticasGuardias()),
-      storage.replaceTeacherPracticasGuardiasTramos(serializeTeacherPracticasGuardiasTramos())
+    const payload=buildAdminSyncPayload();
+    const payloadHash=buildAdminSyncHash(payload);
+    if(payloadHash===lastAdminPersistedHash){
+      console.info('[save skipped same payload]',{origin:pendingAdminSyncRequest?.origin||'unknown',reason:pendingAdminSyncRequest?.reason||'unspecified'});
+      lastBackendSnapshot=makeBackendSnapshot();
+      pendingDeletedAbsenceKeys.clear();
+      pendingAdminSyncRequest=null;
+      return {ok:true,skipped:true,unchanged:true};
+    }
+    const syncStartedAt=performance.now();
+    const persistedGuardias=await storage.replaceGuardias(payload.guardias);
+    const auxiliaryResults=await Promise.allSettled([
+      storage.replaceBiblioteca(payload.biblioteca),
+      storage.replaceHistorial(payload.historial),
+      storage.replacePatioGuardias(payload.patioGuardias),
+      storage.replacePatioTeacherBlocks(payload.patioTeacherBlocks),
+      storage.replaceTeacherSubstitutions(payload.substitutions),
+      storage.replaceTeacherPracticasGuardias(payload.practicasGuardias),
+      storage.replaceTeacherPracticasGuardiasTramos(payload.practicasGuardiasTramos)
     ]);
+    const auxiliaryFailures=auxiliaryResults
+      .map((result,index)=>({result,index}))
+      .filter(item=>item.result.status==='rejected')
+      .map(item=>({
+        domain:['biblioteca','historial','patio-guardias','patio-bloqueos','sustituciones','practicas-guardias','practicas-tramos'][item.index]||`domain-${item.index}`,
+        error:item.result.reason
+      }));
+    if(Array.isArray(persistedGuardias)){
+      data=normalizeStoredRows(persistedGuardias.map(row=>({...row,faena:!!row.faena})));
+      nid=computeNextId(data);
+      persist(data);
+    }
+    await refreshGuardiasFromBackend({render:false});
     try{
       guardiaMonthlyLoad=normalizeGuardiaMonthlyLoadState(await storage.fetchGuardiaMonthlyLoad());
       persistGuardiaMonthlyLoad(guardiaMonthlyLoad);
     }catch(monthlyLoadError){
       console.warn('Monthly guardia load refresh failed',monthlyLoadError);
     }
+    if(!auxiliaryFailures.length) markAdminStatePersisted();
+    else lastAdminPersistedHash='';
     lastBackendSnapshot=makeBackendSnapshot();
     pendingDeletedAbsenceKeys.clear();
     superAdminStatus.lastAdminSyncAt=new Date().toISOString();
-    clearSuperAdminError();
-    pushSuperAdminEvent('Admin sync','Guardias, biblioteca, historial, sustituciones y ajustes de practicas sincronizados con backend.');
+    if(auxiliaryFailures.length){
+      const failedDomains=auxiliaryFailures.map(item=>item.domain).join(', ');
+      console.warn('[guardias] admin sync partial failure',auxiliaryFailures);
+      setSuperAdminError(`Guardias guardadas, pero falló la sincronización auxiliar: ${failedDomains}.`);
+      pushSuperAdminEvent('Admin sync parcial',`Guardias persistidas. Revisa: ${failedDomains}.`);
+    }else{
+      clearSuperAdminError();
+    }
+    console.info('[guardias] admin sync persisted', {
+      guardias: payload.guardias.length,
+      ms: Math.round(performance.now()-syncStartedAt),
+      auxiliaryFailures: auxiliaryFailures.length
+    });
+    if(!auxiliaryFailures.length){
+      pushSuperAdminEvent('Admin sync','Guardias, biblioteca, historial, sustituciones y ajustes de practicas sincronizados con backend.');
+    }
     notifyRealtimeSync('admin-sync');
-    return {ok:true};
+    pendingAdminSyncRequest=null;
+    return {ok:true,partialAuxFailures:auxiliaryFailures};
   }catch(error){
     console.warn('Backend sync failed',error);
     setSuperAdminError('Fallo en la sincronización de Jefatura.');
     pushSuperAdminEvent('Error sync',`Jefatura: ${String(error?.message||error)}`);
+    pendingAdminSyncRequest=null;
     return {ok:false,syncError:true,error};
   }finally{
     backendSyncInFlight=false;
     drainPendingBackendSync();
   }
+}
+async function syncAdminState(options={}){
+  if(!storage.hasBackend()) return {ok:true,localOnly:true};
+  if(options.manual!==true){
+    console.info('[save skipped auto]',{origin:options.origin||'auto',reason:options.reason||'automatic-sync-blocked'});
+    return {ok:true,skipped:true,auto:true};
+  }
+  pendingAdminSyncRequest={
+    origin:options.origin||'manual',
+    reason:options.reason||'manual-save'
+  };
+  if(options.immediate){
+    clearScheduledAdminSync();
+    try{
+      const result=await runAdminStateSync();
+      settleAdminSyncDeferred('resolve',result);
+      return result;
+    }catch(error){
+      settleAdminSyncDeferred('reject',error);
+      throw error;
+    }
+  }
+  return scheduleAdminStateSync(options.delayMs);
 }
 async function syncTeacherState(){
   if(!storage.hasBackend()) return;
@@ -3327,6 +3863,27 @@ async function hydrateTeacherSubstitutions(){
     setSuperAdminError('Fallo al hidratar sustituciones.');
   }
 }
+async function hydrateGroupStates(){
+  if(!storage.hasBackend()) return;
+  try{
+    const rows=await storage.fetchGroups();
+    if(!Array.isArray(rows)) return;
+    groupStates=mergeGroupStatesWithDetected(rows);
+    persistGroupStates(groupStates);
+    renderGroupStatesPanel();
+    renderGuardiaBoard();
+    renderTable();
+    renderAbsenceHourChoices();
+    renderAbsenceDecisionBar();
+    if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
+    superAdminStatus.lastHydrateAt=new Date().toISOString();
+    clearSuperAdminError();
+    pushSuperAdminEvent('Hydrate','Estado de grupos recargado desde backend.');
+  }catch(error){
+    console.warn('Group states hydration failed',error);
+    setSuperAdminError('Fallo al hidratar grupos activos/inactivos.');
+  }
+}
 async function hydrateTeacherFutureAbsences(){
   if(!storage.hasBackend()) return;
   try{
@@ -3378,7 +3935,7 @@ function normalizeTeacherFutureAbsence(row){
     profesor:resolveTeacherCanonicalName(row?.profesor)||cleanText(row?.profesor),
     date:cleanText(row?.date),
     note:cleanText(row?.note),
-    hours:Array.isArray(row?.hours)?[...new Set(row.hours.map(Number).filter(Number.isInteger).filter(hora=>!HORAS_PATIO.has(hora)))].sort((a,b)=>a-b):[],
+    hours:Array.isArray(row?.hours)?[...new Set(row.hours.map(Number).filter(esHoraValida).filter(hora=>!HORAS_PATIO.has(hora)))].sort((a,b)=>a-b):[],
     status:cleanText(row?.status||'pending')||'pending',
     reviewedAt:cleanText(row?.reviewedAt),
     reviewerNote:cleanText(row?.reviewerNote),
@@ -3422,7 +3979,7 @@ function getSchoolWeekInfoFromDate(dateValue){
 }
 function getFutureAbsenceHoursForEntry(item){
   if(Array.isArray(item?.hours)&&item.hours.length){
-    return [...new Set(item.hours.map(Number).filter(Number.isInteger).filter(hora=>!HORAS_PATIO.has(hora)))].sort((a,b)=>a-b);
+    return [...new Set(item.hours.map(Number).filter(esHoraValida).filter(hora=>!HORAS_PATIO.has(hora)))].sort((a,b)=>a-b);
   }
   const weekInfo=getSchoolWeekInfoFromDate(item?.date);
   if(!weekInfo||weekInfo.dayIndex==null) return [];
@@ -3481,8 +4038,27 @@ function buildProjectedRowsForWeek(weekKey){
     });
   return assignGuardiasForRows(rows);
 }
+function mergeActualAndProjectedRows(actualRows,projectedRows){
+  const merged=Array.isArray(actualRows)?actualRows.slice():[];
+  const existingKeys=new Set(merged.map(row=>makeAbsenceSyncKey(row)).filter(Boolean));
+  (Array.isArray(projectedRows)?projectedRows:[]).forEach(row=>{
+    const key=makeAbsenceSyncKey(row);
+    if(!key||existingKeys.has(key)) return;
+    existingKeys.add(key);
+    merged.push(row);
+  });
+  return merged.sort((a,b)=>Number(a.dia)-Number(b.dia)||Number(a.hora)-Number(b.hora)||String(a.ausente||'').localeCompare(String(b.ausente||''),'es'));
+}
+function isAbsenceRowVisibleByGroup(row){
+  if(!row||typeof row!=='object') return false;
+  const session=resolveTeacherSession(row.ausente,row.dia,row.hora);
+  return !session?.grupo||isGroupCurrentlyActive(session.grupo);
+}
 function getRowsForWeekOffset(offset){
-  return isCurrentWeekOffset(offset)?data:buildProjectedRowsForWeek(getSchoolWeekKeyFromOffset(offset));
+  const weekKey=getSchoolWeekKeyFromOffset(offset);
+  const projectedRows=buildProjectedRowsForWeek(weekKey);
+  const rows=isCurrentWeekOffset(offset)?mergeActualAndProjectedRows(data,projectedRows):projectedRows;
+  return rows.filter(isAbsenceRowVisibleByGroup);
 }
 function getSelectedRowsForDay(targetDay){
   return getRowsForWeekOffset(weekOffset).filter(row=>row.dia===targetDay).sort((a,b)=>a.hora-b.hora);
@@ -3915,6 +4491,10 @@ async function applyApprovedFutureAbsencesForCurrentWeek(){
     const horasLectivas=getFutureAbsenceHoursForEntry(item);
     if(!horasLectivas.length) continue;
     horasLectivas.forEach(horaItem=>{
+      if(!esHoraValida(horaItem)){
+        logInvalidAbsenceHour('skip hora inválida',{profesor:item.profesor,hora:horaItem});
+        return;
+      }
       if(data.some(row=>row.dia===weekInfo.dayIndex&&row.hora===horaItem&&sameNormalizedText(row.ausente,item.profesor))) return;
       data.push({dia:weekInfo.dayIndex,hora:horaItem,ausente:item.profesor,guardia:'',aula:getAulaProfesor(item.profesor,weekInfo.dayIndex,horaItem)||'',faena:false,obs:'',id:nid++});
       stateChanged=true;
@@ -3954,7 +4534,7 @@ async function applyApprovedFutureAbsencesForCurrentWeek(){
     }
   }
   if(appliedSummaries.length){
-    await syncAdminState();
+      await syncAdminState({manual:true,immediate:true,origin:'future-absence',reason:'apply-approved-current-week'});
   }
   return stateChanged||approvalsChanged;
 }
@@ -4013,7 +4593,7 @@ async function hydrateFromBackend(){
   if(backendHydrationPromise) return backendHydrationPromise;
   backendHydrationPromise=(async()=>{
     try{
-    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult]=await Promise.allSettled([
+    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult,groupStatesResult]=await Promise.allSettled([
       storage.fetchGuardias(),
       storage.fetchHistorial(),
       storage.fetchTareasProfesorado(),
@@ -4025,7 +4605,8 @@ async function hydrateFromBackend(){
       storage.fetchPatioGuardias(),
       storage.fetchPatioTeacherBlocks(),
       storage.fetchTvAnnouncement(),
-      storage.fetchGuardiaMonthlyLoad()
+      storage.fetchGuardiaMonthlyLoad(),
+      storage.fetchGroups()
     ]);
     const guardiasRows=guardiasResult.status==='fulfilled'?guardiasResult.value:null;
     const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
@@ -4039,6 +4620,7 @@ async function hydrateFromBackend(){
     const patioTeacherBlocksRows=patioTeacherBlocksResult.status==='fulfilled'?patioTeacherBlocksResult.value:null;
     const tvAnnouncementRow=tvAnnouncementResult.status==='fulfilled'?tvAnnouncementResult.value:null;
     const guardiaMonthlyLoadRow=guardiaMonthlyLoadResult.status==='fulfilled'?guardiaMonthlyLoadResult.value:null;
+    const groupStateRows=groupStatesResult.status==='fulfilled'?groupStatesResult.value:null;
     let guardiaAssignmentsChanged=false;
 
     const backendHasData=
@@ -4052,6 +4634,7 @@ async function hydrateFromBackend(){
       (Array.isArray(practicasGuardiasTramosRows)&&practicasGuardiasTramosRows.length)||
       (Array.isArray(patioGuardiasRows)&&patioGuardiasRows.length)||
       (Array.isArray(patioTeacherBlocksRows)&&patioTeacherBlocksRows.length)||
+      (Array.isArray(groupStateRows)&&groupStateRows.length)||
       (tvAnnouncementRow&&typeof tvAnnouncementRow==='object'&&(Array.isArray(tvAnnouncementRow.items)?tvAnnouncementRow.items.length:!!cleanText(tvAnnouncementRow.text)))||
       (guardiaMonthlyLoadRow&&typeof guardiaMonthlyLoadRow==='object'&&Object.keys(guardiaMonthlyLoadRow.byDate||{}).length);
 
@@ -4135,24 +4718,31 @@ async function hydrateFromBackend(){
       guardiaMonthlyLoad=normalizeGuardiaMonthlyLoadState(guardiaMonthlyLoadRow);
       persistGuardiaMonthlyLoad(guardiaMonthlyLoad);
     }
+    if(Array.isArray(groupStateRows)){
+      groupStates=mergeGroupStatesWithDetected(groupStateRows);
+      persistGroupStates(groupStates);
+    }
+    const needsBootstrapSync=!backendHasData&&!storage.isBackendOnly()&&(data.length||historialCambios.length);
     refreshOrdenGuardias();
     lastBackendSnapshot=makeBackendSnapshot();
+    if(!guardiaAssignmentsChanged&&!needsBootstrapSync) markAdminStatePersisted();
+    else lastAdminPersistedHash='';
     backendHydrated=true;
     superAdminStatus.lastHydrateAt=new Date().toISOString();
     clearSuperAdminError();
     pushSuperAdminEvent('Hydrate','Estado principal recargado desde backend.');
-    renderGuardiaBoard();
-    renderTable();
+    renderGuardiasUiIfChanged(true);
     renderHistoryList();
     renderSubstitutionList();
     renderPracticasGuardiasList();
     renderPracticasGuardiasConfig();
+    renderGroupStatesPanel();
     renderFutureAbsenceAdminList();
     renderTvAnnouncement();
     if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
 
-    if(guardiaAssignmentsChanged||(!backendHasData&&!storage.isBackendOnly()&&(data.length||historialCambios.length))){
-      syncAdminState();
+    if(guardiaAssignmentsChanged||needsBootstrapSync){
+      syncAdminState({origin:'hydrate',reason:'autoassign-after-hydrate'});
     }
     }catch(error){
       backendHydrated=false;
@@ -4202,6 +4792,38 @@ function makeBackendSnapshot(){
     }))
   });
 }
+function makeGuardiasUiSnapshot(){
+  const rows=getSelectedRowsForDay(day);
+  const filteredRows=getAdminFilteredRows(rows);
+  return JSON.stringify({
+    weekOffset,
+    day,
+    adminTableFilter,
+    teacherWeekOffset,
+    teacherDay,
+    rows:filteredRows.map(row=>({
+      id:row.id,
+      dia:row.dia,
+      hora:row.hora,
+      ausente:row.ausente,
+      guardia:row.guardia||'',
+      aula:resolveAulaRegistro(row),
+      faena:!!resolveFaena(row).faena,
+      obs:resolveFaena(row).obs||'',
+      futurePlanned:!!row.futurePlanned,
+      futureStatus:row.futureStatus||''
+    }))
+  });
+}
+function renderGuardiasUiIfChanged(force=false){
+  const nextSnapshot=makeGuardiasUiSnapshot();
+  if(!force&&nextSnapshot===lastRenderedGuardiasUiSnapshot) return false;
+  console.info('[render triggered]',{force,reason:force?'forced-or-initial':'visible-state-changed'});
+  lastRenderedGuardiasUiSnapshot=nextSnapshot;
+  renderGuardiaBoard();
+  renderTable();
+  return true;
+}
 async function pollBackendState(force=false){
   if(!storage.hasBackend()||backendPollingInFlight||backendSyncInFlight) return;
   if(!force&&(document.hidden||isAnyOverlayOpen())) return;
@@ -4210,7 +4832,7 @@ async function pollBackendState(force=false){
   renderSuperAdminMonitor();
   try{
     const previousSnapshot=makeBackendSnapshot();
-    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult]=await Promise.allSettled([
+    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult,groupStatesResult]=await Promise.allSettled([
       storage.fetchGuardias(),
       storage.fetchHistorial(),
       storage.fetchTareasProfesorado(),
@@ -4222,7 +4844,8 @@ async function pollBackendState(force=false){
       storage.fetchPatioGuardias(),
       storage.fetchPatioTeacherBlocks(),
       storage.fetchTvAnnouncement(),
-      storage.fetchGuardiaMonthlyLoad()
+      storage.fetchGuardiaMonthlyLoad(),
+      storage.fetchGroups()
     ]);
     const guardiasRows=guardiasResult.status==='fulfilled'?guardiasResult.value:null;
     const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
@@ -4236,6 +4859,7 @@ async function pollBackendState(force=false){
     const patioTeacherBlocksRows=patioTeacherBlocksResult.status==='fulfilled'?patioTeacherBlocksResult.value:null;
     const tvAnnouncementRow=tvAnnouncementResult.status==='fulfilled'?tvAnnouncementResult.value:null;
     const guardiaMonthlyLoadRow=guardiaMonthlyLoadResult.status==='fulfilled'?guardiaMonthlyLoadResult.value:null;
+    const groupStateRows=groupStatesResult.status==='fulfilled'?groupStatesResult.value:null;
     let guardiaAssignmentsChanged=false;
 
     if(Array.isArray(guardiasRows)){
@@ -4318,24 +4942,30 @@ async function pollBackendState(force=false){
       guardiaMonthlyLoad=normalizeGuardiaMonthlyLoadState(guardiaMonthlyLoadRow);
       persistGuardiaMonthlyLoad(guardiaMonthlyLoad);
     }
+    if(Array.isArray(groupStateRows)){
+      groupStates=mergeGroupStatesWithDetected(groupStateRows);
+      persistGroupStates(groupStates);
+    }
     refreshOrdenGuardias();
     lastBackendSnapshot=makeBackendSnapshot();
+    if(!guardiaAssignmentsChanged) markAdminStatePersisted();
+    else lastAdminPersistedHash='';
     superAdminStatus.lastPollAt=new Date().toISOString();
     clearSuperAdminError();
     if(previousSnapshot!==makeBackendSnapshot()){
       pushSuperAdminEvent('Polling','Se detectaron cambios remotos y se actualizaron en local.');
-      renderGuardiaBoard();
-      renderTable();
+      renderGuardiasUiIfChanged();
       renderHistoryList();
       renderSubstitutionList();
       renderPracticasGuardiasList();
       renderPracticasGuardiasConfig();
+      renderGroupStatesPanel();
       renderTvAnnouncement();
       if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
     }else{
       pushSuperAdminEvent('Polling','Comprobación remota sin cambios.');
     }
-    if(guardiaAssignmentsChanged) syncAdminState();
+    if(guardiaAssignmentsChanged) syncAdminState({origin:'polling',reason:'autoassign-after-poll'});
   }catch(error){
     console.warn('Backend polling failed',error);
     setSuperAdminError('Fallo en la comprobación periódica del backend.');
@@ -4484,6 +5114,7 @@ async function ensureSuperAdminRouteAccess(){
 async function initializeApp(){
   await loadAuthSession();
   if(!await ensureSuperAdminRouteAccess()) return;
+  await hydrateGroupStates();
   await hydrateTeacherSubstitutions();
   await hydrateTeacherPracticasGuardias();
   await hydrateTeacherFutureAbsences();
@@ -4597,6 +5228,146 @@ function toggleGuardiaCard(button){
   button.parentElement.classList.toggle('is-open');
 }
 function setDay(i){day=i;renderPills();renderGuardiaBoard();renderTable();}
+function isMobileAbsenceLayout(){
+  return window.innerWidth<=900;
+}
+function buildAbsenceDisplayModel(g,rowsSource){
+  const h=HORA_MAP[g.hora]||{label:g.hora+'a',rango:''};
+  const cub=g.guardia&&g.guardia.trim();
+  const needsCoverage=rowNeedsCoverage(g);
+  const sugerido=needsCoverage?(cub||getGuardiaSugerida(day,g.hora,1,rowsSource)):'';
+  const faenaInfo=resolveFaena(g);
+  const aula=resolveAulaRegistro(g)||'-';
+  const ausenteNombre=getVisibleTeacherName(g.ausente);
+  const guardiaNombre=sugerido?getVisibleTeacherName(sugerido):'';
+  const ausenteMood=getTeacherMoodForToday(g.ausente);
+  const guardiaMood=sugerido?getTeacherMoodForToday(sugerido):null;
+  const guardiaEstado=!needsCoverage?'No requiere cobertura':(g.futurePlanned?(g.futureStatus==='approved'||g.futureStatus==='applied'?(cub?'Guardia planificada':'Cobertura prevista'):'Pendiente de validar'):(sugerido?(cub?'':'Guardia prevista'):'Sin cobertura'));
+  const guardiaBadgeClass=g.futurePlanned
+    ?(g.futureStatus==='approved'||g.futureStatus==='applied'?'b-ok status-pill':'status-pill teacher-duty-badge')
+    :(!needsCoverage?'b-ok status-pill':(sugerido?(cub?'b-ok status-pill':'status-pill teacher-duty-badge'):'b-nok status-pill'));
+  const guardiaChipClass=sugerido?`${cub?'guardia-chip guardia-chip-assigned chip-strong':'guardia-chip guardia-chip-suggested chip-strong'}${guardiaMood?` chip-mood chip-mood-${guardiaMood.tone}`:''}`:'';
+  const ausenteChipClass=`chip chip-absence chip-strong${ausenteMood?` chip-mood chip-mood-${ausenteMood.tone}`:''}`;
+  const statusText=g.futurePlanned
+    ?(g.futureStatus==='approved'?'Validada':g.futureStatus==='applied'?'Aplicada':g.futureStatus==='pending'?'Pendiente':'Planificada')
+    :(!needsCoverage?'No requiere cobertura':(sugerido?(cub?'Cubierta':'Pendiente de confirmar'):'Sin cubrir'));
+  const planningMeta=g.futurePlanned?`<span class="badge future-plan-badge ${g.futureStatus==='pending'?'future-plan-badge-pending':'future-plan-badge-approved'}">${g.futureStatus==='pending'?'Falta futura pendiente':'Falta futura validada'}</span>`:'';
+  const rowClasses=[
+    g.futurePlanned?'future-planned-row':'',
+    (needsCoverage&&!sugerido)?'admin-row-urgent':(!faenaInfo.faena||g.futureStatus==='pending')?'admin-row-warning':''
+  ].filter(Boolean).join(' ');
+  return {
+    h,
+    cub,
+    needsCoverage,
+    sugerido,
+    faenaInfo,
+    aula,
+    ausenteNombre,
+    guardiaNombre,
+    ausenteMood,
+    guardiaMood,
+    guardiaEstado,
+    guardiaBadgeClass,
+    guardiaChipClass,
+    ausenteChipClass,
+    statusText,
+    planningMeta,
+    rowClasses
+  };
+}
+function renderMobileAbsenceGroups(filteredRows,rows,editableWeek){
+  if(!filteredRows.length){
+    const emptyMessage=rows.length
+      ? 'No hay ausencias que coincidan con el filtro actual.'
+      : `No hay ausencias registradas para ${editableWeek?'este día':'esta vista futura'}.`;
+    return `<tr class="empty-row"><td colspan="7">${emptyMessage}</td></tr>`;
+  }
+  const rowsSource=getRowsForWeekOffset(weekOffset);
+  const groupedRows=new Map();
+  filteredRows
+    .slice()
+    .sort((a,b)=>a.hora-b.hora||String(getVisibleTeacherName(a.ausente)).localeCompare(String(getVisibleTeacherName(b.ausente)),'es'))
+    .forEach(row=>{
+      const key=String(row.hora);
+      if(!groupedRows.has(key)){
+        const horaInfo=HORA_MAP[row.hora]||{label:`${row.hora}a`,rango:''};
+        groupedRows.set(key,{
+          hora:Number(row.hora),
+          horaInfo,
+          rows:[]
+        });
+      }
+      groupedRows.get(key).rows.push(row);
+    });
+  return [...groupedRows.values()].map((group,index)=>{
+    const summaryParts=[
+      `${group.rows.length} ${group.rows.length===1?'falta':'faltas'}`
+    ];
+    const uncoveredCount=group.rows.filter(row=>{
+      const model=buildAbsenceDisplayModel(row,rowsSource);
+      return model.needsCoverage&&!model.sugerido;
+    }).length;
+    if(uncoveredCount) summaryParts.push(`${uncoveredCount} sin cubrir`);
+    const itemMarkup=group.rows.map(row=>{
+      const model=buildAbsenceDisplayModel(row,rowsSource);
+      const numericId=Number(row.id);
+      const canEditRow=isAdmin&&editableWeek&&Number.isInteger(numericId);
+      const taskMarkup=row.futurePlanned
+        ?`<span class="badge ${row.futureStatus==='pending'?'teacher-duty-badge':'b-ok'}">${row.futureStatus==='pending'?'Pendiente':'Planificada'}</span>`
+        :(model.faenaInfo.faena
+          ?`<div class="faena-status"><span class="badge b-ok">Con tarea</span>${model.faenaInfo.obs?`<div class="mobile-absence-task-note">${escapeHtml(model.faenaInfo.obs)}</div>`:''}</div>`
+          :'<span class="badge b-nok">Sin tarea</span>');
+      const coverageMarkup=model.sugerido
+        ?`<div class="chip ${model.guardiaChipClass}"><div class="avatar av-yellow">${initials(model.guardiaNombre)}</div>${escapeHtml(model.guardiaNombre)}${model.guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(model.guardiaMood.label)}">${model.guardiaMood.emoji}</span>`:''}</div>`
+        :`<span class="sin-asignar">${model.needsCoverage?'Sin asignar':'No aplica'}</span>`;
+      const actionMarkup=canEditRow
+        ?`<div class="mobile-absence-actions"><button class="btn-edit" type="button" onclick="openModal(${numericId})">Editar</button><label class="row-selector"><input type="checkbox" ${selectedAbsenceIds.has(numericId)?'checked':''} onchange="toggleAbsenceSelection(${numericId}, this.checked)"><span>Seleccionar</span></label></div>`
+        :'';
+      return `<article class="mobile-absence-item ${model.rowClasses}">
+        <div class="mobile-absence-item-head">
+          <div class="mobile-absence-item-hour">
+            <div class="${model.ausenteChipClass}"><div class="avatar av-red">${initials(model.ausenteNombre)}</div>${escapeHtml(model.ausenteNombre)}${model.ausenteMood?`<span class="chip-mood-tag" title="${escapeHtml(model.ausenteMood.label)}">${model.ausenteMood.emoji}</span>`:''}</div>
+            ${row.futurePlanned?`<span class="mobile-absence-item-range">Planificada para ${escapeHtml(formatFutureAbsenceDateLabel(row.futureDate))}</span>`:''}
+          </div>
+          <span class="badge ${model.guardiaBadgeClass}">${model.statusText}</span>
+        </div>
+        <div class="mobile-absence-item-grid">
+          <div class="mobile-absence-detail">
+            <span class="mobile-absence-detail-label">Cobertura</span>
+            ${coverageMarkup}
+            <span class="mobile-absence-detail-meta">${escapeHtml(model.guardiaEstado)}</span>
+          </div>
+          <div class="mobile-absence-detail">
+            <span class="mobile-absence-detail-label">Aula</span>
+            <span class="aula-tag">${escapeHtml(model.aula)}</span>
+          </div>
+          <div class="mobile-absence-detail">
+            <span class="mobile-absence-detail-label">Tarea</span>
+            ${taskMarkup}
+          </div>
+        </div>
+        ${actionMarkup}
+      </article>`;
+    }).join('');
+    return `<tr class="mobile-group-row">
+      <td colspan="7">
+        <details class="mobile-absence-group"${index===0?' open':''}>
+          <summary class="mobile-absence-summary">
+            <div class="mobile-absence-summary-main">
+              <div class="mobile-absence-hour-badge">${escapeHtml(group.horaInfo.label)} hora${group.horaInfo.rango?` · ${escapeHtml(group.horaInfo.rango.replace('-', ' - '))}`:''}</div>
+              <div class="mobile-absence-summary-meta">${summaryParts.join(' · ')}</div>
+            </div>
+            <div class="mobile-absence-hours">${group.rows.map(row=>`<span class="mobile-absence-hour-pill">${escapeHtml(getVisibleTeacherName(row.ausente))}</span>`).join('')}</div>
+          </summary>
+          <div class="mobile-absence-group-body">
+            ${itemMarkup}
+          </div>
+        </details>
+      </td>
+    </tr>`;
+  }).join('');
+}
 async function changeWeekOffset(delta){
   const openPanels=getOpenWorkflowOverlayIds();
   if(openPanels.length){
@@ -5570,7 +6341,7 @@ async function assignTeacherSubstitution(nombre){
   renderTable();
   if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
   showToast('Sustituto asignado correctamente.','success');
-  syncAdminState();
+  syncAdminState({manual:true,origin:'teacher-substitution',reason:'assign-substitution'});
 }
 async function clearTeacherSubstitution(nombre){
   if(!isAdmin||!teacherSubstitutions[nombre]) return;
@@ -5585,7 +6356,7 @@ async function clearTeacherSubstitution(nombre){
   renderTable();
   if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
   showToast('Titular restaurado.','success');
-  syncAdminState();
+  syncAdminState({manual:true,origin:'teacher-substitution',reason:'clear-substitution'});
 }
 async function toggleTeacherPracticasGuardias(nombre){
   if(!isAdmin||!getProfesor(nombre)) return;
@@ -5603,7 +6374,7 @@ async function toggleTeacherPracticasGuardias(nombre){
   renderGuardiaBoard();
   renderTable();
   showToast(enabled?'Profesor retirado de la rotaci\u00f3n por pr\u00e1cticas.':'Profesor habilitado para entrar en guardias por pr\u00e1cticas.','success');
-  syncAdminState();
+  syncAdminState({manual:true,origin:'practicas-guardias',reason:'toggle-teacher'});
 }
 async function toggleTeacherPracticasGuardiasSlot(nombre,dia,hora){
   if(!isAdmin||!getProfesor(nombre)||HORAS_PATIO.has(hora)) return;
@@ -5623,7 +6394,7 @@ async function toggleTeacherPracticasGuardiasSlot(nombre,dia,hora){
   renderGuardiaBoard();
   renderTable();
   showToast(current.has(key)?'Tramo manual retirado de guardias.':'Tramo manual habilitado para guardias.','success');
-  syncAdminState();
+  syncAdminState({manual:true,origin:'practicas-guardias',reason:'toggle-slot'});
 }
 async function clearHistory(){
   if(!isAdmin) return;
@@ -5632,7 +6403,7 @@ async function clearHistory(){
   persistHistorial(historialCambios);
   renderHistoryList();
   showToast('Historial borrado.','success');
-  syncAdminState();
+  syncAdminState({manual:true,origin:'history',reason:'clear-history'});
 }
 async function undoLastHistoryChange(){
   if(!isAdmin) return;
@@ -5655,85 +6426,173 @@ async function undoLastHistoryChange(){
   const saveTs=document.getElementById('saveTs');
   if(saveTs) saveTs.textContent='Deshecho - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
   showToast('\u00daltimo cambio deshecho.','success');
+  await syncAdminStateConfirmed({origin:'history',reason:'undo-last-change'});
 }
+function getVisibleSelectableAbsenceRows(rows){
+  if(!isAdmin||!isCurrentWeekOffset(weekOffset)) return [];
+  return (rows||[]).filter(row=>Number.isInteger(Number(row?.id)));
+}
+function pruneSelectedAbsenceIds(validIds){
+  const allowed=validIds instanceof Set ? validIds : new Set((validIds||[]).map(value=>Number(value)).filter(Number.isInteger));
+  selectedAbsenceIds=new Set([...selectedAbsenceIds].filter(id=>allowed.has(id)));
+}
+function updateAbsenceBatchBar(filteredRows){
+  const batchBar=document.getElementById('tableBatchBar');
+  const selectAll=document.getElementById('batchSelectAll');
+  const summary=document.getElementById('tableBatchSummary');
+  const deleteButton=document.getElementById('btnDeleteSelectedAbsences');
+  if(!batchBar||!selectAll||!summary||!deleteButton) return;
+  const selectableRows=getVisibleSelectableAbsenceRows(filteredRows);
+  const selectableIds=new Set(selectableRows.map(row=>Number(row.id)));
+  pruneSelectedAbsenceIds(selectableIds);
+  if(!selectableRows.length){
+    batchBar.style.display='none';
+    selectAll.checked=false;
+    selectAll.indeterminate=false;
+    summary.textContent='0 seleccionadas';
+    deleteButton.disabled=true;
+    return;
+  }
+  const selectedCount=selectableRows.filter(row=>selectedAbsenceIds.has(Number(row.id))).length;
+  batchBar.style.display=selectedCount>1?'':'none';
+  selectAll.checked=selectedCount>0&&selectedCount===selectableRows.length;
+  selectAll.indeterminate=selectedCount>0&&selectedCount<selectableRows.length;
+  summary.textContent=`${selectedCount} ${selectedCount===1?'seleccionada':'seleccionadas'} de ${selectableRows.length}`;
+  deleteButton.disabled=selectedCount===0;
+}
+function toggleAbsenceSelection(id,checked){
+  const numericId=Number(id);
+  if(!Number.isInteger(numericId)) return;
+  if(checked) selectedAbsenceIds.add(numericId);
+  else selectedAbsenceIds.delete(numericId);
+  updateAbsenceBatchBar(getAdminFilteredRows(getSelectedRowsForDay(day)));
+}
+function toggleSelectAllAbsences(checked){
+  const selectableRows=getVisibleSelectableAbsenceRows(getAdminFilteredRows(getSelectedRowsForDay(day)));
+  selectableRows.forEach(row=>{
+    const numericId=Number(row.id);
+    if(checked) selectedAbsenceIds.add(numericId);
+    else selectedAbsenceIds.delete(numericId);
+  });
+  renderTable();
+}
+async function deleteSelectedAbsences(){
+  const filteredRows=getAdminFilteredRows(getSelectedRowsForDay(day));
+  const selectedRows=getVisibleSelectableAbsenceRows(filteredRows).filter(row=>selectedAbsenceIds.has(Number(row.id)));
+  if(!selectedRows.length){
+    showToast('Selecciona al menos una ausencia.','info');
+    return;
+  }
+  const count=selectedRows.length;
+  if(!await askConfirm('Eliminar ausencias',`Se eliminar${count===1?'á':'án'} ${count} ${count===1?'ausencia seleccionada':'ausencias seleccionadas'}.`,'Eliminar')) return;
+  if(!await ensureBackendReadyForMutations()){
+    showToast('Todavia no se ha cargado el estado guardado. Espera un momento y vuelve a intentarlo.','error');
+    return;
+  }
+  const selectedIds=new Set(selectedRows.map(row=>Number(row.id)));
+  const undoState=buildUndoState(day);
+  selectedRows.forEach(row=>pendingDeletedAbsenceKeys.add(makeAbsenceSyncKey(row)));
+  data=data.filter(row=>!selectedIds.has(Number(row.id)));
+  const affectedHoursByDay=new Map();
+  selectedRows.forEach(row=>{
+    const diaKey=Number(row.dia);
+    if(!affectedHoursByDay.has(diaKey)) affectedHoursByDay.set(diaKey,new Set());
+    affectedHoursByDay.get(diaKey).add(Number(row.hora));
+  });
+  affectedHoursByDay.forEach((hours,diaKey)=>reassignGuardiasForDayHours(diaKey,[...hours]));
+  persist(data);
+  selectedAbsenceIds=new Set();
+  if(editId&&selectedIds.has(Number(editId))) closeModal();
+  const historyDetail=selectedRows.slice(0,3).map(row=>formatHistoryAbsence(row)).join(' | ');
+  addHistoryEntry(
+    count===1?'Ausencia eliminada':'Ausencias eliminadas',
+    count===1?historyDetail:`${count} registros eliminados${historyDetail?`: ${historyDetail}${count>3?'...':''}`:''}`,
+    'delete',
+    {undoState}
+  );
+  renderTable();
+  try{
+    const syncResult=await syncAdminStateConfirmed({origin:'absence-batch-delete',reason:'delete-selected-absences'});
+    if(syncResult?.syncError){
+      showToast('Las ausencias se han eliminado en local, pero no se han podido sincronizar con el servidor.','error');
+    }else if(syncResult?.partialAuxFailures?.length){
+      showToast('Ausencias eliminadas y guardadas, pero ha fallado parte de la sincronización auxiliar.','info');
+    }else if(syncResult?.queued){
+      showToast('Ausencias eliminadas en local. Sincronización en cola.','info');
+    }else{
+      showToast(count===1?'Registro eliminado.':'Ausencias eliminadas.','success');
+    }
+  }catch(syncError){
+    console.error('Absences deleted but sync trigger failed',syncError);
+    showToast('Las ausencias se han eliminado en local, pero no se ha podido lanzar la sincronización.','error');
+  }
+}
+window.toggleAbsenceSelection=toggleAbsenceSelection;
+window.toggleSelectAllAbsences=toggleSelectAllAbsences;
+window.deleteSelectedAbsences=deleteSelectedAbsences;
 function renderTable(){
   const rows=getSelectedRowsForDay(day);
   const filteredRows=getAdminFilteredRows(rows);
   const editableWeek=isCurrentWeekOffset(weekOffset);
   const tb=document.getElementById('tbody');
-  if(!filteredRows.length){
+  pruneSelectedAbsenceIds(new Set(getVisibleSelectableAbsenceRows(filteredRows).map(row=>Number(row.id))));
+  if(isMobileAbsenceLayout()){
+    tb.innerHTML=renderMobileAbsenceGroups(filteredRows,rows,editableWeek);
+  }else if(!filteredRows.length){
     const emptyMessage=rows.length
       ? 'No hay ausencias que coincidan con el filtro actual.'
       : `No hay ausencias registradas para ${editableWeek?'este día':'esta vista futura'}.`;
     tb.innerHTML=`<tr class="empty-row"><td colspan="7">${emptyMessage}</td></tr>`;
-  }
-  else{
+  } else{
+    const rowsSource=getRowsForWeekOffset(weekOffset);
     tb.innerHTML=filteredRows.map(g=>{
-      const h=HORA_MAP[g.hora]||{label:g.hora+'a',rango:''};
-      const cub=g.guardia&&g.guardia.trim();
-      const needsCoverage=rowNeedsCoverage(g);
-      const sugerido=needsCoverage?(cub||getGuardiaSugerida(day,g.hora,1,getRowsForWeekOffset(weekOffset))):'';
-      const faenaInfo=resolveFaena(g);
-      const aula=resolveAulaRegistro(g)||'-';
-      const ausenteNombre=getVisibleTeacherName(g.ausente);
-      const guardiaNombre=sugerido?getVisibleTeacherName(sugerido):'';
-      const ausenteMood=getTeacherMoodForToday(g.ausente);
-      const guardiaMood=sugerido?getTeacherMoodForToday(sugerido):null;
-      const guardiaEstado=!needsCoverage?'No requiere cobertura':(g.futurePlanned?(g.futureStatus==='approved'||g.futureStatus==='applied'?(cub?'Guardia planificada':'Cobertura prevista'):'Pendiente de validar'):(sugerido?(cub?'':'Guardia prevista'):'Sin cobertura'));
-      const guardiaBadgeClass=g.futurePlanned
-        ?(g.futureStatus==='approved'||g.futureStatus==='applied'?'b-ok status-pill':'status-pill teacher-duty-badge')
-        :(!needsCoverage?'b-ok status-pill':(sugerido?(cub?'b-ok status-pill':'status-pill teacher-duty-badge'):'b-nok status-pill'));
-      const guardiaChipClass=sugerido?`${cub?'guardia-chip guardia-chip-assigned chip-strong':'guardia-chip guardia-chip-suggested chip-strong'}${guardiaMood?` chip-mood chip-mood-${guardiaMood.tone}`:''}`:'';
-      const ausenteChipClass=`chip chip-absence chip-strong${ausenteMood?` chip-mood chip-mood-${ausenteMood.tone}`:''}`;
-      const statusText=g.futurePlanned
-        ?(g.futureStatus==='approved'?'Validada':g.futureStatus==='applied'?'Aplicada':g.futureStatus==='pending'?'Pendiente':'Planificada')
-        :(!needsCoverage?'No requiere cobertura':(sugerido?(cub?'Cubierta':'Pendiente de confirmar'):'Sin cubrir'));
-      const planningMeta=g.futurePlanned?`<span class="badge future-plan-badge ${g.futureStatus==='pending'?'future-plan-badge-pending':'future-plan-badge-approved'}">${g.futureStatus==='pending'?'Falta futura pendiente':'Falta futura validada'}</span>`:'';
-      const rowClasses=[
-        g.futurePlanned?'future-planned-row':'',
-        (needsCoverage&&!sugerido)?'admin-row-urgent':(!faenaInfo.faena||g.futureStatus==='pending')?'admin-row-warning':''
-      ].filter(Boolean).join(' ');
-      return `<tr class="${rowClasses}">
+      const model=buildAbsenceDisplayModel(g,rowsSource);
+      const numericId=Number(g.id);
+      const canEditRow=isAdmin&&editableWeek&&Number.isInteger(numericId);
+      const actionContent=canEditRow
+        ? `<div class="table-actions"><button class="btn-edit" onclick="openModal(${numericId})">Editar</button><label class="row-selector"><input type="checkbox" ${selectedAbsenceIds.has(numericId)?'checked':''} onchange="toggleAbsenceSelection(${numericId}, this.checked)"><span>Seleccionar</span></label></div>`
+        : '<span class="cell-meta">Solo lectura</span>';
+      return `<tr class="${model.rowClasses}">
         <td>
           <div class="cell-stack cell-stack-hour">
             <div class="hora-num">${HORA_MAP[g.hora].label} hora</div>
-            <div class="hora-range">${h.rango.replace('-', ' - ')}</div>
+            <div class="hora-range">${model.h.rango.replace('-', ' - ')}</div>
           </div>
         </td>
         <td>
           <div class="cell-stack">
             <div class="cell-label">Ausente</div>
-            ${planningMeta}
+            ${model.planningMeta}
             <div class="guardia-slot">
-              <div class="${ausenteChipClass}"><div class="avatar av-red">${initials(ausenteNombre)}</div>${escapeHtml(ausenteNombre)}${ausenteMood?`<span class="chip-mood-tag" title="${escapeHtml(ausenteMood.label)}">${ausenteMood.emoji}</span>`:''}</div>
+              <div class="${model.ausenteChipClass}"><div class="avatar av-red">${initials(model.ausenteNombre)}</div>${escapeHtml(model.ausenteNombre)}${model.ausenteMood?`<span class="chip-mood-tag" title="${escapeHtml(model.ausenteMood.label)}">${model.ausenteMood.emoji}</span>`:''}</div>
             </div>
             ${g.futurePlanned?`<div class="cell-meta">Planificada para ${escapeHtml(formatFutureAbsenceDateLabel(g.futureDate))}</div>`:''}
           </div>
         </td>
         <td>
-          ${sugerido?`<div class="cell-stack"><div class="cell-label">Cubre</div><div class="guardia-slot"><div class="chip ${guardiaChipClass}"><div class="avatar av-yellow">${initials(guardiaNombre)}</div>${escapeHtml(guardiaNombre)}${guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(guardiaMood.label)}">${guardiaMood.emoji}</span>`:''}</div></div><div class="cell-meta">${guardiaEstado}</div></div>`:`<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">${needsCoverage?'Sin asignar':'No aplica'}</span><div class="cell-meta">${needsCoverage?'No hay profesor disponible en este turno.':'La ausencia cae en una hora de guardia del propio profesor.'}</div></div>`}
+          ${model.sugerido?`<div class="cell-stack"><div class="cell-label">Cubre</div><div class="guardia-slot"><div class="chip ${model.guardiaChipClass}"><div class="avatar av-yellow">${initials(model.guardiaNombre)}</div>${escapeHtml(model.guardiaNombre)}${model.guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(model.guardiaMood.label)}">${model.guardiaMood.emoji}</span>`:''}</div></div><div class="cell-meta">${model.guardiaEstado}</div></div>`:`<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">${model.needsCoverage?'Sin asignar':'No aplica'}</span><div class="cell-meta">${model.needsCoverage?'No hay profesor disponible en este turno.':'La ausencia cae en una hora de guardia del propio profesor.'}</div></div>`}
         </td>
         <td>
           <div class="cell-stack cell-stack-compact">
             <div class="cell-label">Aula</div>
-            <div class="guardia-slot"><span class="aula-tag">${escapeHtml(aula)}</span></div>
+            <div class="guardia-slot"><span class="aula-tag">${escapeHtml(model.aula)}</span></div>
           </div>
         </td>
         <td>
           <div class="cell-stack">
             <div class="cell-label">Tarea</div>
             <div class="guardia-slot">
-              ${g.futurePlanned?`<span class="badge ${g.futureStatus==='pending'?'teacher-duty-badge':'b-ok'}">${g.futureStatus==='pending'?'Pendiente':'Planificada'}</span>`:(faenaInfo.faena?`<div class="faena-status"><span class="badge b-ok">Con tarea</span>${faenaInfo.obs?`<details class="faena-toggle"><summary></summary><div class="faena-text">${escapeHtml(faenaInfo.obs)}</div></details>`:''}</div>`:`<span class="badge b-nok">Sin tarea</span>`)}
+              ${g.futurePlanned?`<span class="badge ${g.futureStatus==='pending'?'teacher-duty-badge':'b-ok'}">${g.futureStatus==='pending'?'Pendiente':'Planificada'}</span>`:(model.faenaInfo.faena?`<div class="faena-status"><span class="badge b-ok">Con tarea</span>${model.faenaInfo.obs?`<details class="faena-toggle"><summary></summary><div class="faena-text">${escapeHtml(model.faenaInfo.obs)}</div></details>`:''}</div>`:`<span class="badge b-nok">Sin tarea</span>`)}
             </div>
           </div>
         </td>
         <td>
           <div class="cell-stack cell-stack-compact">
             <div class="cell-label">Estado</div>
-            <div class="guardia-slot"><span class="badge ${guardiaBadgeClass}">${statusText}</span></div>
+            <div class="guardia-slot"><span class="badge ${model.guardiaBadgeClass}">${model.statusText}</span></div>
           </div>
         </td>
-        <td style="${isAdmin?'':'display:none'}">${isAdmin&&editableWeek&&Number.isInteger(Number(g.id))?`<button class="btn-edit" onclick="openModal(${g.id})">Editar</button>`:'<span class="cell-meta">Solo lectura</span>'}</td>
+        <td style="${isAdmin?'':'display:none'}">${actionContent}</td>
       </tr>`;
     }).join('');
   }
@@ -5741,7 +6600,12 @@ function renderTable(){
   const rowsSource=getRowsForWeekOffset(weekOffset);
   const rowsNeedingCoverage=rows.filter(row=>rowNeedsCoverage(row));
   const asig=rowsNeedingCoverage.filter(g=>(g.guardia&&g.guardia.trim())||getGuardiaSugerida(day,g.hora,1,rowsSource)).length;
-  document.getElementById('thAcc').style.display=isAdmin?'':'none';
+  const thAcc=document.getElementById('thAcc');
+  if(thAcc){
+    thAcc.style.display=isAdmin?'':'none';
+    thAcc.textContent='Acciones';
+  }
+  updateAbsenceBatchBar(filteredRows);
   document.getElementById('sAus').textContent=aus;
   document.getElementById('sAsig').textContent=asig;
   document.getElementById('sSin').textContent=Math.max(rowsNeedingCoverage.length-asig,0);
@@ -6377,15 +7241,37 @@ function syncTodoDiaMode(){
   setFieldError('fGuardia','');
 }
 function getAbsenceSelectedHours(){
-  return [...new Set((absenceSelectedHours||[]).map(Number).filter(Number.isInteger))].sort((a,b)=>a-b);
+  return [...new Set((absenceSelectedHours||[]).map(Number).filter(esHoraValida))].sort((a,b)=>a-b);
 }
 function setAbsenceSelectedHours(hours){
-  absenceSelectedHours=[...new Set((hours||[]).map(Number).filter(Number.isInteger))].sort((a,b)=>a-b);
+  const invalidHours=(hours||[]).map(Number).filter(hora=>!esHoraValida(hora));
+  invalidHours.forEach(hora=>logInvalidAbsenceHour('skip hora inválida',{profesor:getCurrentAbsenceTeacher()||'',hora}));
+  absenceSelectedHours=[...new Set((hours||[]).map(Number).filter(esHoraValida))].sort((a,b)=>a-b);
 }
 function getAbsencePrimaryHour(){
   const selected=getAbsenceSelectedHours();
-  if(selected.length) return selected[0];
-  return Number(document.getElementById('fHora')?.value||1);
+  if(selected.length&&esHoraValida(selected[0])) return selected[0];
+  const fallback=Number(document.getElementById('fHora')?.value||1);
+  return esHoraValida(fallback)?fallback:1;
+}
+function getCurrentAbsenceTeacher(){
+  const input=document.getElementById('fAusente');
+  return input?getProfesorNombreSeleccionado(input.value,{input,allowSelectedInput:true}):'';
+}
+function getCurrentAbsenceScheduledHours(){
+  const nombre=getCurrentAbsenceTeacher();
+  const dia=Number(document.getElementById('fDia')?.value||day);
+  return nombre?getHorasCubriblesProfesorDia(nombre,dia):[];
+}
+function getCurrentAbsenceEditGroupRows(){
+  const groupIds=new Set((editAbsenceGroupIds||[]).map(Number).filter(Number.isInteger));
+  return groupIds.size?data.filter(row=>groupIds.has(Number(row?.id))):[];
+}
+function getAbsenceEditRowsForBaseRow(row){
+  if(!row) return [];
+  return data
+    .filter(item=>item&&item.dia===row.dia&&sameNormalizedText(item.ausente,row.ausente))
+    .sort((a,b)=>Number(a.hora)-Number(b.hora)||Number(a.id)-Number(b.id));
 }
 function syncAbsencePrimaryHour(){
   const hiddenHour=document.getElementById('fHora');
@@ -6395,13 +7281,28 @@ function renderAbsenceHourChoices(){
   const container=document.getElementById('fHorasMulti');
   const todoDiaInput=document.getElementById('fTodoDia');
   if(!container) return;
-  if(!getAbsenceSelectedHours().length){
-    setAbsenceSelectedHours([Number(document.getElementById('fHora')?.value||1)]);
+  const selectedTeacher=getCurrentAbsenceTeacher();
+  const scheduledHours=selectedTeacher?getCurrentAbsenceScheduledHours():[];
+  const scheduledSet=new Set(scheduledHours);
+  const preservedUnavailable=new Set(getCurrentAbsenceEditGroupRows().map(row=>Number(row.hora)).filter(Number.isInteger));
+  let normalizedSelected=getAbsenceSelectedHours();
+  if(selectedTeacher&&scheduledHours.length){
+    normalizedSelected=normalizedSelected.filter(hora=>scheduledSet.has(hora)||preservedUnavailable.has(hora));
+    if(!normalizedSelected.length) normalizedSelected=[scheduledHours[0]];
+    setAbsenceSelectedHours(normalizedSelected);
+  }else if(!normalizedSelected.length){
+    const fallbackHour=Number(document.getElementById('fHora')?.value||1);
+    setAbsenceSelectedHours([esHoraValida(fallbackHour)?fallbackHour:1]);
   }
   syncAbsencePrimaryHour();
   const selectedSet=new Set(getAbsenceSelectedHours());
   container.innerHTML=Object.entries(HORA_MAP).map(([hora,info])=>`
-    <button class="absence-hour-chip${selectedSet.has(Number(hora))?' is-selected':''}" type="button" data-absence-hour="${hora}" ${todoDiaInput?.checked?'disabled':''}>
+    <button
+      class="absence-hour-chip${selectedSet.has(Number(hora))?' is-selected':''}${selectedTeacher&&(!scheduledSet.has(Number(hora))&&!selectedSet.has(Number(hora)))?' is-unavailable':''}"
+      type="button"
+      data-absence-hour="${hora}"
+      ${todoDiaInput?.checked||!!(selectedTeacher&&(!scheduledSet.has(Number(hora))&&!selectedSet.has(Number(hora))))?'disabled':''}
+      title="${selectedTeacher&&(!scheduledSet.has(Number(hora))&&!selectedSet.has(Number(hora)))?'Ese profesor no tiene una sesión cubrible registrada en esta hora.':''}">
       ${escapeHtml(`${info.label} hora`)}
       <span>${escapeHtml(info.rango.replace('-', ' - '))}</span>
     </button>
@@ -6434,7 +7335,7 @@ function renderTeacherAdminStats(nombre,dia){
     container.innerHTML='';
     return;
   }
-  const scheduledHours=getHorasProgramadasProfesorDia(nombre,dia);
+  const scheduledHours=getHorasCubriblesProfesorDia(nombre,dia);
   const weekAbsenceRows=getTeacherCurrentWeekAbsenceRows(nombre);
   const futureStats=getTeacherFutureAbsenceStats(nombre);
   const currentMonthGuardias=getTeacherCurrentMonthGuardiaCount(nombre);
@@ -6456,7 +7357,7 @@ function renderTeacherAdminStats(nombre,dia){
     {
       label:'Horario de hoy',
       value:String(scheduledHours.length),
-      note:scheduledHours.length?scheduledHours.map(formatHoraLabel).join(', '):'Sin sesiones programadas hoy'
+      note:scheduledHours.length?scheduledHours.map(formatHoraLabel).join(', '):'Sin sesiones cubribles hoy'
     },
     {
       label:'Faltas futuras',
@@ -6477,12 +7378,12 @@ function renderTeacherAdminStats(nombre,dia){
     </article>
   `).join('');
 }
-function openModal(id){if(!isCurrentWeekOffset(weekOffset)){showToast('La edición solo está disponible en la semana actual.','info');return;}editId=id||null;const g=id?data.find(x=>x.id===id):null;const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?'Editar ausencia':'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;setAusenteSelection(g?g.ausente:'');if(!g) document.getElementById('fAusente').value='';document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fTodoDia').checked=false;setAbsenceSelectedHours(g?[g.hora]:[]);document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';renderAbsenceHourChoices();populateProfesoresGuardia();syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
+function openModal(id){if(!isCurrentWeekOffset(weekOffset)){showToast('La edición solo está disponible en la semana actual.','info');return;}editId=id||null;const g=id?data.find(x=>x.id===id):null;const editRows=g?getAbsenceEditRowsForBaseRow(g):[];editAbsenceGroupIds=editRows.map(row=>Number(row.id)).filter(Number.isInteger);const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?(editRows.length>1?`Editar ausencia (${editRows.length} horas)`:'Editar ausencia'):'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;setAusenteSelection(g?g.ausente:'');if(!g){document.getElementById('fAusente').value='';editAbsenceGroupIds=[];}document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fTodoDia').checked=false;setAbsenceSelectedHours(g?(editRows.length?editRows.map(row=>row.hora):[g.hora]):[]);document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';renderAbsenceHourChoices();populateProfesoresGuardia();syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
 function renderAusentePreview(){
   const input=document.getElementById('fAusente');
   const preview=document.getElementById('ausentePreview');
   if(!input||!preview) return;
-  const nombre=getProfesorNombreSeleccionado(input.value);
+  const nombre=getProfesorNombreSeleccionado(input.value,{input,allowSelectedInput:true});
   if(!nombre){
     preview.textContent='Empieza a escribir para localizar al profesor.';
     renderTeacherAdminStats('',+document.getElementById('fDia').value);
@@ -6491,8 +7392,9 @@ function renderAusentePreview(){
   const dia=+document.getElementById('fDia').value;
   const hora=getAbsencePrimaryHour();
   const aula=getAulaProfesor(nombre,dia,hora)||'Sin aula registrada';
-  const horas=getHorasProgramadasProfesorDia(nombre,dia);
-  preview.textContent=`${getVisibleTeacherName(nombre)} \u00b7 ${DIAS[dia]} \u00b7 ${horas.length} sesiones programadas \u00b7 ${aula}`;
+  const horas=getHorasCubriblesProfesorDia(nombre,dia);
+  const editRows=getCurrentAbsenceEditGroupRows();
+  preview.textContent=`${getVisibleTeacherName(nombre)} \u00b7 ${DIAS[dia]} \u00b7 ${horas.length} sesiones cubribles \u00b7 ${aula}${editRows.length>1?` \u00b7 Editando ${editRows.length} horas ya registradas`:''}`;
   renderTeacherAdminStats(nombre,dia);
 }
 function renderAbsenceDecisionBar(){
@@ -6500,12 +7402,12 @@ function renderAbsenceDecisionBar(){
   if(!panel) return;
   const input=document.getElementById('fAusente');
   if(!input){
-    panel.textContent='Selecciona profesor y hora para ver la ubicación, la cobertura prevista y la tarea disponible.';
+    panel.textContent='Selecciona primero el profesor y después las horas para ver la ubicación, la cobertura prevista y la tarea disponible.';
     return;
   }
-  const nombre=getProfesorNombreSeleccionado(input.value);
+  const nombre=getProfesorNombreSeleccionado(input.value,{input,allowSelectedInput:true});
   if(!nombre){
-    panel.textContent='Selecciona profesor y hora para ver la ubicación, la cobertura prevista y la tarea disponible.';
+    panel.textContent='Selecciona primero el profesor y después las horas para ver la ubicación, la cobertura prevista y la tarea disponible.';
     return;
   }
   const dia=+document.getElementById('fDia').value;
@@ -6517,13 +7419,22 @@ function renderAbsenceDecisionBar(){
   const formObs=document.getElementById('fObs')?.value.trim()||'';
   const formFaena=!!document.getElementById('fFaena')?.checked||!!formObs;
   const tarea=getAbsenceTaskState(nombre,dia,hora,formFaena,formObs);
-  const horasLectivas=todoDia?getHorasProgramadasProfesorDia(nombre,dia):[];
+  const horasLectivas=todoDia?getHorasCubriblesProfesorDia(nombre,dia):[];
+  const editRows=getCurrentAbsenceEditGroupRows();
   const extras=[];
-  if(todoDia) extras.push(`Se aplicar\u00e1 a ${horasLectivas.length} ${horasLectivas.length===1?'sesi\u00f3n programada':'sesiones programadas'}`);
+  if(todoDia) extras.push(`Se aplicar\u00e1 a ${horasLectivas.length} ${horasLectivas.length===1?'sesión cubrible':'sesiones cubribles'}`);
   else if(selectedHours.length>1) extras.push(`Se aplicar\u00e1 a ${selectedHours.length} horas: ${selectedHours.map(formatHoraLabel).join(', ')}`);
+  if(editRows.length>1) extras.push(`Editando ${editRows.length} horas ya registradas`);
   if(tarea.faena&&tarea.obs) extras.push(`Tarea: ${escapeHtml((tarea.obs||'').slice(0,90)+((tarea.obs||'').length>90?'...':''))}`);
-  panel.innerHTML=`<strong>Ubicación:</strong> ${escapeHtml(aula)} | <strong>Guardia prevista:</strong> ${escapeHtml(guardia?getVisibleTeacherName(guardia):'Sin cobertura')} | <strong>Tarea:</strong> ${tarea.faena?'Disponible':'No registrada'}${extras.length?` | ${extras.join(' · ')}`:''}`;
-}function closeModal(){document.getElementById('overlay').classList.remove('open');}
+  panel.innerHTML=`
+    <div class="absence-decision-grid">
+      <div class="absence-decision-item"><span class="absence-decision-k">Aula</span><strong>${escapeHtml(aula)}</strong></div>
+      <div class="absence-decision-item"><span class="absence-decision-k">Guardia prevista</span><strong>${escapeHtml(guardia?getVisibleTeacherName(guardia):'Sin cobertura')}</strong></div>
+      <div class="absence-decision-item"><span class="absence-decision-k">Tarea</span><strong>${tarea.faena?'Disponible':'No registrada'}</strong></div>
+    </div>
+    ${extras.length?`<div class="absence-decision-extra">${extras.join(' · ')}</div>`:''}
+  `;
+}function closeModal(){editId=null;editAbsenceGroupIds=[];document.getElementById('overlay').classList.remove('open');}
 function bgClose(e){if(e.target.id==='overlay')closeModal();}
 function populateProfesoresAusencias(){
   renderAusenteSuggestions(false);
@@ -6538,8 +7449,13 @@ function renderAusenteSuggestions(forceOpen=false){
   const suggestions=document.getElementById('ausenteSuggestions');
   if(!input||!suggestions) return;
   const query=normalizeTeacherSearch(input.value);
-  const selected=getProfesorNombreSeleccionado(input.value);
+  const selected=getProfesorNombreSeleccionado(input.value,{input,allowSelectedInput:true});
   if(!query && !selected){
+    suggestions.innerHTML='';
+    suggestions.hidden=true;
+    return;
+  }
+  if(selected&&input.dataset.selectedTeacher){
     suggestions.innerHTML='';
     suggestions.hidden=true;
     return;
@@ -6578,13 +7494,21 @@ function selectAusenteSuggestion(nombre){
   closeAusenteSuggestions();
 }
 function handleAusenteInput(){
-  clearAusenteSelection();
+  const input=document.getElementById('fAusente');
+  clearAusenteSelection(input);
   absenceActiveIndex=-1;
+  const uniqueMatch=input?resolveTeacherFromInputValue(input.value):'';
+  if(uniqueMatch){
+    setAusenteSelection(uniqueMatch,input);
+    absenceMatches=[uniqueMatch];
+    absenceActiveIndex=0;
+  }
   renderAbsenceHourChoices();
   syncGuardiaPreview();
   renderAusentePreview();
   renderAbsenceDecisionBar();
-  renderAusenteSuggestions(true);
+  if(uniqueMatch) closeAusenteSuggestions();
+  else renderAusenteSuggestions(true);
   setFieldError('fAusente','');
 }
 function handleAusenteKeydown(event){
@@ -6625,7 +7549,9 @@ function clearAbsenceFormErrors(){
   ['fDia','fHora','fHorasMulti','fAusente','fGuardia'].forEach(fieldId=>setFieldError(fieldId,''));
 }
 function findDuplicateAbsence(dia,hora,ausente){
-  return data.find(item=>item.dia===dia&&item.hora===hora&&sameNormalizedText(item.ausente,ausente)&&item.id!==editId) || null;
+  const ignoredIds=new Set((editAbsenceGroupIds||[]).map(Number).filter(Number.isInteger));
+  if(Number.isInteger(Number(editId))) ignoredIds.add(Number(editId));
+  return data.find(item=>item.dia===dia&&item.hora===hora&&sameNormalizedText(item.ausente,ausente)&&!ignoredIds.has(Number(item.id))) || null;
 }
 function validateAbsenceForm(){
   const dia=+document.getElementById('fDia').value;
@@ -6633,22 +7559,39 @@ function validateAbsenceForm(){
   const todoDia=document.getElementById('fTodoDia').checked;
   const selectedHours=getAbsenceSelectedHours();
   const ausenteInput=document.getElementById('fAusente');
-  const ausente=getProfesorNombreSeleccionado(ausenteInput.value)||resolveTeacherFromInputValue(ausenteInput.value);
+  const ausente=getProfesorNombreSeleccionado(ausenteInput.value,{input:ausenteInput,allowSelectedInput:true})||resolveTeacherFromInputValue(ausenteInput.value);
   if(ausente) setAusenteSelection(ausente,ausenteInput);
   clearAbsenceFormErrors();
   if(!ausente){
     setFieldError('fAusente','Selecciona un profesor ausente del listado o escribe un nombre que deje una coincidencia única.');
     return {valid:false,focus:ausenteInput};
   }
+  if(!esHoraValida(hora)){
+    logInvalidAbsenceHour('skip hora inválida',{profesor:ausente,hora});
+    setFieldError('fHora','La hora seleccionada no es válida.');
+    return {valid:false,focus:document.getElementById('fHora')};
+  }
   if(todoDia){
-    const horasLectivas=getHorasProgramadasProfesorDia(ausente,dia);
+    const horasLectivas=getHorasCubriblesProfesorDia(ausente,dia);
     if(!horasLectivas.length){
-      setFieldError('fAusente','Ese profesor no tiene horas programadas registradas ese día.');
+      setFieldError('fAusente','Ese profesor no tiene sesiones cubribles registradas ese día.');
       return {valid:false,focus:ausenteInput};
     }
-    return {valid:true,ausente,guardia:'',todoDia:true,horasLectivas};
+    return {valid:true,ausente,guardia:'',todoDia:true,horasLectivas:horasLectivas.filter(esHoraValida)};
   }
-  const horasObjetivo=selectedHours.length>1?selectedHours:[hora];
+  const horasProgramadas=new Set(getHorasCubriblesProfesorDia(ausente,dia));
+  const preservedUnavailable=new Set(getCurrentAbsenceEditGroupRows().map(row=>Number(row.hora)).filter(Number.isInteger));
+  const invalidHour=selectedHours.find(horaItem=>!horasProgramadas.has(horaItem)&&!preservedUnavailable.has(horaItem));
+  if(invalidHour!=null){
+    setFieldError('fHorasMulti',`Ese profesor no tiene una sesión cubrible registrada en ${formatHoraLabel(invalidHour)}.`);
+    return {valid:false,focus:ausenteInput};
+  }
+  const horasObjetivo=(selectedHours.length>1?selectedHours:[hora]).map(Number).filter(esHoraValida);
+  if(!horasObjetivo.length){
+    logInvalidAbsenceHour('skip hora inválida',{profesor:ausente,hora});
+    setFieldError('fHora','No hay ninguna hora válida para guardar.');
+    return {valid:false,focus:document.getElementById('fHora')};
+  }
   const duplicateHour=horasObjetivo.find(horaItem=>findDuplicateAbsence(dia,horaItem,ausente));
   if(duplicateHour!=null){
     setFieldError(selectedHours.length>1?'fHorasMulti':'fAusente',`Ya existe una ausencia registrada para ese profesor en ${formatHoraLabel(duplicateHour)}.`);
@@ -6702,12 +7645,24 @@ function syncGuardiaPreview(){
   guardiaInput.value=getVisibleTeacherName(sugerida);
   guardiaInput.placeholder=sugerida?'Asignaci\u00f3n autom\u00e1tica prevista':'Sin guardia disponible';
 }
+function setAbsenceSavingState(isSaving){
+  const saveButton=document.getElementById('btnSaveAbsence');
+  const cancelButton=document.getElementById('btnCancelAbsence');
+  const deleteButton=document.getElementById('btnDel');
+  if(saveButton){
+    saveButton.disabled=!!isSaving;
+    saveButton.textContent=isSaving?'Guardando...':'Guardar';
+  }
+  if(cancelButton) cancelButton.disabled=!!isSaving;
+  if(deleteButton) deleteButton.disabled=!!isSaving;
+}
 async function saveAbsence(){
   if(absenceSaveInFlight){
     showToast('Ya se está guardando una ausencia. Espera a que termine.','info');
     return;
   }
   absenceSaveInFlight=true;
+  setAbsenceSavingState(true);
   try{
     if(!await ensureBackendReadyForMutations()){
       showToast('Todavia no se ha cargado el estado guardado. Espera un momento y vuelve a intentarlo.','error');
@@ -6733,43 +7688,103 @@ async function saveAbsence(){
     document.getElementById('fAusente').value=getVisibleTeacherName(ausente);
     document.getElementById('fGuardia').value='';
 
-    if(editId&&!todoDia){
-      const aulaReal=resolveAbsenceAulaForSave(ausente,dia,hora,previousRow);
-      const taskState=getAbsenceTaskState(ausente,dia,hora,faena,obs);
-      const i=data.findIndex(g=>g&&g.id===editId);
-      data[i]={dia,hora,ausente,guardia:'',aula:aulaReal,faena:taskState.faena,obs:taskState.obs,id:editId};
-      if(previousRow && (previousRow.dia!==dia || previousRow.hora!==hora || !sameNormalizedText(previousRow.ausente,ausente))){
-        pendingDeletedAbsenceKeys.add(makeAbsenceSyncKey(previousRow));
-        reassignGuardiasForDayHours(previousRow.dia,[previousRow.hora]);
-      }
-      reassignGuardiasForDayHours(dia,[hora]);
-      addHistoryEntry('Ausencia editada',`${formatHistoryAbsence(previousRow)} -> ${formatHistoryAbsence(data[i])}`,'edit',{undoState});
-    }else{
-      if(editId){
-        data=data.filter(g=>g.id!==editId);
-      }
-      horasObjetivo.forEach(horaItem=>{
-        const taskState=getAbsenceTaskState(ausente,dia,horaItem,faena,obs);
-        const existing=data.find(g=>g&&g.dia===dia&&g.hora===horaItem&&sameNormalizedText(g.ausente,ausente));
-        const aulaReal=resolveAbsenceAulaForSave(ausente,dia,horaItem,existing);
-        const entry={dia,hora:horaItem,ausente,guardia:'',aula:aulaReal,faena:taskState.faena,obs:taskState.obs};
-        if(existing){
-          Object.assign(existing,entry);
-        }else{
-          data.push({...entry,id:nid++});
-        }
+    const previousRows=editId?(getCurrentAbsenceEditGroupRows().length?getCurrentAbsenceEditGroupRows():(previousRow?[previousRow]:[])):[];
+    const previousIds=new Set(previousRows.map(row=>Number(row.id)).filter(Number.isInteger));
+    const previousByHour=new Map(previousRows.map(row=>[Number(row.hora),row]));
+    if(todoDia){
+      const fullDayResult=await storage.saveFullDayAbsence({
+        tipo:'dia_completo',
+        profesor:ausente,
+        dia,
+        faena,
+        obs,
+        replaceIds:[...previousIds]
       });
-      if(editId && previousRow && (previousRow.dia!==dia || !horasObjetivo.includes(previousRow.hora) || !sameNormalizedText(previousRow.ausente,ausente))){
-        pendingDeletedAbsenceKeys.add(makeAbsenceSyncKey(previousRow));
-        reassignGuardiasForDayHours(previousRow.dia,[previousRow.hora]);
+      const savedRows=Array.isArray(fullDayResult?.rows)?fullDayResult.rows:[];
+      data=await refreshGuardiasFromBackend({render:false});
+      clearAbsenceFormErrors();
+      closeModal();
+      const saveTs=document.getElementById('saveTs');
+      if(saveTs) saveTs.textContent='Guardado - '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      try{
+        if(day!==dia) setDay(dia); else renderTable();
+      }catch(renderError){
+        console.error('Full day absence saved but render failed',renderError);
+        showToast(`La ausencia se ha guardado, pero la vista no se ha podido refrescar: ${String(renderError?.message||renderError)}`,'error');
       }
-      reassignGuardiasForDayHours(dia,todoDia?getSchoolDayGuardiaHours():horasObjetivo);
-      if(todoDia){
-        addHistoryEntry('Ausencia de d\u00eda completo',`${DIAS[dia]} \u00b7 ${ausente} \u00b7 ${horasObjetivo.map(formatHoraLabel).join(', ')}`,'create',{undoState});
+      if(editId){
+        addHistoryEntry(
+          savedRows.length>1||previousRows.length>1?'Ausencias editadas':'Ausencia editada',
+          `${getVisibleTeacherName(ausente)} · ${DIAS[dia]} · ${savedRows.map(row=>formatHoraLabel(row.hora)).join(', ')}`,
+          'edit',
+          {undoState}
+        );
       }else{
-        const savedRow=data.find(g=>g&&g.dia===dia&&g.hora===hora&&sameNormalizedText(g.ausente,ausente));
-        addHistoryEntry('Nueva ausencia',formatHistoryAbsence(savedRow),'create',{undoState});
+        addHistoryEntry('Ausencia de día completo',`${DIAS[dia]} · ${ausente} · ${savedRows.map(row=>formatHoraLabel(row.hora)).join(', ')}`,'create',{undoState});
       }
+      try{
+        await storage.replaceHistorial(historialCambios);
+        showToast(`Ausencia de día completo registrada en ${savedRows.length} horas.`,'success');
+      }catch(historySyncError){
+        console.error('Full day absence saved but history sync failed',historySyncError);
+        showToast('La ausencia de día completo se ha guardado, pero no se ha podido sincronizar el historial.','error');
+      }
+      return;
+    }
+    const horaNum=Number(hora);
+    if(!Number.isInteger(horaNum)||horaNum<1||horaNum>9){
+      console.warn('[frontend] ausencia individual cancelada por hora inválida',{profesor:ausente,dia,hora});
+      showToast('La ausencia no se puede guardar porque la hora seleccionada no es válida.','error');
+      return;
+    }
+    const targetKeys=new Set(horasObjetivo.map(horaItem=>makeAbsenceSyncKey({dia,hora:horaItem,ausente})));
+    if(previousIds.size){
+      data=data.filter(row=>!previousIds.has(Number(row.id)));
+      previousRows.forEach(row=>{
+        const oldKey=makeAbsenceSyncKey(row);
+        if(oldKey&&!targetKeys.has(oldKey)) pendingDeletedAbsenceKeys.add(oldKey);
+      });
+    }
+    const savedRows=[];
+    horasObjetivo.forEach(horaItem=>{
+      if(!esHoraValida(horaItem)){
+        logInvalidAbsenceHour('skip hora inválida',{profesor:ausente,hora:horaItem});
+        return;
+      }
+      const reuseRow=previousByHour.get(Number(horaItem))||null;
+      const taskState=getAbsenceTaskState(ausente,dia,horaItem,faena,obs);
+      const aulaReal=resolveAbsenceAulaForSave(ausente,dia,horaItem,reuseRow);
+      const entry={dia,hora:horaItem,ausente,guardia:'',aula:aulaReal,faena:taskState.faena,obs:taskState.obs,id:Number.isInteger(Number(reuseRow?.id))?Number(reuseRow.id):nid++};
+      data.push(entry);
+      savedRows.push(entry);
+    });
+    if(!savedRows.length){
+      showToast('No hay horas válidas para guardar esta ausencia.','error');
+      return;
+    }
+    data=dedupeAbsenceRowsByLogic(data);
+    const affectedHoursByDay=new Map();
+    [...previousRows,...savedRows].forEach(row=>{
+      const diaKey=Number(row.dia);
+      if(!affectedHoursByDay.has(diaKey)) affectedHoursByDay.set(diaKey,new Set());
+      affectedHoursByDay.get(diaKey).add(Number(row.hora));
+    });
+    affectedHoursByDay.forEach((hours,diaKey)=>reassignGuardiasForDayHours(diaKey,[...hours]));
+    if(editId){
+      addHistoryEntry(
+        savedRows.length>1||previousRows.length>1?'Ausencias editadas':'Ausencia editada',
+        savedRows.length>1
+          ? `${getVisibleTeacherName(ausente)} \u00b7 ${DIAS[dia]} \u00b7 ${savedRows.map(row=>formatHoraLabel(row.hora)).join(', ')}`
+          : `${formatHistoryAbsence(previousRow)} -> ${formatHistoryAbsence(savedRows[0])}`,
+        'edit',
+        {undoState}
+      );
+    }else if(todoDia){
+      addHistoryEntry('Ausencia de d\u00eda completo',`${DIAS[dia]} \u00b7 ${ausente} \u00b7 ${horasObjetivo.map(formatHoraLabel).join(', ')}`,'create',{undoState});
+    }else if(savedRows.length>1){
+      addHistoryEntry('Ausencias registradas',`${getVisibleTeacherName(ausente)} \u00b7 ${DIAS[dia]} \u00b7 ${savedRows.map(row=>formatHoraLabel(row.hora)).join(', ')}`,'create',{undoState});
+    }else{
+      addHistoryEntry('Nueva ausencia',formatHistoryAbsence(savedRows[0]),'create',{undoState});
     }
 
     persist(data);
@@ -6785,12 +7800,26 @@ async function saveAbsence(){
     }
 
     try{
-      const syncResult=await syncAdminStateConfirmed();
+      const syncResult=await syncAdminStateConfirmed({origin:'absence-save',reason:editId?'edit-absence':'create-absence'});
       if(syncResult?.syncError){
         showToast('La ausencia se ha guardado en local, pero no se ha podido sincronizar con el servidor.','error');
+      }else if(syncResult?.partialAuxFailures?.length){
+        try{
+          await refreshGuardiasFromBackend({render:false});
+          if(day!==dia) setDay(dia); else renderTable();
+        }catch(refreshError){
+          console.warn('Guardias refresh after partial save failed',refreshError);
+        }
+        showToast('La ausencia se ha guardado, aunque ha fallado parte de la sincronización auxiliar.','info');
       }else if(syncResult?.queued){
         showToast('Ausencia guardada en local. Sincronización en cola.','info');
       }else{
+        try{
+          await refreshGuardiasFromBackend({render:false});
+          if(day!==dia) setDay(dia); else renderTable();
+        }catch(refreshError){
+          console.warn('Guardias refresh after save failed',refreshError);
+        }
         showToast(todoDia?`Ausencia de d\u00eda completo registrada en ${horasObjetivo.length} horas.`:'Ausencia guardada correctamente.','success');
       }
     }catch(syncError){
@@ -6802,26 +7831,53 @@ async function saveAbsence(){
     showToast(`No se pudo guardar la ausencia: ${String(error?.message||error)}`,'error');
   }finally{
     absenceSaveInFlight=false;
+    setAbsenceSavingState(false);
   }
 }
 function save(){return saveAbsence();}
 async function del(){
-  if(!await askConfirm('Eliminar registro','\u00bfQuieres eliminar este registro de ausencia?','Eliminar')) return;
+  const previousRows=getCurrentAbsenceEditGroupRows().length?getCurrentAbsenceEditGroupRows():(editId?data.filter(g=>g.id===editId):[]);
+  const deleteCount=previousRows.length||1;
+  if(!await askConfirm(deleteCount>1?'Eliminar registros':'Eliminar registro',deleteCount>1?`Se eliminarán ${deleteCount} registros de ausencia de este profesor en el día seleccionado.`:'\u00bfQuieres eliminar este registro de ausencia?','Eliminar')) return;
   if(!await ensureBackendReadyForMutations()){
     showToast('Todavia no se ha cargado el estado guardado. Espera un momento y vuelve a intentarlo.','error');
     return;
   }
-  const previousRow=data.find(g=>g.id===editId);
+  const previousRow=previousRows[0]||data.find(g=>g.id===editId);
   const undoState=buildUndoState(previousRow?.dia ?? day);
-  if(previousRow) pendingDeletedAbsenceKeys.add(makeAbsenceSyncKey(previousRow));
-  data=data.filter(g=>g.id!==editId);
-  if(previousRow) reassignGuardiasForDayHours(previousRow.dia,[previousRow.hora]);
+  const previousIds=new Set(previousRows.map(row=>Number(row.id)).filter(Number.isInteger));
+  previousRows.forEach(row=>{
+    pendingDeletedAbsenceKeys.add(makeAbsenceSyncKey(row));
+    if(Number.isInteger(Number(row.id))) selectedAbsenceIds.delete(Number(row.id));
+  });
+  data=data.filter(g=>!previousIds.has(Number(g.id)));
+  const affectedHoursByDay=new Map();
+  previousRows.forEach(row=>{
+    const diaKey=Number(row.dia);
+    if(!affectedHoursByDay.has(diaKey)) affectedHoursByDay.set(diaKey,new Set());
+    affectedHoursByDay.get(diaKey).add(Number(row.hora));
+  });
+  affectedHoursByDay.forEach((hours,diaKey)=>reassignGuardiasForDayHours(diaKey,[...hours]));
   persist(data);
-  if(previousRow) addHistoryEntry('Ausencia eliminada',formatHistoryAbsence(previousRow),'delete',{undoState});
+  if(previousRows.length>1) addHistoryEntry('Ausencias eliminadas',`${getVisibleTeacherName(previousRow?.ausente||'')} \u00b7 ${DIAS[previousRow?.dia??day]} \u00b7 ${previousRows.map(row=>formatHoraLabel(row.hora)).join(', ')}`,'delete',{undoState});
+  else if(previousRow) addHistoryEntry('Ausencia eliminada',formatHistoryAbsence(previousRow),'delete',{undoState});
   closeModal();
   renderTable();
-  showToast('Registro eliminado.','success');
-  syncAdminState();
+  try{
+    const syncResult=await syncAdminStateConfirmed({origin:'absence-delete',reason:'delete-absence'});
+    if(syncResult?.syncError){
+      showToast('El registro se ha eliminado en local, pero no se ha podido sincronizar con el servidor.','error');
+    }else if(syncResult?.partialAuxFailures?.length){
+      showToast('El registro se ha eliminado y guardado, pero ha fallado parte de la sincronización auxiliar.','info');
+    }else if(syncResult?.queued){
+      showToast('Registro eliminado en local. Sincronización en cola.','info');
+    }else{
+      showToast('Registro eliminado.','success');
+    }
+  }catch(syncError){
+    console.error('Absence deleted but sync trigger failed',syncError);
+    showToast('El registro se ha eliminado en local, pero no se ha podido lanzar la sincronización.','error');
+  }
 }
 if(tvAnnouncementsDomain){
   renderTvAnnouncement=()=>tvAnnouncementsDomain.render();
@@ -6903,7 +7959,18 @@ if(futureAbsencesDomain){
   getTeacherFutureAbsenceStats=nombre=>futureAbsencesDomain.getTeacherStats(nombre);
 }
 document.getElementById('fDia').addEventListener('change',()=>{renderAbsenceHourChoices();populateProfesoresGuardia();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);setFieldError('fDia','');});
-document.getElementById('fHora').addEventListener('change',()=>{setAbsenceSelectedHours([Number(document.getElementById('fHora').value)]);syncAbsencePrimaryHour();renderAbsenceHourChoices();populateProfesoresGuardia();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);setFieldError('fHora','');});
+document.getElementById('fHora').addEventListener('change',()=>{
+  const rawHour=Number(document.getElementById('fHora').value);
+  if(!esHoraValida(rawHour)){
+    logInvalidAbsenceHour('skip hora inválida',{profesor:getCurrentAbsenceTeacher()||'',hora:rawHour});
+    setFieldError('fHora','La hora seleccionada no es válida.');
+    setAbsenceSelectedHours([1]);
+  }else{
+    setAbsenceSelectedHours([rawHour]);
+    setFieldError('fHora','');
+  }
+  syncAbsencePrimaryHour();renderAbsenceHourChoices();populateProfesoresGuardia();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);
+});
 document.getElementById('fTodoDia').addEventListener('change',()=>{syncTodoDiaMode();renderAbsenceHourChoices();syncGuardiaPreview();renderAbsenceDecisionBar();});
 document.getElementById('fAusente').addEventListener('change',()=>{renderAbsenceHourChoices();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);setFieldError('fAusente','');});
 document.getElementById('fAusente').addEventListener('input',handleAusenteInput);
@@ -6928,10 +7995,16 @@ if(absenceHoursGrid){
     const button=event.target.closest('[data-absence-hour]');
     if(!button||button.disabled) return;
     const hora=Number(button.dataset.absenceHour);
+    if(!esHoraValida(hora)){
+      logInvalidAbsenceHour('skip hora inválida',{profesor:getCurrentAbsenceTeacher()||'',hora});
+      setFieldError('fHorasMulti','La hora seleccionada no es válida.');
+      return;
+    }
     const current=new Set(getAbsenceSelectedHours());
     if(current.has(hora)) current.delete(hora); else current.add(hora);
-    const next=[...current].sort((a,b)=>a-b);
-    setAbsenceSelectedHours(next.length?next:[Number(document.getElementById('fHora')?.value||hora)]);
+    const next=[...current].filter(esHoraValida).sort((a,b)=>a-b);
+    const fallbackHour=Number(document.getElementById('fHora')?.value||hora);
+    setAbsenceSelectedHours(next.length?next:[esHoraValida(fallbackHour)?fallbackHour:1]);
     syncAbsencePrimaryHour();
     renderAbsenceHourChoices();
     populateProfesoresGuardia();
@@ -6940,6 +8013,16 @@ if(absenceHoursGrid){
     renderAbsenceDecisionBar();
     setFieldError('fHorasMulti','');
   });
+}
+const batchSelectAllInput=document.getElementById('batchSelectAll');
+if(batchSelectAllInput){
+  batchSelectAllInput.addEventListener('change',event=>{
+    toggleSelectAllAbsences(!!event.target.checked);
+  });
+}
+const deleteSelectedAbsencesButton=document.getElementById('btnDeleteSelectedAbsences');
+if(deleteSelectedAbsencesButton){
+  deleteSelectedAbsencesButton.addEventListener('click',()=>{ deleteSelectedAbsences(); });
 }
 const substitutionSearch=document.getElementById('substitutionSearch');
 if(substitutionSearch){
@@ -6991,6 +8074,21 @@ if(practicasGuardiasConfig){
     if(!button) return;
     const [profesor,dia,hora]=(button.dataset.practicasSlotToggle||'').split('|');
     toggleTeacherPracticasGuardiasSlot(profesor||'',Number(dia),Number(hora));
+  });
+}
+const groupStatesSearch=document.getElementById('groupStatesSearch');
+if(groupStatesSearch){
+  groupStatesSearch.addEventListener('input',event=>{
+    groupStateFilter=event.target.value||'';
+    renderGroupStatesPanel();
+  });
+}
+const groupStatesList=document.getElementById('groupStatesList');
+if(groupStatesList){
+  groupStatesList.addEventListener('click',event=>{
+    const button=event.target.closest('[data-group-state-toggle]');
+    if(!button) return;
+    toggleGroupState(button.dataset.groupStateToggle||'');
   });
 }
 const futureAbsenceAdminList=document.getElementById('futureAbsenceAdminList');
@@ -7080,12 +8178,12 @@ if(!storage.isBackendOnly()){
   safeInitStep(()=>{reassignAllGuardias();persist(data);},'reassignAllGuardias');
 }
 safeInitStep(renderPills,'renderPills');
-safeInitStep(renderGuardiaBoard,'renderGuardiaBoard');
+safeInitStep(()=>{renderGuardiasUiIfChanged(true);},'renderGuardiasUi');
 safeInitStep(renderTvAnnouncement,'renderTvAnnouncement');
-safeInitStep(renderTable,'renderTable');
 safeInitStep(renderSubstitutionList,'renderSubstitutionList');
 safeInitStep(renderPracticasGuardiasList,'renderPracticasGuardiasList');
 safeInitStep(renderPracticasGuardiasConfig,'renderPracticasGuardiasConfig');
+safeInitStep(renderGroupStatesPanel,'renderGroupStatesPanel');
 safeInitStep(renderFutureAbsenceAdminList,'renderFutureAbsenceAdminList');
 safeInitStep(renderTeacherFutureAbsenceOwnList,'renderTeacherFutureAbsenceOwnList');
 safeInitStep(syncTeacherIdentity,'syncTeacherIdentity');
@@ -7093,6 +8191,13 @@ safeInitStep(refreshAccessUi,'refreshAccessUi');
 safeInitStep(syncAppModeClasses,'syncAppModeClasses');
 safeInitStep(()=>{initializeApp().catch(error=>console.error('Init step failed: initializeApp',error));},'initializeApp');
 let lastRenderedSchoolSlotKey=JSON.stringify(getCurrentSchoolSlot());
+let lastAbsenceLayoutMobile=isMobileAbsenceLayout();
+window.addEventListener('resize',()=>{
+  const nextAbsenceLayoutMobile=isMobileAbsenceLayout();
+  if(nextAbsenceLayoutMobile===lastAbsenceLayoutMobile) return;
+  lastAbsenceLayoutMobile=nextAbsenceLayoutMobile;
+  renderTable();
+});
 window.setInterval(()=>{
   const nextKey=JSON.stringify(getCurrentSchoolSlot());
   if(nextKey===lastRenderedSchoolSlotKey) return;
@@ -7101,6 +8206,7 @@ window.setInterval(()=>{
   if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
 },60000);
 window.setInterval(()=>{
+  hydrateGroupStates();
   if(shouldHydrateTeacherFutureAbsencesOnInterval()) hydrateTeacherFutureAbsences();
   if(shouldHydrateAlumnosFueraAulaOnInterval()){
     hydrateAlumnosFueraAula().then(changed=>{
@@ -7119,6 +8225,7 @@ window.setInterval(()=>{
 },SUPERADMIN_INFO_REFRESH_MS);
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){
+    hydrateGroupStates();
     hydrateTeacherSubstitutions();
     hydrateTeacherPracticasGuardias();
     hydrateTeacherFutureAbsences();

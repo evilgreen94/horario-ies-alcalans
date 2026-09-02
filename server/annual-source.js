@@ -8,9 +8,40 @@ const OUTPUT_PATH = path.join(ROOT_DIR, 'js', 'data', 'profesorado_horarios_guar
 const IMPORT_XML_PATH = path.join(ROOT_DIR, 'json_profes', 'horario_anual_importado.xml');
 const JSON_BACKUP_DIR = path.join(ROOT_DIR, 'json_profes', 'backups');
 const JS_BACKUP_DIR = path.join(ROOT_DIR, 'js', 'data', 'backups');
+const DAY_ORDER = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+const DAY_INDEX = Object.fromEntries(DAY_ORDER.map((day, index) => [day, index]));
+const DAY_ALIASES = {
+  lunes: 'Lunes',
+  martes: 'Martes',
+  miercoles: 'Miércoles',
+  miércoles: 'Miércoles',
+  jueves: 'Jueves',
+  viernes: 'Viernes'
+};
+const VALID_FRANJAS = new Set([
+  '08:15-09:10',
+  '09:10-10:05',
+  '10:05-11:00',
+  '11:00-11:25',
+  '11:25-12:20',
+  '12:20-13:15',
+  '13:15-14:10',
+  '14:10-14:25',
+  '14:25-15:20'
+]);
 
 function cleanText(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeText(value) {
+  if (!value) return '';
+  return String(value)
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
 }
 
 function looksMojibake(value) {
@@ -39,6 +70,167 @@ function normalizeInput(value) {
   return value;
 }
 
+function normalizeTeacherName(value) {
+  return cleanText(value);
+}
+
+function normalizeGroupLabel(value) {
+  return cleanText(String(value ?? '').replace(/\s*,\s*/g, ', '));
+}
+
+function normalizeDayLabel(value) {
+  return DAY_ALIASES[normalizeText(value)] || '';
+}
+
+function normalizeTime(value) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(cleanText(value));
+  if (!match) return '';
+  const hour = String(Number(match[1])).padStart(2, '0');
+  const minute = match[2];
+  return `${hour}:${minute}`;
+}
+
+function buildFranja(inicio, fin) {
+  const normalizedInicio = normalizeTime(inicio);
+  const normalizedFin = normalizeTime(fin);
+  if (!normalizedInicio || !normalizedFin) return '';
+  const franja = `${normalizedInicio}-${normalizedFin}`;
+  return VALID_FRANJAS.has(franja) ? franja : '';
+}
+
+function normalizeSessionType(value) {
+  return normalizeText(value) === 'guardia' ? 'guardia' : 'clase';
+}
+
+function sortTeachersAndRows(teachers) {
+  return Object.fromEntries(
+    Object.entries(teachers)
+      .sort((a, b) => a[0].localeCompare(b[0], 'es'))
+      .map(([teacherName, rows]) => [
+        teacherName,
+        rows.slice().sort((a, b) =>
+          DAY_INDEX[a.dia] - DAY_INDEX[b.dia] ||
+          buildFranja(a.inicio, a.fin).localeCompare(buildFranja(b.inicio, b.fin), 'es') ||
+          cleanText(a.asignatura).localeCompare(cleanText(b.asignatura), 'es') ||
+          cleanText(a.grupo).localeCompare(cleanText(b.grupo), 'es') ||
+          cleanText(a.aula).localeCompare(cleanText(b.aula), 'es')
+        )
+      ])
+  );
+}
+
+function validateAndNormalizeAnnualSource(source, options = {}) {
+  const normalizedSource = normalizeInput(source);
+  const teacherEntries = Object.entries(normalizedSource?.teachers || {});
+  if (!teacherEntries.length) {
+    throw new Error('La fuente anual no contiene profesorado.');
+  }
+
+  const mergedTeachers = new Map();
+  const teacherDisplayNames = new Map();
+  const duplicateTeacherNames = new Set();
+
+  teacherEntries.forEach(([rawTeacherName, rawRows]) => {
+    const teacherName = normalizeTeacherName(rawTeacherName);
+    if (!teacherName) {
+      throw new Error('La fuente anual contiene un bloque de profesorado sin nombre.');
+    }
+    const teacherKey = normalizeText(teacherName);
+    if (!teacherKey) {
+      throw new Error(`Nombre de profesorado inválido: "${rawTeacherName}"`);
+    }
+    if (teacherDisplayNames.has(teacherKey)) duplicateTeacherNames.add(teacherName);
+    else teacherDisplayNames.set(teacherKey, teacherName);
+    if (!Array.isArray(rawRows) || !rawRows.length) {
+      throw new Error(`El profesor ${teacherName} no contiene sesiones válidas.`);
+    }
+    if (!mergedTeachers.has(teacherKey)) mergedTeachers.set(teacherKey, []);
+    mergedTeachers.get(teacherKey).push(...rawRows);
+  });
+
+  const normalizedTeachers = {};
+  const conflicts = [];
+  const duplicateRows = [];
+
+  for (const [teacherKey, teacherRows] of mergedTeachers.entries()) {
+    const teacherName = teacherDisplayNames.get(teacherKey) || teacherKey;
+    const slots = new Map();
+
+    teacherRows.forEach((rawRow, index) => {
+      const dia = normalizeDayLabel(rawRow?.dia);
+      const inicio = normalizeTime(rawRow?.inicio);
+      const fin = normalizeTime(rawRow?.fin);
+      const franja = buildFranja(rawRow?.inicio, rawRow?.fin);
+      if (!dia) {
+        throw new Error(`Profesor ${teacherName}: día no soportado en la sesión ${index + 1} ("${cleanText(rawRow?.dia)}").`);
+      }
+      if (!inicio || !fin) {
+        throw new Error(`Profesor ${teacherName}: formato de hora inválido en la sesión ${index + 1} (${cleanText(rawRow?.inicio)}-${cleanText(rawRow?.fin)}).`);
+      }
+      if (!franja) {
+        throw new Error(`Profesor ${teacherName}: franja no soportada en la sesión ${index + 1} (${inicio}-${fin}).`);
+      }
+
+      const row = {
+        dia,
+        inicio,
+        fin,
+        tipo: normalizeSessionType(rawRow?.tipo),
+        asignatura: cleanText(rawRow?.asignatura),
+        grupo: normalizeGroupLabel(rawRow?.grupo),
+        aula: cleanText(rawRow?.aula)
+      };
+
+      if (row.tipo === 'guardia') {
+        row.asignatura = 'GUARDIA';
+        row.grupo = '';
+        row.aula = '';
+      }
+
+      const slotKey = `${dia}|${franja}`;
+      const signature = JSON.stringify(row);
+      const existing = slots.get(slotKey);
+      if (!existing) {
+        slots.set(slotKey, { row, signature });
+        return;
+      }
+
+      if (existing.signature === signature) {
+        duplicateRows.push(`${teacherName} · ${dia} ${franja}`);
+        return;
+      }
+
+      conflicts.push({
+        teacherName,
+        slotKey,
+        current: existing.row,
+        incoming: row
+      });
+    });
+
+    normalizedTeachers[teacherName] = [...slots.values()].map(item => item.row);
+  }
+
+  if (conflicts.length) {
+    const first = conflicts[0];
+    throw new Error(
+      `Conflicto de importación para ${first.teacherName} en ${first.slotKey}. ` +
+      `Hay dos sesiones distintas en el mismo tramo.`
+    );
+  }
+
+  return {
+    fuente: cleanText(normalizedSource?.fuente) || cleanText(options.sourceLabel || 'importado'),
+    formato: cleanText(normalizedSource?.formato) || 'fuente_normalizada',
+    teachers: sortTeachersAndRows(normalizedTeachers),
+    metadata: {
+      teachers: Object.keys(normalizedTeachers).length,
+      duplicateTeacherNames: [...duplicateTeacherNames].sort((a, b) => a.localeCompare(b, 'es')),
+      duplicateRows: duplicateRows.slice().sort((a, b) => a.localeCompare(b, 'es'))
+    }
+  };
+}
+
 function formatFranja(entry) {
   return `${cleanText(entry.inicio)}-${cleanText(entry.fin)}`;
 }
@@ -65,7 +257,8 @@ function toLegacyEntry(entry) {
 }
 
 function buildPayload(source) {
-  const teacherEntries = Object.entries(source.teachers || {});
+  const preparedSource = validateAndNormalizeAnnualSource(source);
+  const teacherEntries = Object.entries(preparedSource.teachers || {});
   const teachers = teacherEntries.map(([nombre, rows]) => {
     const horario = (Array.isArray(rows) ? rows : []).map(toLegacyEntry);
     const guardias = horario.filter(row => cleanText(row.texto).toUpperCase() === 'GUARDIA');
@@ -78,12 +271,12 @@ function buildPayload(source) {
 
   const datasetId = crypto
     .createHash('sha1')
-    .update(JSON.stringify(source))
+    .update(JSON.stringify(preparedSource))
     .digest('hex')
     .slice(0, 12);
 
   return {
-    fuente: cleanText(source.fuente) || '',
+    fuente: cleanText(preparedSource.fuente) || '',
     formato: 'js_desde_json_limpio',
     datasetId,
     teachers
@@ -199,10 +392,14 @@ function parseAnnualXml(xmlText, sourceLabel = 'import.xml') {
   }
 
   const teachers = {};
+  const unnamedTeacherNodes = [];
   for (const teacherNode of teacherNodes) {
     const teacherName = getNodeValue(teacherNode.attrs, teacherNode.body, ['nombre', 'name', 'profesor', 'docente']);
-    if (!teacherName) continue;
     const sessionNodes = collectNodeMatches(teacherNode.body, ['session', 'sesion', 'entry', 'row', 'tramo'], true);
+    if (!teacherName) {
+      if (sessionNodes.length) unnamedTeacherNodes.push('sin nombre');
+      continue;
+    }
     const rows = sessionNodes
       .map(sessionNode => ({
         dia: getNodeValue(sessionNode.attrs, sessionNode.body, ['dia', 'day']),
@@ -222,6 +419,10 @@ function parseAnnualXml(xmlText, sourceLabel = 'import.xml') {
     if (rows.length) {
       teachers[teacherName] = rows;
     }
+  }
+
+  if (unnamedTeacherNodes.length) {
+    throw new Error('El XML contiene nodos de profesorado con sesiones pero sin nombre.');
   }
 
   if (!Object.keys(teachers).length) {
@@ -259,7 +460,7 @@ function backupIfExists(filePath, backupDir) {
 }
 
 function writeAnnualSourceArtifacts(source, options = {}) {
-  const normalizedSource = normalizeInput(source);
+  const normalizedSource = validateAndNormalizeAnnualSource(source, options);
   const payload = buildPayload(normalizedSource);
   if (!payload.fuente) payload.fuente = cleanText(options.sourceLabel || 'importado');
 
@@ -280,6 +481,7 @@ function writeAnnualSourceArtifacts(source, options = {}) {
 
   return {
     payload,
+    normalizedSource,
     sourcePath: DEFAULT_SOURCE_PATH,
     outputPath: OUTPUT_PATH,
     xmlSnapshotPath,
@@ -297,6 +499,8 @@ module.exports = {
   buildPayload,
   cleanText,
   loadJsonSource,
+  normalizeText,
   parseAnnualXml,
+  validateAndNormalizeAnnualSource,
   writeAnnualSourceArtifacts
 };

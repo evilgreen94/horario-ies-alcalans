@@ -1,4 +1,6 @@
 const { formatDateKey, getCurrentSchoolWeekKey, getMadridNow } = require('../../db');
+const { getInactiveGroupSet, isGroupInactive, logInactiveGroupSkip } = require('../../group-state');
+const { getResolvedTeacherSession } = require('../../teacher-schedule');
 
 const MONTHLY_GUARDIA_LOAD_STATE_KEY = 'guardia_monthly_load';
 
@@ -88,16 +90,27 @@ async function rebuildMonthlyGuardiaLoadForCurrentWeek(db) {
   const nextByDate = Object.fromEntries(
     Object.entries(state.byDate || {}).filter(([dateKey]) => !weekDates.has(dateKey))
   );
-  const rows = await db.all('SELECT dia, guardia FROM ausencias ORDER BY dia, hora, id');
+  const rows = await db.all('SELECT dia, hora, ausente, guardia FROM ausencias ORDER BY dia, hora, id');
+  const inactiveGroups = await getInactiveGroupSet(db);
 
-  rows.forEach(row => {
+  for (const row of rows) {
     const teacher = String(row?.guardia || '').trim();
-    if (!teacher) return;
+    if (!teacher) continue;
+    const session = await getResolvedTeacherSession(db, row?.ausente, row?.dia, row?.hora);
+    if (isGroupInactive(session?.grupo, inactiveGroups)) {
+      logInactiveGroupSkip({
+        grupo: String(session?.grupo || '').trim(),
+        profesor: String(row?.ausente || '').trim(),
+        dia: Number(row?.dia),
+        hora: Number(row?.hora)
+      });
+      continue;
+    }
     const dateKey = getWeekDateKey(currentWeekKey, Number(row.dia));
-    if (!dateKey || !dateKey.startsWith(`${state.monthKey}-`)) return;
+    if (!dateKey || !dateKey.startsWith(`${state.monthKey}-`)) continue;
     if (!nextByDate[dateKey]) nextByDate[dateKey] = {};
     nextByDate[dateKey][teacher] = (nextByDate[dateKey][teacher] || 0) + 1;
-  });
+  }
 
   const nextState = { monthKey: state.monthKey, byDate: nextByDate };
   await saveMonthlyGuardiaLoadState(db, nextState);

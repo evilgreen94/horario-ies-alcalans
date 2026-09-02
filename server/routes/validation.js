@@ -71,6 +71,17 @@ function ensureTimestamp(value, field) {
 
 function sanitizeAusencia(row) {
   const input = ensureObject(row, 'Ausencia');
+  const horaRaw = input.hora;
+  const horaNum = Number(horaRaw);
+  if (!Number.isInteger(horaNum) || horaNum < 1 || horaNum > 9) {
+    console.warn('[ausencias] sanitizeAusencia hora inválida', {
+      profesor: input.ausente ?? input.profesor ?? '',
+      dia: input.dia,
+      hora: horaRaw,
+      horaType: typeof horaRaw,
+      payload: input
+    });
+  }
   return {
     id: ensureOptionalId(input.id, 'id'),
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
@@ -208,7 +219,7 @@ function sanitizeTeacherFutureAbsence(row) {
     throw badRequest('status inv\u00e1lido.');
   }
   const hours = Array.isArray(input.hours)
-    ? input.hours.map(value => normalizeInteger(value, 'hours', 1, 9)).filter(value => ![4, 8, 9].includes(value))
+    ? input.hours.map(value => normalizeInteger(value, 'hours', 1, 9)).filter(value => ![8, 9].includes(value))
     : [];
   return {
     id: ensureRequiredString(input.id, 'id'),
@@ -226,6 +237,7 @@ function sanitizeTeacherFutureAbsence(row) {
 
 module.exports = {
   ensureArray,
+  ensureObject,
   ensureOptionalId,
   ensureRequiredString,
   ensureTimestamp,

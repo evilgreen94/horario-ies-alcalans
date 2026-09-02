@@ -53,6 +53,13 @@
     });
 
     if (!response.ok) {
+      try {
+        console.warn('[guardias][request:error]', {
+          path,
+          method: (options && options.method) || 'GET',
+          status: response.status
+        });
+      } catch (_error) {}
       if (response.status === 401 && path !== '/auth/login') {
         global.dispatchEvent(new CustomEvent('guardias-auth-invalid'));
       }
@@ -96,10 +103,25 @@
     fetchGuardiaMonthlyLoad(){
       return request('/guardias/monthly-load');
     },
+    fetchGroups(){
+      return request('/grupos');
+    },
+    updateGroupState(grupo, activo){
+      return request(`/grupos/${encodeURIComponent(grupo)}/estado`, {
+        method: 'PUT',
+        body: JSON.stringify({ activo: !!activo })
+      });
+    },
     replaceGuardias(rows){
       return request('/guardias/replace', {
         method: 'PUT',
         body: JSON.stringify(rows)
+      });
+    },
+    saveFullDayAbsence(payload){
+      return request('/guardias', {
+        method: 'POST',
+        body: JSON.stringify(payload)
       });
     },
     fetchBiblioteca(){

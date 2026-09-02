@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { DB_PATH, getDatabase } = require('../db');
+const { DB_PATH, getDatabase, withImmediateTransaction } = require('../db');
 const { finishRestore, isRestoreInProgress, startRestore } = require('../maintenance');
 const { requireRole } = require('../session');
 const { getTelemetrySnapshot } = require('../telemetry');
@@ -49,6 +49,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       tareasProfesorado,
       alumnosFueraAula,
       sessionOverrides,
+      gruposEstado,
       appStateRows,
       substitutionsState,
       practicasGuardiasState,
@@ -62,6 +63,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       db.all('SELECT * FROM tareas_profesorado ORDER BY profesor, dia, hora'),
       db.all('SELECT * FROM alumnos_fuera_aula ORDER BY dia, hora, profesor, id'),
       db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora'),
+      db.all('SELECT grupo, activo, updated_at FROM grupos_estado ORDER BY grupo COLLATE NOCASE'),
       db.all(
         'SELECT key, value FROM app_state WHERE key IN (?, ?, ?, ?, ?, ?) ORDER BY key',
         [SUBSTITUTIONS_STATE_KEY, FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY, MONTHLY_GUARDIA_LOAD_STATE_KEY, PATIO_GUARDIAS_STATE_KEY, PATIO_TEACHER_BLOCKS_STATE_KEY]
@@ -111,6 +113,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
         updatedAt: row.updated_at || ''
       })),
       sessionOverrides,
+      gruposEstado,
       substitutions: Array.isArray(substitutions) ? substitutions : [],
       futureAbsences: Array.isArray(futureAbsences) ? futureAbsences : [],
       schoolWeekKey,
@@ -119,7 +122,12 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       teacherPracticasGuardias: practicasGuardiasState?.value ? JSON.parse(practicasGuardiasState.value) : [],
       teacherPracticasGuardiasTramos: practicasGuardiasTramosState?.value ? JSON.parse(practicasGuardiasTramosState.value) : [],
       patioGuardias: patioGuardiasState?.value ? JSON.parse(patioGuardiasState.value) : [],
-      patioTeacherBlocks: patioTeacherBlocksState?.value ? JSON.parse(patioTeacherBlocksState.value) : []
+      patioTeacherBlocks: patioTeacherBlocksState?.value ? JSON.parse(patioTeacherBlocksState.value) : [],
+      gruposEstado: gruposEstado.map(row => ({
+        grupo: row.grupo,
+        activo: !!row.activo,
+        updated_at: row.updated_at || ''
+      }))
     };
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -142,12 +150,13 @@ router.get('/info', requireRole('superadmin'), async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const dbStat = fs.statSync(DB_PATH);
-    const [ausenciasRow, historialRow, tareasRow, alumnosFueraAulaRow, overridesRow, appStateRows] = await Promise.all([
+    const [ausenciasRow, historialRow, tareasRow, alumnosFueraAulaRow, overridesRow, gruposEstadoRow, appStateRows] = await Promise.all([
       db.get('SELECT COUNT(*) AS total FROM ausencias'),
       db.get('SELECT COUNT(*) AS total FROM historial'),
       db.get('SELECT COUNT(*) AS total FROM tareas_profesorado'),
       db.get('SELECT COUNT(*) AS total FROM alumnos_fuera_aula'),
       db.get('SELECT COUNT(*) AS total FROM session_overrides'),
+      db.get('SELECT COUNT(*) AS total FROM grupos_estado'),
       db.all(
         'SELECT key, LENGTH(value) AS size, updated_at FROM app_state WHERE key IN (?, ?, ?, ?, ?, ?) ORDER BY key',
         [SUBSTITUTIONS_STATE_KEY, FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY, MONTHLY_GUARDIA_LOAD_STATE_KEY, PATIO_GUARDIAS_STATE_KEY, PATIO_TEACHER_BLOCKS_STATE_KEY]
@@ -177,6 +186,7 @@ router.get('/info', requireRole('superadmin'), async (_req, res, next) => {
         tareasProfesorado: tareasRow?.total || 0,
         alumnosFueraAula: alumnosFueraAulaRow?.total || 0,
         sessionOverrides: overridesRow?.total || 0,
+        gruposEstado: gruposEstadoRow?.total || 0,
         appState: appStateRows.map(row => ({
           key: row.key,
           size: row.size || 0,
@@ -204,6 +214,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       tareasProfesorado,
       alumnosFueraAula,
       sessionOverrides,
+      gruposEstado,
       substitutions,
       futureAbsences,
       schoolWeekKey,
@@ -217,14 +228,14 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
     const effectiveSubstitutions = teacherSubstitutions.length ? teacherSubstitutions : substitutions;
 
     const db = await getDatabase();
-    await db.exec('BEGIN TRANSACTION');
-    try {
+    await withImmediateTransaction(db, async () => {
       await db.exec('DELETE FROM ausencias');
       await db.exec('DELETE FROM biblioteca_guardias');
       await db.exec('DELETE FROM historial');
       await db.exec('DELETE FROM tareas_profesorado');
       await db.exec('DELETE FROM alumnos_fuera_aula');
       await db.exec('DELETE FROM session_overrides');
+      await db.exec('DELETE FROM grupos_estado');
       await db.run(
         'DELETE FROM app_state WHERE key IN (?, ?, ?, ?, ?, ?, ?, ?)',
         [
@@ -241,10 +252,9 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
 
       for (const row of guardias) {
         await db.run(
-          `INSERT INTO ausencias (id, dia, hora, ausente, guardia, aula, faena, obs, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO ausencias (dia, hora, ausente, guardia, aula, faena, obs, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            row.id,
             row.dia,
             row.hora,
             row.ausente,
@@ -339,6 +349,14 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         );
       }
 
+      for (const row of gruposEstado) {
+        await db.run(
+          `INSERT INTO grupos_estado (grupo, activo, updated_at)
+           VALUES (?, ?, ?)`,
+          [row.grupo, row.activo ? 1 : 0, row.updated_at]
+        );
+      }
+
       if (monthlyGuardiaLoad) {
         await db.run(
           `INSERT INTO app_state (key, value, updated_at)
@@ -378,12 +396,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
           [PATIO_TEACHER_BLOCKS_STATE_KEY, JSON.stringify(patioTeacherBlocks)]
         );
       }
-
-      await db.exec('COMMIT');
-    } catch (error) {
-      await db.exec('ROLLBACK');
-      throw error;
-    }
+    }, { label: 'export:restore' });
 
       res.json({
         ok: true,
@@ -394,8 +407,9 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
           historial: historial.length,
           tareasProfesorado: tareasProfesorado.length,
           alumnosFueraAula: alumnosFueraAula.length,
-          sessionOverrides: sessionOverrides.length,
-          substitutions: effectiveSubstitutions.length,
+        sessionOverrides: sessionOverrides.length,
+        gruposEstado: gruposEstado.length,
+        substitutions: effectiveSubstitutions.length,
           futureAbsences: futureAbsences.length,
         teacherSubstitutions: effectiveSubstitutions.length,
         monthlyGuardiaLoad: monthlyGuardiaLoad ? 1 : 0,

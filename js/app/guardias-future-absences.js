@@ -182,6 +182,13 @@
     return new Set();
   }
 
+  function isSelectableFutureAbsenceHour(hora){
+    const numericHora = Number(hora);
+    if(!Number.isInteger(numericHora) || numericHora < 1 || numericHora > 9) return false;
+    if(numericHora === 4) return true;
+    return !getPatioSet().has(numericHora);
+  }
+
   function getVisibleTeacherName(name){
     const custom = readHostValue('getVisibleTeacherName');
     return typeof custom === 'function' ? (custom(name) || cleanText(name)) : cleanText(name);
@@ -239,9 +246,8 @@
   }
 
   function normalizeHours(hours){
-    const patio = getPatioSet();
     return Array.isArray(hours)
-      ? [...new Set(hours.map(Number).filter(Number.isInteger).filter(hora => !patio.has(hora)))].sort((a, b) => a - b)
+      ? [...new Set(hours.map(Number).filter(isSelectableFutureAbsenceHour))].sort((a, b) => a - b)
       : [];
   }
 
@@ -373,7 +379,15 @@
   function getHorasLectivasProfesorDia(profesor, dayIndex){
     const resolver = requireHostFunction('getHorasLectivasProfesorDia', 'future absence schedule lookup');
     const rows = resolver(profesor, dayIndex);
-    return Array.isArray(rows) ? rows.map(Number).filter(Number.isInteger).sort((a, b) => a - b) : [];
+    const hours = Array.isArray(rows) ? rows.map(Number).filter(Number.isInteger) : [];
+    const resolveTeacherSession = readHostValue('resolveTeacherSession');
+    if(typeof resolveTeacherSession === 'function'){
+      const patioSession = resolveTeacherSession(profesor, dayIndex, 4);
+      if(patioSession && patioSession.tipo !== 'guardia'){
+        hours.push(4);
+      }
+    }
+    return [...new Set(hours.filter(isSelectableFutureAbsenceHour))].sort((a, b) => a - b);
   }
 
   function getFutureAbsenceHoursForEntry(item){
@@ -386,7 +400,7 @@
 
   function isFutureAbsenceProjected(item){
     const status = normalizeStatus(item && item.status);
-    return status === 'approved' || status === 'applied';
+    return status === 'pending' || status === 'approved' || status === 'applied';
   }
 
   function findOverlapping(entry, options){

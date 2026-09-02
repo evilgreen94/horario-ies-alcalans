@@ -1,6 +1,6 @@
 const express = require('express');
 const { getDatabase, withImmediateTransaction } = require('../db');
-const { parseAnnualXml, writeAnnualSourceArtifacts } = require('../annual-source');
+const { parseAnnualXml, validateAndNormalizeAnnualSource, writeAnnualSourceArtifacts } = require('../annual-source');
 const {
   ensureArray,
   ensureRequiredString,
@@ -72,6 +72,7 @@ registerStateCollectionRoutes(router, {
 
 registerAnnualImportRoutes(router, {
   parseAnnualXml,
+  validateAndNormalizeAnnualSource,
   writeAnnualSourceArtifacts,
   normalizeAnnualImportRequest,
   ensureRequiredString,

@@ -180,7 +180,7 @@ module.exports = [
         profesor: 'Ada',
         date: '2026-05-04',
         note: 'Reunion externa',
-        hours: [1, 2, 3],
+        hours: [1, 2, 3, 4],
         status: 'approved',
         reviewedAt: '2026-04-30T10:15:00.000Z',
         reviewerNote: 'ok',

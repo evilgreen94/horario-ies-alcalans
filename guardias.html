@@ -139,6 +139,24 @@
         </div>
         <div class="admin-pasillo-list" id="adminPasilloList"></div>
       </section>
+      <details class="admin-panel admin-panel-groups admin-panel-collapsible">
+        <summary class="admin-panel-toggle">
+          <div class="admin-section-head">
+            <div>
+              <div class="admin-section-title">Grupos activos/inactivos</div>
+              <div class="admin-section-copy">Desactiva los grupos que ya no deben generar ausencias ni guardias durante el curso.</div>
+            </div>
+          </div>
+        </summary>
+        <div class="admin-panel-body">
+          <div class="future-absence-summary" id="groupStatesSummary"></div>
+          <div class="fg">
+            <label for="groupStatesSearch">Buscar grupo</label>
+            <input type="text" id="groupStatesSearch" placeholder="2FPB, 2 BACH, DAW, ASIR...">
+          </div>
+          <div class="group-states-list" id="groupStatesList"></div>
+        </div>
+      </details>
 
       <section class="admin-panel admin-panel-announcements">
         <div class="admin-section-head">
@@ -228,6 +246,14 @@
     <span class="teacher-name" id="teacherBarName">Profesorado</span>
   </div>
   <div class="tbl-wrap">
+    <div class="table-batch-bar" id="tableBatchBar" style="display:none">
+      <label class="table-batch-select-all">
+        <input type="checkbox" id="batchSelectAll" onchange="toggleSelectAllAbsences(this.checked)">
+        <span>Seleccionar visibles</span>
+      </label>
+      <div class="table-batch-summary" id="tableBatchSummary">0 seleccionadas</div>
+      <button class="btn-add btn-add-secondary" id="btnDeleteSelectedAbsences" type="button" onclick="deleteSelectedAbsences()" disabled>Eliminar seleccionadas</button>
+    </div>
     <table>
       <thead>
         <tr>
@@ -237,7 +263,7 @@
           <th>Aula</th>
           <th>Faena dejada</th>
           <th>Estado</th>
-          <th id="thAcc" style="display:none"></th>
+          <th id="thAcc" style="display:none">Acciones</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -254,8 +280,23 @@
 
     <div class="modal-section">
       <div class="modal-section-head">
+        <div class="modal-section-title">Profesor ausente</div>
+        <div class="modal-section-copy">Busca primero al profesor y luego marca las horas concretas de la ausencia.</div>
+      </div>
+      <div class="fg">
+        <label>Profesor ausente</label>
+        <input type="text" id="fAusente" placeholder="Selecciona o busca un profesor" autocomplete="off" aria-autocomplete="list" aria-controls="ausenteSuggestions">
+        <div class="absence-suggestions" id="ausenteSuggestions" hidden></div>
+        <div class="absence-preview" id="ausentePreview">Empieza a escribir para localizar al profesor.</div>
+        <div class="teacher-admin-stats" id="teacherAdminStats"></div>
+        <div class="field-error" id="fAusenteError"></div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-head">
         <div class="modal-section-title">Tramo horario</div>
-        <div class="modal-section-copy">Indica cu&aacute;ndo se produce la ausencia.</div>
+        <div class="modal-section-copy">Indica cu&aacute;ndo se produce la ausencia para ese profesor.</div>
       </div>
       <div class="fg">
         <label>D&iacute;a</label>
@@ -268,24 +309,6 @@
         <div class="modal-inline-copy">Marca una, varias o todas las horas que correspondan. Si activas ausencia de todo el d&iacute;a, esta selecci&oacute;n queda bloqueada.</div>
         <div class="absence-hours-grid" id="fHorasMulti"></div>
         <div class="field-error" id="fHorasMultiError"></div>
-      </div>
-    </div>
-
-    <div class="modal-section">
-      <div class="modal-section-head">
-        <div class="modal-section-title">Profesor ausente</div>
-        <div class="modal-section-copy">Busca el profesor y confirma el aula o lugar.</div>
-      </div>
-      <div class="fg">
-        <label>Profesor ausente</label>
-        <div class="input-with-action">
-          <input type="text" id="fAusente" placeholder="Selecciona o busca un profesor" autocomplete="off" aria-autocomplete="list" aria-controls="ausenteSuggestions">
-          <button class="btn-inline-save" type="button" onclick="saveAbsence()">Guardar</button>
-        </div>
-        <div class="absence-suggestions" id="ausenteSuggestions" hidden></div>
-        <div class="absence-preview" id="ausentePreview">Empieza a escribir para localizar al profesor.</div>
-        <div class="teacher-admin-stats" id="teacherAdminStats"></div>
-        <div class="field-error" id="fAusenteError"></div>
       </div>
     </div>
 
@@ -320,8 +343,8 @@
     </div>
 
     <div class="modal-actions">
-      <button class="btn-cancel" type="button" onclick="closeModal()">Cancelar</button>
-      <button class="btn-save" type="button" onclick="saveAbsence()">Guardar</button>
+      <button class="btn-cancel" id="btnCancelAbsence" type="button" onclick="closeModal()">Cancelar</button>
+      <button class="btn-save" id="btnSaveAbsence" type="button" onclick="saveAbsence()">Guardar</button>
     </div>
     <button class="btn-del" id="btnDel" style="display:none" onclick="del()">Eliminar registro</button>
   </div>

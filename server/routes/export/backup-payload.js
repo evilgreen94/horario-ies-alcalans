@@ -102,6 +102,16 @@ function sanitizeRestoreAlumnosFueraAula(row) {
   };
 }
 
+function sanitizeGroupStateRow(row) {
+  const input = ensureObject(row, 'Estado de grupo');
+  const grupo = ensureRequiredString(input.grupo, 'grupo');
+  return {
+    grupo,
+    activo: normalizeBoolean(input.activo),
+    updated_at: input.updated_at ? ensureTimestamp(input.updated_at, 'updated_at') : new Date().toISOString()
+  };
+}
+
 function sanitizeBackupPayload(payload) {
   const input = ensureObject(payload, 'Backup');
   if (input.exportedAt) {
@@ -122,6 +132,7 @@ function sanitizeBackupPayload(payload) {
     teacherPracticasGuardiasTramos: ensureOptionalBackupSection(input, 'teacherPracticasGuardiasTramos', 'teacherPracticasGuardiasTramos', sanitizeTeacherPracticeGuardiaSlot),
     patioGuardias: ensureOptionalBackupSection(input, 'patioGuardias', 'patioGuardias', sanitizePatioGuardia),
     patioTeacherBlocks: ensureOptionalBackupSection(input, 'patioTeacherBlocks', 'patioTeacherBlocks', sanitizePatioTeacherBlock),
+    gruposEstado: ensureOptionalBackupSection(input, 'gruposEstado', 'gruposEstado', sanitizeGroupStateRow),
     monthlyGuardiaLoad: input.monthlyGuardiaLoad && typeof input.monthlyGuardiaLoad === 'object' && !Array.isArray(input.monthlyGuardiaLoad)
       ? input.monthlyGuardiaLoad
       : null

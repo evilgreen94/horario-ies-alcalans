@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { AsyncLocalStorage } = require('async_hooks');
 const { open } = require('sqlite');
 const sqlite3 = require('sqlite3');
 const { ADMIN_ROLE, SUPERADMIN_ROLE, hashPassword } = require('./auth');
@@ -39,6 +40,8 @@ const DB_PATH = resolveDatabasePath();
 const DATA_DIR = path.dirname(DB_PATH);
 
 let databasePromise = null;
+const transactionContext = new AsyncLocalStorage();
+const transactionStateByDb = new WeakMap();
 
 function copyIfExists(sourcePath, targetPath) {
   if (!fs.existsSync(sourcePath) || fs.existsSync(targetPath)) return;
@@ -72,20 +75,46 @@ async function getDatabase() {
   return databasePromise;
 }
 
-async function withImmediateTransaction(db, callback) {
-  await db.exec('BEGIN IMMEDIATE TRANSACTION');
-  try {
-    const result = await callback();
-    await db.exec('COMMIT');
-    return result;
-  } catch (error) {
-    try {
-      await db.exec('ROLLBACK');
-    } catch (_rollbackError) {
-      // Keep the original failure; rollback can fail if SQLite already closed the transaction.
-    }
-    throw error;
+function getTransactionState(db) {
+  let state = transactionStateByDb.get(db);
+  if (!state) {
+    state = { tail: Promise.resolve() };
+    transactionStateByDb.set(db, state);
   }
+  return state;
+}
+
+async function withImmediateTransaction(db, callback, options = {}) {
+  const activeContext = transactionContext.getStore();
+  if (activeContext?.db === db) {
+    return callback();
+  }
+
+  const state = getTransactionState(db);
+  const label = String(options.label || 'sqlite-tx');
+  const runTransaction = async () => {
+    const startedAt = Date.now();
+    console.info(`[sqlite] BEGIN ${label}`);
+    await db.exec('BEGIN');
+    try {
+      const result = await transactionContext.run({ db, label }, callback);
+      await db.exec('COMMIT');
+      console.info(`[sqlite] COMMIT ${label} (${Date.now() - startedAt}ms)`);
+      return result;
+    } catch (error) {
+      try {
+        await db.exec('ROLLBACK');
+        console.warn(`[sqlite] ROLLBACK ${label} (${Date.now() - startedAt}ms): ${error.message || error}`);
+      } catch (_rollbackError) {
+        console.warn(`[sqlite] ROLLBACK FAILED ${label}: ${_rollbackError.message || _rollbackError}`);
+      }
+      throw error;
+    }
+  };
+
+  const runPromise = state.tail.then(runTransaction, runTransaction);
+  state.tail = runPromise.catch(() => {});
+  return runPromise;
 }
 
 async function initializeDatabase() {
