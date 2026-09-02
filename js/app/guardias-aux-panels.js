@@ -1057,9 +1057,9 @@
       if(normalizedValue===normalizedOwner) return 'El sustituto no puede tener exactamente el mismo nombre que el titular.';
       const teachers=Array.isArray(getValue(options.allTeachers,[]))?getValue(options.allTeachers,[]):[];
       const canonicalConflict=teachers.find(otherName=>otherName!==nombre&&normalizeTeacherSearch(otherName)===normalizedValue);
-      if(canonicalConflict) return `Ese nombre coincide con el profesor real ${canonicalConflict}.`;
+      if(canonicalConflict) return `Ese nombre coincide con el docente registrado ${canonicalConflict}.`;
       const aliasConflict=Object.entries(getSubstitutions()).find((entry)=>entry[0]!==nombre&&normalizeTeacherSearch(entry[1])===normalizedValue);
-      if(aliasConflict) return `Ese nombre ya esta asignado como sustituto de ${aliasConflict[0]}.`;
+      if(aliasConflict) return `Ese nombre ya está asignado como sustituto de ${aliasConflict[0]}.`;
       return '';
     }
     function getFilteredTeachers(){
@@ -1334,7 +1334,7 @@
       if(!panel) return;
       const nombre=configTeacher;
       if(!nombre||!getTeacher(nombre)){
-        panel.innerHTML='<div class="history-empty">Selecciona un profesor y pulsa en "Configurar horas" para habilitar tramos concretos.</div>';
+        panel.innerHTML='<div class="history-empty">Selecciona un docente y pulsa en "Configurar horas" para habilitar tramos concretos.</div>';
         return;
       }
       const manualSet=getManualSet();

@@ -505,7 +505,7 @@
       </div>
     </div>
     <div class="future-absence-item-note"><strong>Horas:</strong> ${escapeHtml(formatHourListLabel(getFutureAbsenceHoursForEntry(item)))}</div>
-    ${nextOptions.showTeacherName ? `<div class="future-absence-item-note"><strong>Profesor:</strong> ${escapeHtml(getVisibleTeacherName(item.profesor) || item.profesor)}</div>` : ''}
+    ${nextOptions.showTeacherName ? `<div class="future-absence-item-note"><strong>Docente:</strong> ${escapeHtml(getVisibleTeacherName(item.profesor) || item.profesor)}</div>` : ''}
     <div class="future-absence-item-note"><strong>Observaciones:</strong> ${escapeHtml(item.note || 'Sin observaciones adicionales.')}</div>
     ${item.reviewerNote ? `<div class="future-absence-item-note"><strong>Respuesta de Jefatura:</strong> ${escapeHtml(item.reviewerNote)}</div>` : ''}
     ${reviewedAtLabel ? `<div class="future-absence-item-note"><strong>Revisada:</strong> ${escapeHtml(reviewedAtLabel)}</div>` : ''}
@@ -789,13 +789,13 @@
       state.syncFlags.delete(`upsert:${saved.id}`);
       upsertRowLocal(saved);
       clearSuperAdminError();
-      pushSuperAdminEvent('Future absence', `Nuevo aviso futuro registrado para ${saved.profesor}.`);
+      pushSuperAdminEvent('Ausencia futura', `Nuevo aviso futuro registrado para ${saved.profesor}.`);
       return result || { ok: true, entry: saved };
     }catch(error){
       console.warn('Teacher future absence create backend sync failed; keeping local state', error);
       state.syncFlags.add(`upsert:${normalized.id}`);
       setSuperAdminError('Hay avisos futuros pendientes de sincronizar.');
-      pushSuperAdminEvent('Pendiente backend', `Nuevo aviso futuro de ${normalized.profesor} guardado solo en local.`);
+      pushSuperAdminEvent('Sincronización pendiente', `Nuevo aviso futuro de ${normalized.profesor} guardado temporalmente en este dispositivo.`);
       renderSuperAdminMonitor();
       notifyStateChange();
       return { ok: true, localOnly: true, syncError: true, entry: normalized };
@@ -814,13 +814,13 @@
       state.syncFlags.delete(`upsert:${saved.id}`);
       upsertRowLocal(saved);
       clearSuperAdminError();
-      pushSuperAdminEvent('Future absence', `Aviso futuro actualizado para ${saved.profesor}.`);
+      pushSuperAdminEvent('Ausencia futura', `Aviso futuro actualizado para ${saved.profesor}.`);
       return result || { ok: true, entry: saved };
     }catch(error){
       console.warn('Teacher future absence update backend sync failed; keeping local state', error);
       state.syncFlags.add(`upsert:${normalized.id}`);
       setSuperAdminError('Hay avisos futuros pendientes de sincronizar.');
-      pushSuperAdminEvent('Pendiente backend', `Aviso futuro de ${normalized.profesor} guardado solo en local.`);
+      pushSuperAdminEvent('Sincronización pendiente', `Aviso futuro de ${normalized.profesor} guardado temporalmente en este dispositivo.`);
       renderSuperAdminMonitor();
       notifyStateChange();
       return { ok: true, localOnly: true, syncError: true, entry: normalized };
@@ -839,14 +839,14 @@
       state.syncFlags.delete(`delete:${targetId}`);
       const result = await requireStorageMethod('deleteTeacherFutureAbsence', 'future absence delete')(targetId);
       clearSuperAdminError();
-      pushSuperAdminEvent('Future absence', `Aviso futuro ${targetId} eliminado en backend.`);
+      pushSuperAdminEvent('Ausencia futura', 'Aviso futuro eliminado en el servidor.');
       notifyStateChange();
       return result;
     }catch(error){
       console.warn('Teacher future absence delete backend sync failed; keeping local state', error);
       state.syncFlags.add(`delete:${targetId}`);
       setSuperAdminError('Hay eliminaciones pendientes de sincronizar.');
-      pushSuperAdminEvent('Pendiente backend', `Eliminación local pendiente para aviso ${targetId}.`);
+      pushSuperAdminEvent('Sincronización pendiente', 'La eliminación del aviso está pendiente de sincronización.');
       renderSuperAdminMonitor();
       notifyStateChange();
       return { ok: true, localOnly: true, syncError: true };

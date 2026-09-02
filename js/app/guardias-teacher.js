@@ -835,9 +835,9 @@
       if(state.teacherIdentityConfirmedFor===state.teacherName) return true;
       const nombre=getVisibleTeacherName(profesor.nombreCompleto || profesor.nombre || state.teacherName);
       const confirmed=await askConfirm(
-        'Confirmar profesor',
+        'Confirmar docente',
         `Vas a trabajar como ${nombre}. Comprueba que es tu panel antes de ${actionLabel}.`,
-        'Confirmar profesor'
+        'Confirmar docente'
       );
       if(confirmed) state.teacherIdentityConfirmedFor=state.teacherName;
       return confirmed;
@@ -1063,7 +1063,7 @@
       }
       const profesor=getProfesor(nombre);
       const confirmed=await askConfirm(
-        'Confirmar profesorado',
+        'Confirmar docente',
         `Vas a entrar como ${getVisibleTeacherName(profesor?.nombreCompleto || nombre)}. Revisa bien el nombre antes de continuar.`,
         'Entrar con este nombre'
       );

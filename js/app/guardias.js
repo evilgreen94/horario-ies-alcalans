@@ -121,7 +121,7 @@ function parseSesion(item){
   if(isGuardiaTexto(texto)) return {tipo:'guardia',materia:'Guardia',detalle:'Guardia',grupo:'',aula:aula||''};
   if(partes.length>=3) return {tipo:'clase',materia:partes[0],grupo:partes[1],detalle:texto,aula:aula||partes[2]||''};
   if(partes.length===2) return {tipo:'clase',materia:partes[0],grupo:'',detalle:texto,aula:aula||partes[1]||''};
-  return {tipo:'clase',materia:partes[0]||texto||'Sesi?n',grupo:'',detalle:texto||'Sesi?n',aula:aula||''};
+  return {tipo:'clase',materia:partes[0]||texto||'Sesión',grupo:'',detalle:texto||'Sesión',aula:aula||''};
 }
 function buildProfesoradoData(){
   const profesoresBase={};
@@ -499,9 +499,9 @@ async function ensureTeacherIdentityConfirmed(actionLabel){
   if(teacherIdentityConfirmedFor===teacherName) return true;
   const nombre=getVisibleTeacherName(profesor.nombreCompleto||profesor.nombre||teacherName);
   const confirmed=await askConfirm(
-    'Confirmar profesor',
+    'Confirmar docente',
     `Vas a trabajar como ${nombre}. Comprueba que es tu panel antes de ${actionLabel}.`,
-    'Confirmar profesor'
+    'Confirmar docente'
   );
   if(confirmed) teacherIdentityConfirmedFor=teacherName;
   return confirmed;
@@ -1602,7 +1602,7 @@ function validateTeacherSubstitutionName(nombre,rawValue){
     otherNombre!==nombre&&normalizeTeacherSearch(otherNombre)===normalizedValue
   );
   if(canonicalConflict){
-    return `Ese nombre coincide con el profesor real ${canonicalConflict}.`;
+    return `Ese nombre coincide con el docente registrado ${canonicalConflict}.`;
   }
 
   const aliasConflict=Object.entries(teacherSubstitutions).find(([otherNombre,sustituto])=>
@@ -3122,7 +3122,7 @@ function renderAdminWorkspace(){
     {
       label:'Futuras pendientes',
       value:insight.pendingFuture.length,
-      note:insight.pendingFuture.length?'Faltas futuras pendientes de validar en esta vista.':'No hay faltas futuras pendientes en este d\u00eda.',
+      note:insight.pendingFuture.length?'Ausencias futuras pendientes de validar en esta vista.':'No hay ausencias futuras pendientes en este d\u00eda.',
       className:insight.pendingFuture.length?'admin-overview-card admin-overview-card-warn':'admin-overview-card'
     },
     {
@@ -3191,7 +3191,7 @@ function getSuperAdminHealthMeta(){
     return {label:'Con incidencias',className:'superadmin-pill-error',note:'Se han detectado errores recientes o fallos de sincronización.'};
   }
   if(activeRequests>=12||Number(minute.count||0)>=180||Number(fiveMinutes.avgDurationMs||0)>=1200){
-    return {label:'Carga alta',className:'superadmin-pill-error',note:'El servidor esta bastante exigido. Mejor no lanzar tareas pesadas ahora.'};
+    return {label:'Carga alta',className:'superadmin-pill-error',note:'El servidor presenta una carga elevada. Evita iniciar tareas pesadas en este momento.'};
   }
   if(activeRequests>=6||Number(minute.count||0)>=90||Number(fiveMinutes.avgDurationMs||0)>=700){
     return {label:'Vigilando',className:'superadmin-pill-warn',note:'La carga es aceptable, pero ya conviene seguirla de cerca.'};
@@ -3618,7 +3618,7 @@ async function runAdminStateSync(){
       const failedDomains=auxiliaryFailures.map(item=>item.domain).join(', ');
       console.warn('[guardias] admin sync partial failure',auxiliaryFailures);
       setSuperAdminError(`Guardias guardadas, pero falló la sincronización auxiliar: ${failedDomains}.`);
-      pushSuperAdminEvent('Sincronización parcial de Jefatura',`Guardias persistidas. Revisa: ${failedDomains}.`);
+      pushSuperAdminEvent('Sincronización parcial de Jefatura',`Las guardias se han guardado, pero quedan apartados pendientes: ${failedDomains}.`);
     }else{
       clearSuperAdminError();
     }
@@ -3628,7 +3628,7 @@ async function runAdminStateSync(){
       auxiliaryFailures: auxiliaryFailures.length
     });
     if(!auxiliaryFailures.length){
-      pushSuperAdminEvent('Sincronización de Jefatura','Guardias, biblioteca, historial, sustituciones y ajustes de practicas sincronizados con backend.');
+      pushSuperAdminEvent('Sincronización de Jefatura','Guardias, biblioteca, historial, sustituciones y ajustes de prácticas sincronizados con el servidor.');
     }
     notifyRealtimeSync('admin-sync');
     pendingAdminSyncRequest=null;
@@ -3636,7 +3636,7 @@ async function runAdminStateSync(){
   }catch(error){
     console.warn('Backend sync failed',error);
     setSuperAdminError('Fallo en la sincronización de Jefatura.');
-    pushSuperAdminEvent('Error sync',`Jefatura: ${String(error?.message||error)}`);
+    pushSuperAdminEvent('Error de sincronización',`Jefatura: ${String(error?.message||error)}`);
     pendingAdminSyncRequest=null;
     return {ok:false,syncError:true,error};
   }finally{
@@ -3683,11 +3683,11 @@ async function syncTeacherState(){
     lastBackendSnapshot=makeBackendSnapshot();
     superAdminStatus.lastTeacherSyncAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Sincronización del profesorado','Tareas y ajustes de profesorado sincronizados con backend.');
+    pushSuperAdminEvent('Sincronización del profesorado','Tareas y ajustes del profesorado sincronizados con el servidor.');
   }catch(error){
     console.warn('Teacher backend sync failed',error);
     setSuperAdminError('Fallo en la sincronización de profesorado.');
-    pushSuperAdminEvent('Error sync',`Profesorado: ${String(error?.message||error)}`);
+    pushSuperAdminEvent('Error de sincronización',`Profesorado: ${String(error?.message||error)}`);
   }finally{
     backendSyncInFlight=false;
     drainPendingBackendSync();
@@ -3706,14 +3706,14 @@ async function syncPatioTeacherBlocksState(){
     lastBackendSnapshot=makeBackendSnapshot();
     superAdminStatus.lastTeacherSyncAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Sincronización del profesorado','Bloqueos de patio por equipo docente sincronizados con backend.');
+    pushSuperAdminEvent('Sincronización del profesorado','Bloqueos de patio por equipo docente sincronizados con el servidor.');
     notifyRealtimeSync('patio-blocks-sync');
     return {ok:true};
   }catch(error){
     console.warn('Patio teacher block backend sync failed',error);
     backendSyncPendingPatioTeacherBlocks=true;
     setSuperAdminError('Fallo en la sincronización del bloqueo de patio.');
-    pushSuperAdminEvent('Error sync',`Patio: ${String(error?.message||error)}`);
+    pushSuperAdminEvent('Error de sincronización',`Patio: ${String(error?.message||error)}`);
     return {ok:true,localOnly:true,syncError:true};
   }finally{
     backendSyncInFlight=false;
@@ -3759,13 +3759,13 @@ async function syncTeacherTaskEntry(overrideKey,overrideRow,tareaKey,tareaRow){
     await Promise.all(requests);
     superAdminStatus.lastTeacherSyncAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Sincronización del profesorado','Tarea y ajustes de profesorado sincronizados con backend.');
+    pushSuperAdminEvent('Sincronización del profesorado','Tarea y ajustes del profesorado sincronizados con el servidor.');
     return {ok:true};
   }catch(error){
     console.warn('Teacher task backend sync failed',error);
     backendSyncPendingTeacher=true;
     setSuperAdminError('Fallo en la sincronización de tarea de profesorado.');
-    pushSuperAdminEvent('Error sync',`Profesorado: ${String(error?.message||error)}`);
+    pushSuperAdminEvent('Error de sincronización',`Profesorado: ${String(error?.message||error)}`);
     return {ok:true,localOnly:true,syncError:true};
   }finally{
     backendSyncInFlight=false;
@@ -3857,7 +3857,7 @@ async function hydrateTeacherSubstitutions(){
     if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
     superAdminStatus.lastHydrateAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Actualización','Sustituciones de profesorado recargadas desde backend.');
+    pushSuperAdminEvent('Actualización','Sustituciones del profesorado recargadas desde el servidor.');
   }catch(error){
     console.warn('Teacher substitutions hydration failed',error);
     setSuperAdminError('Fallo al hidratar sustituciones.');
@@ -3878,7 +3878,7 @@ async function hydrateGroupStates(){
     if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
     superAdminStatus.lastHydrateAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Actualización','Estado de grupos recargado desde backend.');
+    pushSuperAdminEvent('Actualización','Estado de grupos recargado desde el servidor.');
   }catch(error){
     console.warn('Group states hydration failed',error);
     setSuperAdminError('Fallo al hidratar grupos activos/inactivos.');
@@ -3896,10 +3896,10 @@ async function hydrateTeacherFutureAbsences(){
     renderTeacherFutureAbsenceOwnList();
     superAdminStatus.lastHydrateAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Actualización','Ausencias futuras recargadas desde backend.');
+    pushSuperAdminEvent('Actualización','Ausencias futuras recargadas desde el servidor.');
   }catch(error){
     console.warn('Teacher future absences hydration failed',error);
-    setSuperAdminError('Fallo al hidratar faltas futuras.');
+    setSuperAdminError('No se pudieron cargar las ausencias futuras.');
   }
 }
 async function hydrateTeacherPracticasGuardias(){
@@ -4466,13 +4466,13 @@ async function updateTeacherFutureAbsenceEntry(entry){
     renderFutureAbsenceAdminList();
     renderTeacherFutureAbsenceOwnList();
     clearSuperAdminError();
-    pushSuperAdminEvent('Future absence',`Aviso futuro actualizado para ${saved.profesor}.`);
+    pushSuperAdminEvent('Ausencia futura',`Aviso futuro actualizado para ${saved.profesor}.`);
     return result||{ok:true,entry:saved};
   }catch(error){
     console.warn('Teacher future absence update backend sync failed; keeping local state',error);
     futureAbsenceSyncFlags.add(`upsert:${normalized.id}`);
     setSuperAdminError('Hay avisos futuros pendientes de sincronizar.');
-    pushSuperAdminEvent('Pendiente backend',`Aviso futuro de ${normalized.profesor} guardado solo en local.`);
+    pushSuperAdminEvent('Sincronización pendiente',`Aviso futuro de ${normalized.profesor} guardado temporalmente en este dispositivo.`);
     renderSuperAdminMonitor();
     return {ok:true,localOnly:true,syncError:true,entry:normalized};
   }
@@ -4554,13 +4554,13 @@ async function createTeacherFutureAbsenceEntry(entry){
     renderFutureAbsenceAdminList();
     renderTeacherFutureAbsenceOwnList();
     clearSuperAdminError();
-    pushSuperAdminEvent('Future absence',`Nuevo aviso futuro registrado para ${saved.profesor}.`);
+    pushSuperAdminEvent('Ausencia futura',`Nuevo aviso futuro registrado para ${saved.profesor}.`);
     return result||{ok:true,entry:saved};
   }catch(error){
     console.warn('Teacher future absence create backend sync failed; keeping local state',error);
     futureAbsenceSyncFlags.add(`upsert:${normalized.id}`);
     setSuperAdminError('Hay avisos futuros pendientes de sincronizar.');
-    pushSuperAdminEvent('Pendiente backend',`Nuevo aviso futuro de ${normalized.profesor} guardado solo en local.`);
+    pushSuperAdminEvent('Sincronización pendiente',`Nuevo aviso futuro de ${normalized.profesor} guardado temporalmente en este dispositivo.`);
     renderSuperAdminMonitor();
     return {ok:true,localOnly:true,syncError:true,entry:normalized};
   }
@@ -4576,13 +4576,13 @@ async function deleteTeacherFutureAbsenceEntry(id){
     futureAbsenceSyncFlags.delete(`delete:${id}`);
     const result=await storage.deleteTeacherFutureAbsence(id);
     clearSuperAdminError();
-    pushSuperAdminEvent('Future absence',`Aviso futuro ${id} eliminado en backend.`);
+    pushSuperAdminEvent('Ausencia futura','Aviso futuro eliminado en el servidor.');
     return result;
   }catch(error){
     console.warn('Teacher future absence delete backend sync failed; keeping local state',error);
     futureAbsenceSyncFlags.add(`delete:${id}`);
     setSuperAdminError('Hay eliminaciones pendientes de sincronizar.');
-    pushSuperAdminEvent('Pendiente backend',`Eliminación local pendiente para aviso ${id}.`);
+    pushSuperAdminEvent('Sincronización pendiente','La eliminación del aviso está pendiente de sincronización.');
     renderSuperAdminMonitor();
     return {ok:true,localOnly:true,syncError:true};
   }
@@ -4730,7 +4730,7 @@ async function hydrateFromBackend(){
     backendHydrated=true;
     superAdminStatus.lastHydrateAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Actualización','Estado principal recargado desde backend.');
+    pushSuperAdminEvent('Actualización','Estado principal recargado desde el servidor.');
     renderGuardiasUiIfChanged(true);
     renderHistoryList();
     renderSubstitutionList();
@@ -4748,7 +4748,7 @@ async function hydrateFromBackend(){
       backendHydrated=false;
       console.warn('Backend hydration failed',error);
       setSuperAdminError('Fallo al hidratar el estado principal.');
-      pushSuperAdminEvent('Error hydrate',String(error?.message||error));
+      pushSuperAdminEvent('Error de carga',String(error?.message||error));
     }finally{
       backendHydrationPromise=null;
     }
@@ -4953,7 +4953,7 @@ async function pollBackendState(force=false){
     superAdminStatus.lastPollAt=new Date().toISOString();
     clearSuperAdminError();
     if(previousSnapshot!==makeBackendSnapshot()){
-      pushSuperAdminEvent('Polling','Se detectaron cambios remotos y se actualizaron en local.');
+      pushSuperAdminEvent('Consulta','Se detectaron cambios remotos y se actualizaron en este dispositivo.');
       renderGuardiasUiIfChanged();
       renderHistoryList();
       renderSubstitutionList();
@@ -4963,7 +4963,7 @@ async function pollBackendState(force=false){
       renderTvAnnouncement();
       if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
     }else{
-      pushSuperAdminEvent('Polling','Comprobación remota sin cambios.');
+      pushSuperAdminEvent('Consulta','Comprobación remota sin cambios.');
     }
     if(guardiaAssignmentsChanged) syncAdminState({origin:'polling',reason:'autoassign-after-poll'});
   }catch(error){
@@ -5928,7 +5928,7 @@ function renderSubstitutionList(){
   if(!list) return;
   const teachers=getFilteredSubstitutionTeachers();
   if(!teachers.length){
-    list.innerHTML='<div class="history-empty">No hay profesores que coincidan con la b\u00fasqueda.</div>';
+    list.innerHTML='<div class="history-empty">No hay docentes que coincidan con la b\u00fasqueda.</div>';
     return;
   }
   list.innerHTML=teachers.map(nombre=>{
@@ -6016,7 +6016,7 @@ function renderPracticasGuardiasConfig(){
   if(!panel) return;
   const nombre=practicasGuardiasConfigTeacher;
   if(!nombre||!getProfesor(nombre)){
-    panel.innerHTML='<div class="history-empty">Selecciona un profesor y pulsa en "Configurar horas" para habilitar tramos concretos.</div>';
+    panel.innerHTML='<div class="history-empty">Selecciona un docente y pulsa en "Configurar horas" para habilitar tramos concretos.</div>';
     return;
   }
   const manualSet=getTeacherPracticasGuardiasTramosSet();
@@ -6123,7 +6123,7 @@ function renderFutureAbsenceCard(item,options={}){
       </div>
     </div>
     <div class="future-absence-item-note"><strong>Horas:</strong> ${escapeHtml(formatHourListLabel(getFutureAbsenceHoursForEntry(item)))}</div>
-    ${options.showTeacherName?`<div class="future-absence-item-note"><strong>Profesor:</strong> ${escapeHtml(getVisibleTeacherName(item.profesor)||item.profesor)}</div>`:''}
+    ${options.showTeacherName?`<div class="future-absence-item-note"><strong>Docente:</strong> ${escapeHtml(getVisibleTeacherName(item.profesor)||item.profesor)}</div>`:''}
     <div class="future-absence-item-note"><strong>Observaciones:</strong> ${escapeHtml(item.note||'Sin observaciones adicionales.')}</div>
     ${item.reviewerNote?`<div class="future-absence-item-note"><strong>Respuesta de Jefatura:</strong> ${escapeHtml(item.reviewerNote)}</div>`:''}
     ${reviewedAtLabel?`<div class="future-absence-item-note"><strong>Revisada:</strong> ${escapeHtml(reviewedAtLabel)}</div>`:''}
@@ -6152,7 +6152,7 @@ function renderFutureAbsenceAdminList(){
   const rows=sortFutureAbsenceRowsForDisplay(teacherFutureAbsences);
   if(summary) summary.innerHTML=rows.length?formatFutureAbsenceAdminSummary(rows):'';
   if(!rows.length){
-    list.innerHTML='<div class="future-absence-empty">No hay faltas futuras comunicadas.</div>';
+    list.innerHTML='<div class="future-absence-empty">No hay ausencias futuras comunicadas.</div>';
     return;
   }
   const teacherFilter=normalizeTeacherSearch(futureAbsenceAdminTeacherFilter);
@@ -6183,7 +6183,7 @@ function renderTeacherFutureAbsenceOwnList(){
   if(!list) return;
   const rows=sortFutureAbsenceRowsForDisplay(teacherFutureAbsences.filter(item=>sameNormalizedText(item.profesor,teacherName)));
   if(!rows.length){
-    list.innerHTML='<div class="future-absence-empty">Todavía no has enviado avisos de falta futura.</div>';
+    list.innerHTML='<div class="future-absence-empty">Todavía no has enviado avisos de ausencia futura.</div>';
     return;
   }
   const groups=groupFutureAbsenceRowsByStatus(rows);
@@ -6242,7 +6242,7 @@ function closeTeacherFutureAbsenceModal(){
 function bgTeacherFutureAbsenceClose(e){if(e.target.id==='teacherFutureAbsenceOverlay') closeTeacherFutureAbsenceModal();}
 async function submitTeacherFutureAbsence(){
   if(!teacherName) return;
-  if(!await ensureTeacherIdentityConfirmed('enviar una falta futura')) return;
+  if(!await ensureTeacherIdentityConfirmed('enviar una ausencia futura')) return;
   const dateInput=document.getElementById('teacherFutureAbsenceDate');
   const noteInput=document.getElementById('teacherFutureAbsenceNote');
   const dateValue=cleanText(dateInput?.value);
@@ -6298,7 +6298,7 @@ function closeFutureAbsenceAdminModal(){
 function bgFutureAbsenceAdminClose(e){if(e.target.id==='futureAbsenceAdminOverlay') closeFutureAbsenceAdminModal();}
 async function handleFutureAbsenceAdminDelete(id){
   if(!isAdmin||!id) return;
-  if(!await askConfirm('Eliminar aviso','Se eliminar? este aviso de ausencia futura.','Eliminar')) return;
+  if(!await askConfirm('Eliminar aviso','Se eliminará este aviso de ausencia futura.','Eliminar')) return;
   try{
     const result=await deleteTeacherFutureAbsenceEntry(id);
     showToast(result?.syncError?'Aviso eliminado en local. Pendiente de sincronizar con el servidor.':'Aviso eliminado.','success');
@@ -6311,7 +6311,7 @@ async function reviewTeacherFutureAbsence(id,status){
   if(!isAdmin||!id) return;
   const current=teacherFutureAbsences.find(item=>item.id===id);
   if(!current) return;
-  const reviewerNote=cleanText(await askText(status==='approved'?'Validar falta futura':'Rechazar falta futura',`Puedes dejar una respuesta breve para ${getVisibleTeacherName(current.profesor)||current.profesor}.`,current.reviewerNote||'','Respuesta opcional',status==='approved'?'Validar':'Rechazar'));
+  const reviewerNote=cleanText(await askText(status==='approved'?'Validar ausencia futura':'Rechazar ausencia futura',`Puedes dejar una respuesta breve para ${getVisibleTeacherName(current.profesor)||current.profesor}.`,current.reviewerNote||'','Respuesta opcional',status==='approved'?'Validar':'Rechazar'));
   const nextEntry={...current,status,reviewerNote,reviewedAt:new Date().toISOString()};
   try{
     const result=await updateTeacherFutureAbsenceEntry(nextEntry);
@@ -6486,7 +6486,7 @@ async function deleteSelectedAbsences(){
   const count=selectedRows.length;
   if(!await askConfirm('Eliminar ausencias',`Se eliminar${count===1?'á':'án'} ${count} ${count===1?'ausencia seleccionada':'ausencias seleccionadas'}.`,'Eliminar')) return;
   if(!await ensureBackendReadyForMutations()){
-    showToast('Todavia no se ha cargado el estado guardado. Espera un momento y vuelve a intentarlo.','error');
+    showToast('Todavía no se ha cargado el estado guardado. Espera un momento y vuelve a intentarlo.','error');
     return;
   }
   const selectedIds=new Set(selectedRows.map(row=>Number(row.id)));
@@ -6570,7 +6570,7 @@ function renderTable(){
           </div>
         </td>
         <td>
-          ${model.sugerido?`<div class="cell-stack"><div class="cell-label">Cubre</div><div class="guardia-slot"><div class="chip ${model.guardiaChipClass}"><div class="avatar av-yellow">${initials(model.guardiaNombre)}</div>${escapeHtml(model.guardiaNombre)}${model.guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(model.guardiaMood.label)}">${model.guardiaMood.emoji}</span>`:''}</div></div><div class="cell-meta">${model.guardiaEstado}</div></div>`:`<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">${model.needsCoverage?'Sin asignar':'No aplica'}</span><div class="cell-meta">${model.needsCoverage?'No hay profesor disponible en este turno.':'La ausencia cae en una hora de guardia del propio profesor.'}</div></div>`}
+          ${model.sugerido?`<div class="cell-stack"><div class="cell-label">Cubre</div><div class="guardia-slot"><div class="chip ${model.guardiaChipClass}"><div class="avatar av-yellow">${initials(model.guardiaNombre)}</div>${escapeHtml(model.guardiaNombre)}${model.guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(model.guardiaMood.label)}">${model.guardiaMood.emoji}</span>`:''}</div></div><div class="cell-meta">${model.guardiaEstado}</div></div>`:`<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">${model.needsCoverage?'Sin asignar':'No aplica'}</span><div class="cell-meta">${model.needsCoverage?'No hay docentes disponibles en este turno.':'La ausencia coincide con una hora de guardia del propio docente.'}</div></div>`}
         </td>
         <td>
           <div class="cell-stack cell-stack-compact">
@@ -6822,7 +6822,7 @@ async function loginTeacher(){
   const nombre=getProfesorNombreSeleccionado(teacherLoginInput.value);
   if(!nombre){showToast('Selecciona tu nombre de la lista.','error');teacherLoginInput.focus();renderTeacherAccessSuggestions(true);return;}
   const profesor=getProfesor(nombre);
-  const confirmed=await askConfirm('Confirmar profesorado',`Vas a entrar como ${getVisibleTeacherName(profesor?.nombreCompleto||nombre)}. Revisa bien el nombre antes de continuar.`,'Entrar con este nombre');
+  const confirmed=await askConfirm('Confirmar docente',`Vas a entrar como ${getVisibleTeacherName(profesor?.nombreCompleto||nombre)}. Revisa bien el nombre antes de continuar.`,'Entrar con este nombre');
   if(!confirmed) return;
   teacherName=nombre;
   teacherDay=day;
@@ -7115,7 +7115,7 @@ function renderTeacherPanel(){
     const texto=tarea?.tarea||'';
     const detalleVisible=grupo||sesion.detalle||'Sin detalle adicional';
     const guardiaTasks=sesion.tipo==='guardia'?dutyAssignments.filter(item=>item.hora===hora):[];
-    const dutyBadge=guardiaTasks.length?`<span class="badge teacher-duty-badge">${currentTeacherWeek?'Te toca cubrir':'Cobertura prevista'}</span>`:''; 
+    const dutyBadge=guardiaTasks.length?`<span class="badge teacher-duty-badge">${currentTeacherWeek?'Te toca cubrir':'Cobertura prevista'}</span>`:'';
     const patioBadge=patioAssignments.length?`<span class="badge ${patioBlock?'b-warn':'b-ok'}">${patioBlock?'Equipo docente':'Patio asignado'}</span>`:'';
     const openByDefault=(!!activeSlot&&activeSlot.dia===teacherDay&&activeSlot.hora===hora)||checked||!!texto||guardiaTasks.length||patioAssignments.length||!!patioBlock;
     const guardiaTasksMarkup=guardiaTasks.length?`<div class="teacher-guardia-tasks">${guardiaTasks.map(item=>`
@@ -7303,7 +7303,7 @@ function renderAbsenceHourChoices(){
       type="button"
       data-absence-hour="${hora}"
       ${todoDiaInput?.checked||!!(selectedTeacher&&(!scheduledSet.has(Number(hora))&&!selectedSet.has(Number(hora))))?'disabled':''}
-      title="${selectedTeacher&&(!scheduledSet.has(Number(hora))&&!selectedSet.has(Number(hora)))?'Ese profesor no tiene una sesión cubrible registrada en esta hora.':''}">
+      title="${selectedTeacher&&(!scheduledSet.has(Number(hora))&&!selectedSet.has(Number(hora)))?'Ese docente no tiene una sesión cubrible registrada en esta hora.':''}">
       ${escapeHtml(`${info.label} hora`)}
       <span>${escapeHtml(info.rango.replace('-', ' - '))}</span>
     </button>
@@ -7361,7 +7361,7 @@ function renderTeacherAdminStats(nombre,dia){
       note:scheduledHours.length?scheduledHours.map(formatHoraLabel).join(', '):'Sin sesiones cubribles hoy'
     },
     {
-      label:'Faltas futuras',
+      label:'Ausencias futuras',
       value:String(futureStats.total),
       note:futureStats.total?`${futureStats.pending} pendientes · ${futureStats.approved} validadas/aplicadas`:'Sin avisos futuros'
     },
@@ -7386,7 +7386,7 @@ function renderAusentePreview(){
   if(!input||!preview) return;
   const nombre=getProfesorNombreSeleccionado(input.value,{input,allowSelectedInput:true});
   if(!nombre){
-    preview.textContent='Empieza a escribir para localizar al profesor.';
+    preview.textContent='Empieza a escribir para localizar al docente.';
     renderTeacherAdminStats('',+document.getElementById('fDia').value);
     return;
   }
@@ -7403,12 +7403,12 @@ function renderAbsenceDecisionBar(){
   if(!panel) return;
   const input=document.getElementById('fAusente');
   if(!input){
-    panel.textContent='Selecciona primero el profesor y después las horas para ver la ubicación, la cobertura prevista y la tarea disponible.';
+    panel.textContent='Selecciona primero al docente y después las horas para ver la ubicación, la cobertura prevista y la tarea disponible.';
     return;
   }
   const nombre=getProfesorNombreSeleccionado(input.value,{input,allowSelectedInput:true});
   if(!nombre){
-    panel.textContent='Selecciona primero el profesor y después las horas para ver la ubicación, la cobertura prevista y la tarea disponible.';
+    panel.textContent='Selecciona primero al docente y después las horas para ver la ubicación, la cobertura prevista y la tarea disponible.';
     return;
   }
   const dia=+document.getElementById('fDia').value;
@@ -7564,7 +7564,7 @@ function validateAbsenceForm(){
   if(ausente) setAusenteSelection(ausente,ausenteInput);
   clearAbsenceFormErrors();
   if(!ausente){
-    setFieldError('fAusente','Selecciona un profesor ausente del listado o escribe un nombre que deje una coincidencia única.');
+    setFieldError('fAusente','Selecciona un docente ausente del listado o escribe un nombre que deje una coincidencia única.');
     return {valid:false,focus:ausenteInput};
   }
   if(!esHoraValida(hora)){
@@ -7575,7 +7575,7 @@ function validateAbsenceForm(){
   if(todoDia){
     const horasLectivas=getHorasCubriblesProfesorDia(ausente,dia);
     if(!horasLectivas.length){
-      setFieldError('fAusente','Ese profesor no tiene sesiones cubribles registradas ese día.');
+      setFieldError('fAusente','Ese docente no tiene sesiones cubribles registradas ese día.');
       return {valid:false,focus:ausenteInput};
     }
     return {valid:true,ausente,guardia:'',todoDia:true,horasLectivas:horasLectivas.filter(esHoraValida)};
@@ -7584,7 +7584,7 @@ function validateAbsenceForm(){
   const preservedUnavailable=new Set(getCurrentAbsenceEditGroupRows().map(row=>Number(row.hora)).filter(Number.isInteger));
   const invalidHour=selectedHours.find(horaItem=>!horasProgramadas.has(horaItem)&&!preservedUnavailable.has(horaItem));
   if(invalidHour!=null){
-    setFieldError('fHorasMulti',`Ese profesor no tiene una sesión cubrible registrada en ${formatHoraLabel(invalidHour)}.`);
+    setFieldError('fHorasMulti',`Ese docente no tiene una sesión cubrible registrada en ${formatHoraLabel(invalidHour)}.`);
     return {valid:false,focus:ausenteInput};
   }
   const horasObjetivo=(selectedHours.length>1?selectedHours:[hora]).map(Number).filter(esHoraValida);
@@ -7595,7 +7595,7 @@ function validateAbsenceForm(){
   }
   const duplicateHour=horasObjetivo.find(horaItem=>findDuplicateAbsence(dia,horaItem,ausente));
   if(duplicateHour!=null){
-    setFieldError(selectedHours.length>1?'fHorasMulti':'fAusente',`Ya existe una ausencia registrada para ese profesor en ${formatHoraLabel(duplicateHour)}.`);
+    setFieldError(selectedHours.length>1?'fHorasMulti':'fAusente',`Ya existe una ausencia registrada para ese docente en ${formatHoraLabel(duplicateHour)}.`);
     return {valid:false,focus:ausenteInput};
   }
   return {valid:true,ausente,guardia:'',todoDia:false,horasLectivas:horasObjetivo};
@@ -7666,7 +7666,7 @@ async function saveAbsence(){
   setAbsenceSavingState(true);
   try{
     if(!await ensureBackendReadyForMutations()){
-      showToast('Todavia no se ha cargado el estado guardado. Espera un momento y vuelve a intentarlo.','error');
+      showToast('Todavía no se ha cargado el estado guardado. Espera un momento y vuelve a intentarlo.','error');
       return;
     }
     data=normalizeStoredRows(data);
@@ -7711,7 +7711,7 @@ async function saveAbsence(){
         if(day!==dia) setDay(dia); else renderTable();
       }catch(renderError){
         console.error('Full day absence saved but render failed',renderError);
-        showToast(`La ausencia se ha guardado, pero la vista no se ha podido refrescar: ${String(renderError?.message||renderError)}`,'error');
+        showToast('La ausencia se ha guardado, pero la vista no se ha podido actualizar. Recarga la página antes de continuar.','error');
       }
       if(editId){
         addHistoryEntry(
@@ -7797,7 +7797,7 @@ async function saveAbsence(){
       if(day!==dia) setDay(dia); else renderTable();
     }catch(renderError){
       console.error('Absence saved but render failed',renderError);
-      showToast(`La ausencia se ha guardado, pero la vista no se ha podido refrescar: ${String(renderError?.message||renderError)}`,'error');
+      showToast('La ausencia se ha guardado, pero la vista no se ha podido actualizar. Recarga la página antes de continuar.','error');
     }
 
     try{
@@ -7829,7 +7829,7 @@ async function saveAbsence(){
     }
   }catch(error){
     console.error('saveAbsence failed',error);
-    showToast(`No se pudo guardar la ausencia: ${String(error?.message||error)}`,'error');
+    showToast('No se pudo guardar la ausencia. Inténtalo de nuevo.','error');
   }finally{
     absenceSaveInFlight=false;
     setAbsenceSavingState(false);
@@ -7839,9 +7839,9 @@ function save(){return saveAbsence();}
 async function del(){
   const previousRows=getCurrentAbsenceEditGroupRows().length?getCurrentAbsenceEditGroupRows():(editId?data.filter(g=>g.id===editId):[]);
   const deleteCount=previousRows.length||1;
-  if(!await askConfirm(deleteCount>1?'Eliminar registros':'Eliminar registro',deleteCount>1?`Se eliminarán ${deleteCount} registros de ausencia de este profesor en el día seleccionado.`:'\u00bfQuieres eliminar este registro de ausencia?','Eliminar')) return;
+  if(!await askConfirm(deleteCount>1?'Eliminar registros':'Eliminar registro',deleteCount>1?`Se eliminarán ${deleteCount} registros de ausencia de este docente en el día seleccionado.`:'\u00bfQuieres eliminar este registro de ausencia?','Eliminar')) return;
   if(!await ensureBackendReadyForMutations()){
-    showToast('Todavia no se ha cargado el estado guardado. Espera un momento y vuelve a intentarlo.','error');
+    showToast('Todavía no se ha cargado el estado guardado. Espera un momento y vuelve a intentarlo.','error');
     return;
   }
   const previousRow=previousRows[0]||data.find(g=>g.id===editId);
