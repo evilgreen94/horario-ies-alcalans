@@ -550,7 +550,7 @@
     const rows = sortFutureAbsenceRowsForDisplay(state.rows);
     if(summary) summary.innerHTML = rows.length ? formatFutureAbsenceAdminSummary(rows) : '';
     if(!rows.length){
-      list.innerHTML = '<div class="future-absence-empty">No hay faltas futuras comunicadas.</div>';
+      list.innerHTML = '<div class="future-absence-empty">No hay ausencias futuras comunicadas.</div>';
       return;
     }
     const filtered = getAdminFilteredRows();
@@ -574,7 +574,7 @@
     const teacherName = getTeacherName();
     const rows = sortFutureAbsenceRowsForDisplay(state.rows.filter(item => sameNormalizedText(item.profesor, teacherName)));
     if(!rows.length){
-      list.innerHTML = '<div class="future-absence-empty">Todavía no has enviado avisos de falta futura.</div>';
+      list.innerHTML = '<div class="future-absence-empty">Todavía no has enviado avisos de ausencia futura.</div>';
       return;
     }
     const groups = groupFutureAbsenceRowsByStatus(rows);
@@ -656,7 +656,7 @@
     if(!teacherName) return null;
     const ensureTeacherIdentityConfirmed = requireHostFunction('ensureTeacherIdentityConfirmed', 'teacher future absence submit');
     const showToast = requireHostFunction('showToast', 'teacher future absence submit');
-    if(!await ensureTeacherIdentityConfirmed('enviar una falta futura')) return null;
+    if(!await ensureTeacherIdentityConfirmed('comunicar una ausencia futura')) return null;
     const dateInput = getElement(domIds.teacherDateInput);
     const noteInput = getElement(domIds.teacherNoteInput);
     const dateValue = cleanText(dateInput && dateInput.value);
@@ -768,11 +768,11 @@
         { clearSyncFlags: !hasPendingLocalChanges }
       );
       clearSuperAdminError();
-      pushSuperAdminEvent('Hydrate', 'Faltas futuras recargadas desde backend.');
+      pushSuperAdminEvent('Actualización', 'Ausencias futuras recargadas desde el servidor.');
       return true;
     }catch(error){
       console.warn('Teacher future absences hydration failed', error);
-      setSuperAdminError('Fallo al hidratar faltas futuras.');
+      setSuperAdminError('No se pudieron cargar las ausencias futuras.');
       return false;
     }
   }
@@ -950,7 +950,7 @@
       let historyRows = (callHost('getHistoryRows') || []).slice();
       historyRows.unshift({
         id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        title: appliedSummaries.length === 1 ? 'Falta futura aplicada' : 'Faltas futuras aplicadas',
+        title: appliedSummaries.length === 1 ? 'Ausencia futura aplicada' : 'Ausencias futuras aplicadas',
         detail: appliedSummaries.join(' · '),
         type: 'create',
         undoState,
@@ -977,7 +977,7 @@
           }
         });
         if(syncResults.some(result => result.status === 'rejected')){
-          setSuperAdminError('Hay faltas futuras aplicadas pendientes de sincronizar.');
+          setSuperAdminError('Hay ausencias futuras aplicadas pendientes de sincronizar.');
           renderSuperAdminMonitor();
         }
       }
@@ -1012,7 +1012,7 @@
     const current = state.rows.find(item => item.id === id);
     if(!current) return null;
     const reviewerNote = cleanText(await askText(
-      status === 'approved' ? 'Validar falta futura' : 'Rechazar falta futura',
+      status === 'approved' ? 'Validar ausencia futura' : 'Rechazar ausencia futura',
       `Puedes dejar una respuesta breve para ${getVisibleTeacherName(current.profesor) || current.profesor}.`,
       current.reviewerNote || '',
       'Respuesta opcional',
@@ -1024,8 +1024,8 @@
       if(status === 'approved') await applyApprovedForCurrentWeek();
       showToast(
         result && result.syncError
-          ? (status === 'approved' ? 'Falta futura validada en local. Pendiente de sincronizar.' : 'Falta futura rechazada en local. Pendiente de sincronizar.')
-          : (status === 'approved' ? 'Falta futura validada.' : 'Falta futura rechazada.'),
+          ? (status === 'approved' ? 'Ausencia futura validada en local. Pendiente de sincronizar.' : 'Ausencia futura rechazada en local. Pendiente de sincronizar.')
+          : (status === 'approved' ? 'Ausencia futura validada.' : 'Ausencia futura rechazada.'),
         'success'
       );
       return result;

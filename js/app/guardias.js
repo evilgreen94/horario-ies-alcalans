@@ -3335,7 +3335,7 @@ function renderSuperAdminMonitor(){
     {
       k:'Profesorado',
       v:formatStatusTimestamp(superAdminStatus.lastTeacherSyncAt),
-      note:`Hydrate: ${formatStatusTimestamp(superAdminStatus.lastHydrateAt)}`
+      note:`Última carga: ${formatStatusTimestamp(superAdminStatus.lastHydrateAt)}`
     },
     {
       k:'Carga reciente',
@@ -3360,7 +3360,7 @@ function renderSuperAdminMonitor(){
     {
       k:'Mantenimiento',
       v:superAdminOpsInfo?.restoreInProgress?`<span class="superadmin-pill superadmin-pill-warn">Restaurando</span>`:`<span class="superadmin-pill superadmin-pill-ok">Operativo</span>`,
-      note:superAdminOpsInfo?`Estado app: ${appStateSummary||'sin extras'} · poll ${formatStatusTimestamp(superAdminStatus.lastPollAt)}`:`${syncPending} avisos futuros pendientes de backend`
+      note:superAdminOpsInfo?`Estado app: ${appStateSummary||'sin extras'} · consulta ${formatStatusTimestamp(superAdminStatus.lastPollAt)}`:`${syncPending} avisos futuros pendientes de backend`
     },
     {
       k:'Diferencias',
@@ -3618,7 +3618,7 @@ async function runAdminStateSync(){
       const failedDomains=auxiliaryFailures.map(item=>item.domain).join(', ');
       console.warn('[guardias] admin sync partial failure',auxiliaryFailures);
       setSuperAdminError(`Guardias guardadas, pero falló la sincronización auxiliar: ${failedDomains}.`);
-      pushSuperAdminEvent('Admin sync parcial',`Guardias persistidas. Revisa: ${failedDomains}.`);
+      pushSuperAdminEvent('Sincronización parcial de Jefatura',`Guardias persistidas. Revisa: ${failedDomains}.`);
     }else{
       clearSuperAdminError();
     }
@@ -3628,7 +3628,7 @@ async function runAdminStateSync(){
       auxiliaryFailures: auxiliaryFailures.length
     });
     if(!auxiliaryFailures.length){
-      pushSuperAdminEvent('Admin sync','Guardias, biblioteca, historial, sustituciones y ajustes de practicas sincronizados con backend.');
+      pushSuperAdminEvent('Sincronización de Jefatura','Guardias, biblioteca, historial, sustituciones y ajustes de practicas sincronizados con backend.');
     }
     notifyRealtimeSync('admin-sync');
     pendingAdminSyncRequest=null;
@@ -3683,7 +3683,7 @@ async function syncTeacherState(){
     lastBackendSnapshot=makeBackendSnapshot();
     superAdminStatus.lastTeacherSyncAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Teacher sync','Tareas y ajustes de profesorado sincronizados con backend.');
+    pushSuperAdminEvent('Sincronización del profesorado','Tareas y ajustes de profesorado sincronizados con backend.');
   }catch(error){
     console.warn('Teacher backend sync failed',error);
     setSuperAdminError('Fallo en la sincronización de profesorado.');
@@ -3706,7 +3706,7 @@ async function syncPatioTeacherBlocksState(){
     lastBackendSnapshot=makeBackendSnapshot();
     superAdminStatus.lastTeacherSyncAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Teacher sync','Bloqueos de patio por equipo docente sincronizados con backend.');
+    pushSuperAdminEvent('Sincronización del profesorado','Bloqueos de patio por equipo docente sincronizados con backend.');
     notifyRealtimeSync('patio-blocks-sync');
     return {ok:true};
   }catch(error){
@@ -3759,7 +3759,7 @@ async function syncTeacherTaskEntry(overrideKey,overrideRow,tareaKey,tareaRow){
     await Promise.all(requests);
     superAdminStatus.lastTeacherSyncAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Teacher sync','Tarea y ajustes de profesorado sincronizados con backend.');
+    pushSuperAdminEvent('Sincronización del profesorado','Tarea y ajustes de profesorado sincronizados con backend.');
     return {ok:true};
   }catch(error){
     console.warn('Teacher task backend sync failed',error);
@@ -3857,7 +3857,7 @@ async function hydrateTeacherSubstitutions(){
     if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
     superAdminStatus.lastHydrateAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Hydrate','Sustituciones de profesorado recargadas desde backend.');
+    pushSuperAdminEvent('Actualización','Sustituciones de profesorado recargadas desde backend.');
   }catch(error){
     console.warn('Teacher substitutions hydration failed',error);
     setSuperAdminError('Fallo al hidratar sustituciones.');
@@ -3878,7 +3878,7 @@ async function hydrateGroupStates(){
     if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
     superAdminStatus.lastHydrateAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Hydrate','Estado de grupos recargado desde backend.');
+    pushSuperAdminEvent('Actualización','Estado de grupos recargado desde backend.');
   }catch(error){
     console.warn('Group states hydration failed',error);
     setSuperAdminError('Fallo al hidratar grupos activos/inactivos.');
@@ -3896,7 +3896,7 @@ async function hydrateTeacherFutureAbsences(){
     renderTeacherFutureAbsenceOwnList();
     superAdminStatus.lastHydrateAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Hydrate','Faltas futuras recargadas desde backend.');
+    pushSuperAdminEvent('Actualización','Ausencias futuras recargadas desde backend.');
   }catch(error){
     console.warn('Teacher future absences hydration failed',error);
     setSuperAdminError('Fallo al hidratar faltas futuras.');
@@ -4514,7 +4514,7 @@ async function applyApprovedFutureAbsencesForCurrentWeek(){
   if(appliedSummaries.length){
     historialCambios.unshift({
       id:`hist-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-      title:appliedSummaries.length===1?'Falta futura aplicada':'Faltas futuras aplicadas',
+      title:appliedSummaries.length===1?'Ausencia futura aplicada':'Ausencias futuras aplicadas',
       detail:appliedSummaries.join(' · '),
       type:'create',
       undoState,
@@ -4730,7 +4730,7 @@ async function hydrateFromBackend(){
     backendHydrated=true;
     superAdminStatus.lastHydrateAt=new Date().toISOString();
     clearSuperAdminError();
-    pushSuperAdminEvent('Hydrate','Estado principal recargado desde backend.');
+    pushSuperAdminEvent('Actualización','Estado principal recargado desde backend.');
     renderGuardiasUiIfChanged(true);
     renderHistoryList();
     renderSubstitutionList();
@@ -4969,7 +4969,7 @@ async function pollBackendState(force=false){
   }catch(error){
     console.warn('Backend polling failed',error);
     setSuperAdminError('Fallo en la comprobación periódica del backend.');
-    pushSuperAdminEvent('Error polling',String(error?.message||error));
+    pushSuperAdminEvent('Error de consulta',String(error?.message||error));
   }finally{
     backendPollingInFlight=false;
     renderSuperAdminMonitor();
@@ -5004,12 +5004,12 @@ function refreshAccessUi(){
   document.body.classList.toggle('superadmin-active',isSuperAdmin);
   if(btnAdmin){
     btnAdmin.classList.toggle('on',isAdmin);
-    btnAdmin.textContent=isAdmin?'Salir Jefatura':'Jefe de estudios';
+    btnAdmin.textContent=isAdmin?'Salir de Jefatura':'Jefatura de Estudios';
   }
   if(btnSuperAdmin){
     btnSuperAdmin.style.display=(SUPERADMIN_ENABLED||isSuperAdmin)?'':'none';
     btnSuperAdmin.classList.toggle('on',isSuperAdmin);
-    btnSuperAdmin.textContent=isSuperAdmin?'Salir Superadmin':'Superadmin';
+    btnSuperAdmin.textContent=isSuperAdmin?'Salir de administración técnica':'Administración técnica';
   }
   if(adminBar) adminBar.classList.toggle('show',isAdmin);
   if(superAdminBar) superAdminBar.classList.toggle('show',isSuperAdmin);
@@ -5100,7 +5100,7 @@ async function ensureSuperAdminRouteAccess(){
   if(isSuperAdmin||isAdmin){
     await logoutCurrentRole();
   }
-  const password=await askPassword('Acceso Superadmin','Introduce la contraseña del modo superadmin.');
+  const password=await askPassword('Acceso de administración técnica','Introduce la contraseña de administración técnica.');
   if(!password){
     window.location.href=window.location.pathname;
     return false;
@@ -5122,7 +5122,7 @@ async function initializeApp(){
   await hydrateFromBackend();
 }
 async function changeRolePasswordFlow(role){
-  const roleLabel=role==='superadmin'?'Superadmin':'Jefatura';
+  const roleLabel=role==='superadmin'?'Administración técnica':'Jefatura';
   if(role==='superadmin'&&!isSuperAdmin){
     showToast('Necesitas sesi\u00f3n de superadmin.','error');
     return;
@@ -5251,7 +5251,7 @@ function buildAbsenceDisplayModel(g,rowsSource){
   const statusText=g.futurePlanned
     ?(g.futureStatus==='approved'?'Validada':g.futureStatus==='applied'?'Aplicada':g.futureStatus==='pending'?'Pendiente':'Planificada')
     :(!needsCoverage?'No requiere cobertura':(sugerido?(cub?'Cubierta':'Pendiente de confirmar'):'Sin cubrir'));
-  const planningMeta=g.futurePlanned?`<span class="badge future-plan-badge ${g.futureStatus==='pending'?'future-plan-badge-pending':'future-plan-badge-approved'}">${g.futureStatus==='pending'?'Falta futura pendiente':'Falta futura validada'}</span>`:'';
+  const planningMeta=g.futurePlanned?`<span class="badge future-plan-badge ${g.futureStatus==='pending'?'future-plan-badge-pending':'future-plan-badge-approved'}">${g.futureStatus==='pending'?'Ausencia futura pendiente':'Ausencia futura validada'}</span>`:'';
   const rowClasses=[
     g.futurePlanned?'future-planned-row':'',
     (needsCoverage&&!sugerido)?'admin-row-urgent':(!faenaInfo.faena||g.futureStatus==='pending')?'admin-row-warning':''
@@ -5430,7 +5430,7 @@ function buildDailyReportText(){
       `Biblioteca: ${biblioteca}`,
       `Ba\u00f1os: ${banos}`,
       `Aula: ${aula}`,
-      `Faena: ${faenaInfo.faena?'S\u00ed':'No'}`,
+      `Tarea: ${faenaInfo.faena?'S\u00ed':'No'}`,
       `${faenaInfo.obs?`Tarea: ${faenaInfo.obs}`:'Tarea: -'}`
     ].join('\n');
   }).join('\n\n');
@@ -5622,7 +5622,7 @@ function buildWeeklyReportHtml(){
       <section class="summary">
         <article class="summary-card"><span class="summary-k">Ausencias</span><span class="summary-v">${totalAusencias}</span><span class="summary-note">Registros semanales</span></article>
         <article class="summary-card"><span class="summary-k">Coberturas</span><span class="summary-v">${totalCoberturas}</span><span class="summary-note">Guardias asignadas</span></article>
-        <article class="summary-card"><span class="summary-k">Con tarea</span><span class="summary-v">${totalConTarea}</span><span class="summary-note">Faena disponible</span></article>
+        <article class="summary-card"><span class="summary-k">Con tarea</span><span class="summary-v">${totalConTarea}</span><span class="summary-note">Tarea disponible</span></article>
         <article class="summary-card"><span class="summary-k">Días activos</span><span class="summary-v">${diasConIncidencia}</span><span class="summary-note">Con incidencias registradas</span></article>
       </section>
       ${daySections}
@@ -6316,7 +6316,7 @@ async function reviewTeacherFutureAbsence(id,status){
   try{
     const result=await updateTeacherFutureAbsenceEntry(nextEntry);
     if(status==='approved') await applyApprovedFutureAbsencesForCurrentWeek();
-    showToast(result?.syncError?(status==='approved'?'Falta futura validada en local. Pendiente de sincronizar.':'Falta futura rechazada en local. Pendiente de sincronizar.'):(status==='approved'?'Falta futura validada.':'Falta futura rechazada.'),'success');
+    showToast(result?.syncError?(status==='approved'?'Ausencia futura validada en local. Pendiente de sincronizar.':'Ausencia futura rechazada en local. Pendiente de sincronizar.'):(status==='approved'?'Ausencia futura validada.':'Ausencia futura rechazada.'),'success');
   }catch(error){
     console.warn('Teacher future absence review failed',error);
     showToast('No se pudo actualizar el aviso.','error');
@@ -6643,14 +6643,14 @@ async function toggleAdmin(){
 async function toggleSuperAdmin(){
   if(!SUPERADMIN_ENABLED) return;
   if(!isSuperAdmin){
-    const pw=await askPassword('Acceso Superadmin','Introduce la contrase\u00f1a del modo superadmin.');
+    const pw=await askPassword('Acceso de administración técnica','Introduce la contrase\u00f1a de administración técnica.');
     if(!pw) return;
     if(!await loginRole('superadmin',pw)){
       if(pw) showToast('Contrase\u00f1a incorrecta.','error');
       return;
     }
     renderTable();
-    showToast('Modo Superadmin activado.','info');
+    showToast('Administración técnica activada.','info');
     return;
   }
   await logoutCurrentRole();
@@ -6659,7 +6659,7 @@ async function toggleSuperAdmin(){
     return;
   }
   renderTable();
-  showToast('Modo Superadmin desactivado.','info');
+  showToast('Administración técnica desactivada.','info');
 }
 function renderTeacherAccessPreview(){
   const teacherLoginInput=document.getElementById('teacherLoginName');
@@ -6851,6 +6851,7 @@ function openTeacherPanelFallback(){
 }
 function openTeacherPanel(){if(!getProfesor(teacherName)){openTeacherAccess();return;}teacherDay=day;teacherWeekOffset=weekOffset;syncTeacherIdentity();document.getElementById('teacherOverlay').classList.add('open');document.getElementById('teacherBar').classList.add('show');syncAppModeClasses();renderTeacherPanel();}
 function closeTeacherPanel(){document.getElementById('teacherOverlay').classList.remove('open');syncAppModeClasses();}
+function bgTeacherClose(event){if(event?.target?.id==='teacherOverlay') closeTeacherPanel();}
 function exitTeacherMode(){
   closeTeacherPanel();
   closeTeacherAccess();

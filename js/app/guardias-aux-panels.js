@@ -205,7 +205,7 @@
         return true;
       }catch(error){
         console.error('GuardiasAuxPanels.persistTvAnnouncementState failed',error);
-        shared.showToast('No se pudo actualizar el aviso para la sala de profesores.','error');
+        shared.showToast('No se pudo actualizar el aviso para la sala del profesorado.','error');
         return false;
       }
     }
@@ -282,7 +282,7 @@
         priority,
         active:true
       },items.length));
-      const ok=await persistState({items},'Aviso anadido y activado en sala de profesores.');
+      const ok=await persistState({items},'Aviso añadido y activado en la sala del profesorado.');
       if(ok&&elements.input) elements.input.value='';
     }
     async function deactivateAll(){
@@ -599,7 +599,7 @@
       const states=summary&&Array.isArray(summary.states)?summary.states:[];
       const extraPosts=resolvePatioExtraPosts(slot,summary);
       if(!summary||!sectors.length){
-        container.innerHTML='<div class="tv-empty">No hay configuracion de patio disponible para este tramo.</div>';
+        container.innerHTML='<div class="tv-empty">No hay configuración de patio disponible para este tramo.</div>';
         return;
       }
       const legendMarkup=sectors.map(sector=>{
@@ -613,7 +613,7 @@
               <span class="tv-patio-legend-text">${escapeHtml(sector.label||sector.id||'Sector')}</span>
               <span class="tv-patio-legend-state">${escapeHtml(state?.statusLabel||(covered?'Cubierto':'Pendiente'))}</span>
             </div>
-            <div class="tv-patio-legend-person">${escapeHtml(state?.responsable||state?.note||'Rotacion sin asignar')}</div>
+            <div class="tv-patio-legend-person">${escapeHtml(state?.responsable||state?.note||'Rotación sin asignar')}</div>
           </div>
         </div>`;
       }).join('');
@@ -660,7 +660,7 @@
                 <span class="tv-patio-sector-state">${escapeHtml(state?.statusLabel||(covered?'Cubierto':'Pendiente'))}</span>
               </div>
               <div class="tv-patio-sector-name">${escapeHtml(sector.label||sector.id||'Sector')}</div>
-              <div class="tv-patio-sector-person">${escapeHtml(state?.responsable||state?.note||'Rotacion sin asignar')}</div>
+              <div class="tv-patio-sector-person">${escapeHtml(state?.responsable||state?.note||'Rotación sin asignar')}</div>
             </article>`;
           }).join('')}
           </div>
@@ -918,7 +918,7 @@
         button.classList.toggle('active',button.dataset.filter===filter);
       });
       if(!visibles.length){
-        historyList.innerHTML=`<div class="history-empty">${filter==='all'?'Todavia no hay cambios registrados.':'No hay cambios de este tipo en el historial.'}</div>`;
+        historyList.innerHTML=`<div class="history-empty">${filter==='all'?'Todavía no hay cambios registrados.':'No hay cambios de este tipo en el historial.'}</div>`;
         if(isFn(options.renderAdminWorkspace)) options.renderAdminWorkspace();
         return;
       }
@@ -961,7 +961,7 @@
         shared.showToast('No hay cambios para deshacer.','info');
         return;
       }
-      if(!await shared.askConfirm('Deshacer ultimo cambio',`Se revertira: ${entry.title}.`,'Deshacer')) return;
+      if(!await shared.askConfirm('Deshacer último cambio',`Se revertirá: ${entry.title}.`,'Deshacer')) return;
       const restoreUndoState=requireFn('restoreUndoState',options.restoreUndoState);
       const currentState=buildUndoState(entry.undoState&&typeof entry.undoState.day==='number'?entry.undoState.day:getValue(options.getDay,0));
       if(!restoreUndoState(entry.undoState)){
@@ -974,7 +974,7 @@
       addEntry('Cambio deshecho',`Se revirtio: ${entry.title}`,'undo',{undoState:currentState});
       renderList();
       if(isFn(options.onUndoApplied)) options.onUndoApplied();
-      shared.showToast('Ultimo cambio deshecho.','success');
+      shared.showToast('Último cambio deshecho.','success');
     }
     function bindFilters(root){
       const container=root||shared.document;
@@ -1072,7 +1072,7 @@
       if(!list) return;
       const teachers=getFilteredTeachers();
       if(!teachers.length){
-        list.innerHTML='<div class="history-empty">No hay profesores que coincidan con la busqueda.</div>';
+        list.innerHTML='<div class="history-empty">No hay docentes que coincidan con la búsqueda.</div>';
         return;
       }
       const visibleName=requireFn('getVisibleTeacherName',options.getVisibleTeacherName);
@@ -1309,7 +1309,7 @@
         summary.innerHTML=`<span class="future-absence-chip"><strong>${enabledSet.size}</strong> habilitados</span><span class="future-absence-chip"><strong>${getCandidateTeachers().length}</strong> candidatos</span>`;
       }
       if(!teachers.length){
-        list.innerHTML='<div class="history-empty">No hay profesorado de ciclos que coincida con la busqueda.</div>';
+        list.innerHTML='<div class="history-empty">No hay profesorado de ciclos que coincida con la búsqueda.</div>';
         return;
       }
       const visible=isFn(options.getVisibleTeacherName)?options.getVisibleTeacherName:(nombre=>nombre);
@@ -1320,7 +1320,7 @@
         return `<article class="substitution-item">
           <div>
             <div class="substitution-item-title">${escapeHtml(visible(nombre))}</div>
-            <div class="substitution-item-meta">${escapeHtml(`${enabled?'Disponible para entrar en la rotacion':'Fuera de la rotacion'} · ${slots} horas potenciales por practicas · ${manualCount} tramos manuales`)}</div>
+            <div class="substitution-item-meta">${escapeHtml(`${enabled?'Disponible para entrar en la rotación':'Fuera de la rotación'} · ${slots} horas potenciales por prácticas · ${manualCount} tramos manuales`)}</div>
           </div>
           <div class="substitution-item-actions">
             <button class="btn-substitution${enabled?' btn-substitution-danger':''}" type="button" data-practicas-guardias-toggle="${escapeHtml(nombre)}">${enabled?'Quitar de guardias':'Habilitar guardias'}</button>
@@ -1348,7 +1348,7 @@
           const eligible=isPracticasSessionEligible(session);
           const manual=manualSet.has(makeSlotKey(nombre,dia,hora));
           const classes=['practicas-slot-chip',manual?'is-manual':'',eligible?'is-eligible':''].filter(Boolean).join(' ');
-          const stateLabel=manual?'Manual':(eligible?'Practicas':'No activo');
+          const stateLabel=manual?'Manual':(eligible?'Prácticas':'No activo');
           chips.push(`<button class="${classes}" type="button" data-practicas-slot-toggle="${escapeHtml(nombre)}|${dia}|${hora}" title="${escapeHtml(`${shared.dias[dia]} · ${formatHoraLabel(shared.horaMap,hora)} · ${stateLabel}`)}">${escapeHtml(shared.horaMap[hora].label)}<span>${escapeHtml(stateLabel)}</span></button>`);
         }
         rows.push(`<div class="practicas-config-row"><div class="practicas-config-day">${escapeHtml(shared.dias[dia])}</div><div class="practicas-config-slots">${chips.join('')}</div></div>`);
@@ -1362,14 +1362,14 @@
         <div class="practicas-config-head">
           <div>
             <div class="substitution-item-title">${escapeHtml(visible(nombre))}</div>
-            <div class="substitution-item-meta">Activa aqui tramos manuales aunque no entren por practicas de forma general.</div>
+            <div class="substitution-item-meta">Activa aquí tramos manuales aunque no entren por prácticas de forma general.</div>
           </div>
           <div class="substitution-item-actions">
             <button class="btn-substitution" type="button" data-practicas-guardias-config-close="1">Cerrar detalle</button>
           </div>
         </div>
         <div class="practicas-config-legend">
-          <span class="future-absence-chip"><strong>Practicas</strong> hora elegible por horario</span>
+          <span class="future-absence-chip"><strong>Prácticas</strong> hora elegible por horario</span>
           <span class="future-absence-chip"><strong>Manual</strong> hora forzada por Jefatura</span>
         </div>
         <div class="practicas-config-grid">${rows.join('')}</div>
@@ -1430,7 +1430,7 @@
       afterPracticeMutation();
       renderList();
       renderConfig();
-      shared.showToast(enabled?'Profesor retirado de la rotacion por practicas.':'Profesor habilitado para entrar en guardias por practicas.','success');
+      shared.showToast(enabled?'Docente retirado de la rotación por prácticas.':'Docente habilitado para entrar en guardias por prácticas.','success');
     }
     async function toggleSlot(nombre,dia,hora){
       if(getValue(options.isAdmin,false)!==true||!getTeacher(nombre)||shared.horasPatio.has(hora)) return;

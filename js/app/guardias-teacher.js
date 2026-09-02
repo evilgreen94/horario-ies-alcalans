@@ -1336,7 +1336,7 @@
       if(dutyAlert){
         if(dutyAssignments.length){
           dutyAlert.hidden=false;
-          dutyAlert.innerHTML=`<div class="teacher-duty-alert-title">${currentTeacherWeek ? 'Guardia asignada' : 'Guardia prevista'}</div><div class="teacher-duty-alert-copy">${currentTeacherWeek ? 'Hoy cubres' : 'En esta semana cubres'} ${dutyAssignments.length} ${dutyAssignments.length===1 ? 'ausencia' : 'ausencias'}. Proxima cobertura: ${escapeHtml(getVisibleTeacherName(nextDuty.ausente))} en ${escapeHtml(nextDuty.aula || 'Sin aula')} (${escapeHtml(formatHoraLabel(nextDuty.hora))}). Pulsa aqui para ir a esa hora.</div>`;
+          dutyAlert.innerHTML=`<div class="teacher-duty-alert-title">${currentTeacherWeek ? 'Guardia asignada' : 'Guardia prevista'}</div><div class="teacher-duty-alert-copy">${currentTeacherWeek ? 'Hoy cubres' : 'En esta semana cubres'} ${dutyAssignments.length} ${dutyAssignments.length===1 ? 'ausencia' : 'ausencias'}. Próxima cobertura: ${escapeHtml(getVisibleTeacherName(nextDuty.ausente))} en ${escapeHtml(nextDuty.aula || 'Sin aula')} (${escapeHtml(formatHoraLabel(nextDuty.hora))}). Pulsa aquí para ir a esa hora.</div>`;
           dutyAlert.onclick=function(){focusTeacherDutyHour(nextDuty.hora);};
           dutyAlert.setAttribute('role','button');
           dutyAlert.setAttribute('tabindex','0');
@@ -1362,7 +1362,7 @@
       if(moodCard){
         moodCard.innerHTML=moodOption
           ? `<div class="teacher-mood-copy"><div class="teacher-mood-title">${moodOption.emoji} ${escapeHtml(moodOption.welcome)}</div><div class="teacher-mood-text">Hoy te sientes ${escapeHtml(moodOption.label.toLowerCase())}. ${escapeHtml(moodMessage)}</div></div><button class="btn-teacher-panel" type="button" onclick="${handlerNames.resetTeacherMood}()">Cambiar estado</button>`
-          : `<div class="teacher-mood-copy"><div class="teacher-mood-title">Como te sientes hoy?</div><div class="teacher-mood-text">Elige una opcion rapida y seguimos. Es solo un guino del panel para arrancar el dia.</div></div><div class="teacher-mood-options">${moodOptions.map(option=>`<button class="teacher-mood-option" type="button" onclick="${handlerNames.selectTeacherMood}('${escapeHtml(option.id)}')" aria-label="${escapeHtml(option.label)}"><span class="teacher-mood-option-emoji">${option.emoji}</span><span class="teacher-mood-option-label">${escapeHtml(option.label)}</span></button>`).join('')}</div>`;
+          : `<div class="teacher-mood-copy"><div class="teacher-mood-title">¿Cómo te sientes hoy?</div><div class="teacher-mood-text">Elige una opción rápida para personalizar el panel de la jornada.</div></div><div class="teacher-mood-options">${moodOptions.map(option=>`<button class="teacher-mood-option" type="button" onclick="${handlerNames.selectTeacherMood}('${escapeHtml(option.id)}')" aria-label="${escapeHtml(option.label)}"><span class="teacher-mood-option-emoji">${option.emoji}</span><span class="teacher-mood-option-label">${escapeHtml(option.label)}</span></button>`).join('')}</div>`;
         moodCard.className=`teacher-mood-card${moodOption ? ` is-${moodOption.tone}` : ''}`;
       }
 
@@ -1381,13 +1381,13 @@
           <article class="teacher-overview-card">
             <div class="teacher-overview-label">Hoy tengo clase</div>
             <div class="teacher-overview-value">${horas.length}</div>
-            <div class="teacher-overview-copy">${horas.length ? `Proxima sesion: ${escapeHtml(formatHoraLabel(horas[0]))}` : 'Sin clases lectivas registradas para este dia.'}</div>
+            <div class="teacher-overview-copy">${horas.length ? `Próxima sesión: ${escapeHtml(formatHoraLabel(horas[0]))}` : 'Sin clases lectivas registradas para este día.'}</div>
             <button class="btn-teacher-panel teacher-overview-action" type="button" onclick="document.getElementById('teacherSessions')?.scrollIntoView({behavior:'smooth',block:'start'})">Ver sesiones</button>
           </article>
           <article class="teacher-overview-card teacher-overview-card-duty">
             <div class="teacher-overview-label">Hoy estoy de guardia</div>
             <div class="teacher-overview-value">${dutyAssignments.length}</div>
-            <div class="teacher-overview-copy">${nextDuty ? `Proxima cobertura: ${escapeHtml(getVisibleTeacherName(nextDuty.ausente))} · ${escapeHtml(formatHoraLabel(nextDuty.hora))}` : 'No tienes coberturas asignadas en este dia.'}</div>
+            <div class="teacher-overview-copy">${nextDuty ? `Próxima cobertura: ${escapeHtml(getVisibleTeacherName(nextDuty.ausente))} · ${escapeHtml(formatHoraLabel(nextDuty.hora))}` : 'No tienes coberturas asignadas en este día.'}</div>
             <button class="btn-teacher-panel teacher-overview-action" type="button" ${nextDuty ? '' : 'disabled'} onclick="${nextDuty ? `${handlerNames.focusTeacherDutyHour}(${nextDuty.hora})` : ''}">${nextDuty ? 'Ir a mi guardia' : 'Sin guardias'}</button>
           </article>
           <article class="teacher-overview-card teacher-overview-card-corridor ${getPasilloLevelClass(activeTotal)}${activeSlot ? ' is-active' : ''}${activeTotal>=maxAlumnosFueraAula ? ' is-full' : ''}">
@@ -1406,7 +1406,7 @@
       const teacherSessions=document.getElementById('teacherSessions');
       if(!teacherSessions) return;
       if(!horas.length){
-        teacherSessions.innerHTML='<div class="teacher-session"><div class="teacher-session-empty">No tienes sesiones registradas para este dia.</div></div>';
+        teacherSessions.innerHTML='<div class="teacher-session"><div class="teacher-session-empty">No tienes sesiones registradas para este día.</div></div>';
         return;
       }
       teacherSessions.innerHTML=horas.map(hora=>{
@@ -1451,7 +1451,7 @@
             <div class="teacher-session-quick">
               <div class="teacher-quick-item"><span class="teacher-quick-label">Grupo</span><span class="teacher-quick-value">${escapeHtml(grupo || 'Sin grupo')}</span></div>
               <div class="teacher-quick-item"><span class="teacher-quick-label">Aula</span><span class="teacher-quick-value">${escapeHtml(aula)}</span></div>
-              <div class="teacher-quick-item"><span class="teacher-quick-label">Tarea</span><span class="teacher-quick-value">${checked ? (texto ? escapeHtml(texto.slice(0,72)+(texto.length>72 ? '...' : '')) : 'Marcada para el grupo') : 'No has dejado tarea todavia'}</span></div>
+              <div class="teacher-quick-item"><span class="teacher-quick-label">Tarea</span><span class="teacher-quick-value">${checked ? (texto ? escapeHtml(texto.slice(0,72)+(texto.length>72 ? '...' : '')) : 'Marcada para el grupo') : 'No has dejado tarea todavía'}</span></div>
             </div>
             <div class="teacher-session-panel" id="teacherSessionPanel-${state.teacherDay}-${hora}">
               <div class="fg">

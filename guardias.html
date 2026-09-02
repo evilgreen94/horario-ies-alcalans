@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Guardias IES</title>
+<title>Gestión de guardias | IES Alcalans</title>
 <link rel="icon" type="image/jpeg" href="imagenes/logo-ies-alcalans.jpg">
 <link rel="apple-touch-icon" href="imagenes/logo-ies-alcalans.jpg">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -40,9 +40,9 @@
   </div>
   <div class="header-actions">
     <button class="btn" id="btnTeacher" onclick="openTeacherPanel()">Profesorado</button>
-    <button class="btn" id="btnAdmin" onclick="toggleAdmin()">Jefe de estudios</button>
-    <button class="btn" id="btnTv" onclick="openTvPanel()">Sala de profesores</button>
-    <button class="btn" id="btnSuperAdmin" onclick="toggleSuperAdmin()" style="display:none">Superadmin</button>
+    <button class="btn" id="btnAdmin" onclick="toggleAdmin()">Jefatura de Estudios</button>
+    <button class="btn" id="btnTv" onclick="openTvPanel()">Sala del profesorado</button>
+    <button class="btn" id="btnSuperAdmin" onclick="toggleSuperAdmin()" style="display:none">Administración técnica</button>
   </div>
 </header>
 <main>
@@ -95,11 +95,11 @@
   </section>
   <div class="admin-bar" id="adminBar">
     <div class="admin-bar-head">
-      <span class="admin-tag">Modo Jefe de Estudios</span>
+      <span class="admin-tag">Modo Jefatura de Estudios</span>
     </div>
     <div class="admin-actions admin-actions-primary">
       <button class="btn-add btn-add-primary" id="btnAddAusencia" onclick="openModal()">+ A&ntilde;adir ausencia</button>
-      <button class="btn-add btn-add-secondary" type="button" onclick="openFutureAbsenceAdminModal()">Faltas futuras</button>
+      <button class="btn-add btn-add-secondary" type="button" onclick="openFutureAbsenceAdminModal()">Ausencias futuras</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="openHistoryModal()">Historial</button>
     </div>
     <div class="admin-actions admin-actions-secondary">
@@ -108,7 +108,7 @@
       <button class="btn-add btn-add-secondary" type="button" onclick="openPrintableSchedule()">Imprimir horario</button>
       <button class="btn-add btn-add-secondary" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe diario</button>
       <button class="btn-add btn-add-secondary" id="btnInformeSemanal" onclick="printWeeklyReportPdf()" style="display:none">Informe semanal</button>
-      <button class="btn-add btn-add-secondary" type="button" onclick="triggerAnnualXmlImport()">Importar XML anual</button>
+      <button class="btn-add btn-add-secondary" type="button" onclick="triggerAnnualXmlImport()">Importar horario anual (XML)</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('admin')">Cambiar contrase&ntilde;a</button>
     </div>
     <div class="admin-workspace">
@@ -161,13 +161,13 @@
       <section class="admin-panel admin-panel-announcements">
         <div class="admin-section-head">
           <div>
-            <div class="admin-section-title">Aviso para sala de profesores</div>
+            <div class="admin-section-title">Aviso para la sala del profesorado</div>
             <div class="admin-section-copy">Se muestra en la cabecera del panel TV solo cuando est&aacute; activado.</div>
           </div>
         </div>
         <div class="fg">
           <label for="tvAnnouncementInput">Texto del aviso</label>
-          <textarea id="tvAnnouncementInput" placeholder="Escribe el aviso del d&iacute;a para la sala de profesores..."></textarea>
+          <textarea id="tvAnnouncementInput" placeholder="Escribe el aviso del d&iacute;a para la sala del profesorado..."></textarea>
         </div>
         <div class="fg-row">
           <div class="fg">
@@ -188,7 +188,7 @@
   </div>
   <div class="admin-bar superadmin-bar" id="superAdminBar">
     <div class="admin-bar-head">
-      <span class="admin-tag superadmin-tag">Modo Superadmin</span>
+      <span class="admin-tag superadmin-tag">Administración técnica</span>
       <div class="admin-status save-ts" id="superAdminHint">Zona de operaciones t&eacute;cnicas. Revisa salud, carga y copias antes de intervenir.</div>
     </div>
     <div class="superadmin-layout">
@@ -201,11 +201,11 @@
         </div>
         <div class="superadmin-toolbar-actions">
           <button class="btn-add btn-add-secondary" type="button" onclick="refreshSuperAdminOps(true)">Actualizar estado</button>
-          <button class="btn-add btn-add-secondary" type="button" onclick="downloadBackupJson()">Backup JSON</button>
-          <button class="btn-add btn-add-secondary" type="button" onclick="triggerRestoreSnapshot()">Restaurar JSON</button>
-          <button class="btn-add btn-add-secondary" type="button" onclick="downloadDatabaseBackup()">Base SQLite</button>
+          <button class="btn-add btn-add-secondary" type="button" onclick="downloadBackupJson()">Descargar copia JSON</button>
+          <button class="btn-add btn-add-secondary" type="button" onclick="triggerRestoreSnapshot()">Restaurar copia JSON</button>
+          <button class="btn-add btn-add-secondary" type="button" onclick="downloadDatabaseBackup()">Descargar copia SQLite</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('superadmin')">Cambiar contrase&ntilde;a</button>
-          <button class="btn-add btn-add-ghost" type="button" onclick="toggleSuperAdmin()">Salir de Superadmin</button>
+          <button class="btn-add btn-add-ghost" type="button" onclick="toggleSuperAdmin()">Salir de administración técnica</button>
         </div>
       </section>
       <section class="superadmin-panel superadmin-panel-summary">
@@ -240,9 +240,9 @@
     <input type="file" id="restoreSnapshotInput" accept="application/json,.json" hidden>
   </div>
   <div class="teacher-bar" id="teacherBar">
-    <span class="teacher-tag">Modo Profesorado</span>
+    <span class="teacher-tag">Panel del profesorado</span>
     <button class="btn-teacher" onclick="openTeacherPanel()">Mis tareas</button>
-    <button class="btn-teacher" onclick="changeTeacherUser()">Cambiar usuario</button>
+    <button class="btn-teacher" onclick="changeTeacherUser()">Cambiar docente</button>
     <span class="teacher-name" id="teacherBarName">Profesorado</span>
   </div>
   <div class="tbl-wrap">
@@ -258,10 +258,10 @@
       <thead>
         <tr>
           <th>Hora</th>
-          <th>Profesor ausente</th>
-          <th>Profesor de guardia</th>
+          <th>Docente ausente</th>
+          <th>Docente de guardia</th>
           <th>Aula</th>
-          <th>Faena dejada</th>
+          <th>Tarea asignada</th>
           <th>Estado</th>
           <th id="thAcc" style="display:none">Acciones</th>
         </tr>
@@ -275,19 +275,19 @@
   <div class="modal absence-modal">
     <div class="modal-hd">
       <span id="mTitle">Nueva ausencia</span>
-      <button class="modal-x" onclick="closeModal()">x</button>
+      <button class="modal-x" aria-label="Cerrar formulario de ausencia" onclick="closeModal()">x</button>
     </div>
 
     <div class="modal-section">
       <div class="modal-section-head">
-        <div class="modal-section-title">Profesor ausente</div>
-        <div class="modal-section-copy">Busca primero al profesor y luego marca las horas concretas de la ausencia.</div>
+        <div class="modal-section-title">Docente ausente</div>
+        <div class="modal-section-copy">Busca primero al docente y luego marca las horas concretas de la ausencia.</div>
       </div>
       <div class="fg">
-        <label>Profesor ausente</label>
-        <input type="text" id="fAusente" placeholder="Selecciona o busca un profesor" autocomplete="off" aria-autocomplete="list" aria-controls="ausenteSuggestions">
+        <label>Docente ausente</label>
+        <input type="text" id="fAusente" placeholder="Selecciona o busca un docente" autocomplete="off" aria-autocomplete="list" aria-controls="ausenteSuggestions">
         <div class="absence-suggestions" id="ausenteSuggestions" hidden></div>
-        <div class="absence-preview" id="ausentePreview">Empieza a escribir para localizar al profesor.</div>
+        <div class="absence-preview" id="ausentePreview">Empieza a escribir para localizar al docente.</div>
         <div class="teacher-admin-stats" id="teacherAdminStats"></div>
         <div class="field-error" id="fAusenteError"></div>
       </div>
@@ -318,16 +318,16 @@
         <div class="modal-section-copy">La guardia se calcula autom&aacute;ticamente con el reparto del tramo.</div>
       </div>
       <div class="fg fg-auto">
-        <label>Profesor de guardia previsto</label>
-        <input type="text" id="fGuardia" list="profesoresGuardia" placeholder="Selecciona un profesor de guardia" autocomplete="off">
+        <label>Docente de guardia previsto</label>
+        <input type="text" id="fGuardia" list="profesoresGuardia" placeholder="Selecciona un docente de guardia" autocomplete="off">
         <datalist id="profesoresGuardia"></datalist>
         <div class="fg-note">Vista previa informativa. La asignaci&oacute;n final se actualiza sola al guardar.</div>
         <div class="field-error" id="fGuardiaError"></div>
       </div>
-      <div class="absence-decision-bar" id="absenceDecisionBar">Selecciona profesor y hora para ver aula, cobertura prevista y tarea disponible.</div>
+      <div class="absence-decision-bar" id="absenceDecisionBar">Selecciona docente y hora para ver aula, cobertura prevista y tarea disponible.</div>
       <div class="check-grid">
         <label class="check-block"><input type="checkbox" id="fTodoDia"><span>Ausencia todo el d&iacute;a seg&uacute;n su horario</span></label>
-        <label class="check-block"><input type="checkbox" id="fFaena"><span>Ha dejado faena / actividad para los alumnos</span></label>
+        <label class="check-block"><input type="checkbox" id="fFaena"><span>Ha dejado tarea o actividad para el grupo</span></label>
       </div>
     </div>
 
@@ -337,8 +337,8 @@
         <div class="modal-section-copy">Opcional. Solo rell&eacute;nalo si hay instrucciones que deban seguir durante la guardia.</div>
       </div>
       <div class="fg">
-        <label>Descripci&oacute;n de la faena</label>
-        <textarea id="fObs" placeholder="Describe la tarea que han de hacer los alumnos..."></textarea>
+        <label>Descripci&oacute;n de la tarea</label>
+        <textarea id="fObs" placeholder="Describe la tarea que debe realizar el grupo..."></textarea>
       </div>
     </div>
 
@@ -353,7 +353,7 @@
   <div class="modal teacher-modal">
     <div class="modal-hd">
       <span>Panel de profesorado</span>
-      <button class="modal-x" onclick="closeTeacherPanel()">x</button>
+      <button class="modal-x" aria-label="Cerrar panel del profesorado" onclick="closeTeacherPanel()">x</button>
     </div>
     <div class="teacher-head">
       <div class="teacher-head-main">
@@ -363,10 +363,10 @@
       <div class="teacher-head-side">
         <div class="teacher-duty-alert" id="teacherDutyAlert" hidden></div>
         <div class="teacher-panel-actions">
-          <button class="btn-teacher-panel" type="button" onclick="openTeacherFutureAbsenceModal()">Avisar falta futura</button>
-          <button class="btn-teacher-panel" type="button" onclick="changeTeacherUser()">Cambiar profesor</button>
+          <button class="btn-teacher-panel" type="button" onclick="openTeacherFutureAbsenceModal()">Comunicar ausencia futura</button>
+          <button class="btn-teacher-panel" type="button" onclick="changeTeacherUser()">Cambiar docente</button>
         </div>
-        <div class="teacher-mood-card" id="teacherMoodCard"></div>
+        <div class="teacher-mood-card" id="teacherMoodCard" hidden aria-hidden="true"></div>
       </div>
     </div>
     <div class="teacher-overview" id="teacherOverview"></div>
@@ -378,13 +378,13 @@
   <div class="modal teacher-access-modal">
     <div class="modal-hd teacher-access-head">
       <span>Acceso profesorado</span>
-      <button class="modal-x" onclick="closeTeacherAccess()">x</button>
+      <button class="modal-x" aria-label="Cerrar acceso del profesorado" onclick="closeTeacherAccess()">x</button>
     </div>
     <div class="teacher-access-shell">
       <div class="teacher-access-intro">Busca tu nombre para abrir tu panel del d&iacute;a. Desde ah&iacute; podr&aacute;s revisar sesiones, indicar tarea y ajustar materia, grupo o aula si hace falta.</div>
       <div class="teacher-access-search-panel">
         <div class="fg">
-          <label>Profesor</label>
+          <label>Docente</label>
           <div class="teacher-access-search">
             <input
               type="text"
@@ -411,7 +411,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" type="button" onclick="closeTeacherAccess()">Cancelar</button>
-      <button class="btn-save" type="button" onclick="loginTeacher()">Entrar al modo profesorado</button>
+      <button class="btn-save" type="button" onclick="loginTeacher()">Abrir panel del profesorado</button>
     </div>
   </div>
 </div>
@@ -419,7 +419,7 @@
   <div class="modal history-modal">
     <div class="modal-hd">
       <span>Historial de cambios</span>
-      <button class="modal-x" type="button" onclick="closeHistoryModal()">x</button>
+      <button class="modal-x" type="button" aria-label="Cerrar historial de cambios" onclick="closeHistoryModal()">x</button>
     </div>
     <div class="history-head">
       <div class="history-copy">Registro reciente de cambios realizados desde Jefatura.</div>
@@ -441,11 +441,11 @@
   <div class="modal substitution-modal">
     <div class="modal-hd">
       <span>Sustituciones de profesorado</span>
-      <button class="modal-x" type="button" onclick="closeSubstitutionModal()">x</button>
+      <button class="modal-x" type="button" aria-label="Cerrar sustituciones de profesorado" onclick="closeSubstitutionModal()">x</button>
     </div>
-    <div class="history-copy">Asigna un sustituto temporal sin tocar horario, guardias ni aulas del profesor titular.</div>
+    <div class="history-copy">Asigna un sustituto temporal sin modificar el horario, las guardias ni las aulas del docente titular.</div>
     <div class="fg" style="margin-top:1rem">
-      <label>Buscar profesor titular</label>
+      <label>Buscar docente titular</label>
       <input type="text" id="substitutionSearch" placeholder="Filtra por titular o sustituto">
     </div>
     <div class="substitution-list" id="substitutionList"></div>
@@ -455,7 +455,7 @@
   <div class="modal substitution-modal">
     <div class="modal-hd">
       <span>Pr&aacute;cticas y guardias</span>
-      <button class="modal-x" type="button" onclick="closePracticasGuardiasModal()">x</button>
+      <button class="modal-x" type="button" aria-label="Cerrar prácticas y guardias" onclick="closePracticasGuardiasModal()">x</button>
     </div>
     <div class="history-copy">Habilita al profesorado de ciclos que, mientras su alumnado est&aacute; de pr&aacute;cticas, puede entrar en la rotaci&oacute;n de guardias en esas horas.</div>
     <div class="future-absence-toolbar">
@@ -472,12 +472,12 @@
 <div class="overlay" id="teacherFutureAbsenceOverlay" onclick="bgTeacherFutureAbsenceClose(event)">
   <div class="modal">
     <div class="modal-hd">
-      <span>Avisar ausencia futura</span>
-      <button class="modal-x" type="button" onclick="closeTeacherFutureAbsenceModal()">x</button>
+      <span>Comunicar ausencia futura</span>
+      <button class="modal-x" type="button" aria-label="Cerrar comunicación de ausencia futura" onclick="closeTeacherFutureAbsenceModal()">x</button>
     </div>
-    <div class="history-copy">Env&iacute;a un aviso anticipado para que Jefatura tenga constancia de la falta prevista.</div>
+    <div class="history-copy">Env&iacute;a un aviso anticipado para que Jefatura de Estudios tenga constancia de la ausencia prevista.</div>
     <div class="fg" style="margin-top:1rem">
-      <label>Profesor</label>
+      <label>Docente</label>
       <input type="text" id="teacherFutureAbsenceName" readonly>
     </div>
     <div class="fg-row">
@@ -505,8 +505,8 @@
 <div class="overlay" id="futureAbsenceAdminOverlay" onclick="bgFutureAbsenceAdminClose(event)">
   <div class="modal history-modal">
     <div class="modal-hd">
-      <span>Faltas futuras comunicadas</span>
-      <button class="modal-x" type="button" onclick="closeFutureAbsenceAdminModal()">x</button>
+      <span>Ausencias futuras comunicadas</span>
+      <button class="modal-x" type="button" aria-label="Cerrar ausencias futuras comunicadas" onclick="closeFutureAbsenceAdminModal()">x</button>
     </div>
     <div class="history-copy">Avisos enviados por profesorado para fechas posteriores.</div>
     <div class="future-absence-toolbar">
@@ -519,7 +519,7 @@
           <option value="rejected">Rechazadas</option>
           <option value="applied">Aplicadas</option>
         </select>
-        <input id="futureAbsenceAdminTeacherFilter" type="text" placeholder="Filtrar por profesor">
+        <input id="futureAbsenceAdminTeacherFilter" type="text" placeholder="Filtrar por docente">
       </div>
     </div>
     <div class="substitution-list" id="futureAbsenceAdminList" style="margin-top:1rem"></div>
@@ -542,7 +542,7 @@
   </a>
   <div
     class="site-footer-credit"
-    aria-label="Ash nazg durbatuluk, ash nazg gimbatul, ash nazg thrakatuluk agh burzum-ishi krimpatul. rm sai 2026"
+    aria-label="Aplicación de gestión de guardias del IES Alcalans, curso 2026/27"
   >
     <svg class="site-footer-ring" viewBox="0 0 220 220" aria-hidden="true">
       <defs>
@@ -553,7 +553,7 @@
       </defs>
       <text class="site-footer-ring-text">
         <textPath href="#siteFooterRingPath">
-          Ash nazg durbatuluk, ash nazg gimbatul, ash nazg thrakatuluk agh burzum-ishi krimpatul. rm sai 2026
+          Aplicación de gestión de guardias · IES Alcalans · Curso 2026/27
         </textPath>
       </text>
     </svg>
@@ -565,7 +565,7 @@
   <div class="modal dialog-modal">
     <div class="modal-hd">
       <span id="dialogTitle">Aviso</span>
-      <button class="modal-x" type="button" onclick="closeDialog(false)">x</button>
+      <button class="modal-x" type="button" aria-label="Cerrar diálogo" onclick="closeDialog(false)">x</button>
     </div>
     <div class="dialog-body">
       <p class="dialog-text" id="dialogText"></p>
