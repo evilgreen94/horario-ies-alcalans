@@ -2,8 +2,10 @@ const path = require('path');
 const fs = require('fs');
 
 const testsDir = path.join(__dirname, '..', 'tests');
+const requestedSuite = process.argv[2] || '';
 const suites = fs.readdirSync(testsDir)
   .filter(fileName => fileName.endsWith('.test.js'))
+  .filter(fileName => !requestedSuite || fileName === requestedSuite)
   .sort((a, b) => a.localeCompare(b, 'en'))
   .map(fileName => require(path.join(testsDir, fileName)));
 

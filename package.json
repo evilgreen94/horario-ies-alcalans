@@ -8,6 +8,7 @@
     "dev": "node server/app.js",
     "start": "node server/app.js",
     "test": "node server/scripts/run-tests.js",
+    "test:integration": "node server/scripts/run-tests.js local-integration-safety.test.js",
     "db:init": "node server/scripts/init-db.js",
     "smoke": "node server/scripts/smoke-test.js",
     "stability:guardias": "node server/scripts/guardias-stability-check.js",
