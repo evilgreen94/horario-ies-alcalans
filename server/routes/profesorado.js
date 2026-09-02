@@ -67,6 +67,7 @@ registerStateCollectionRoutes(router, {
   sanitizePatioGuardia,
   sanitizePatioTeacherBlock,
   requireRole,
+  requireSameOriginWrite,
   withImmediateTransaction
 });
 

@@ -129,6 +129,7 @@ function validateAndNormalizeAnnualSource(source, options = {}) {
   const mergedTeachers = new Map();
   const teacherDisplayNames = new Map();
   const duplicateTeacherNames = new Set();
+  const teachersWithoutSessions = new Set();
 
   teacherEntries.forEach(([rawTeacherName, rawRows]) => {
     const teacherName = normalizeTeacherName(rawTeacherName);
@@ -141,9 +142,10 @@ function validateAndNormalizeAnnualSource(source, options = {}) {
     }
     if (teacherDisplayNames.has(teacherKey)) duplicateTeacherNames.add(teacherName);
     else teacherDisplayNames.set(teacherKey, teacherName);
-    if (!Array.isArray(rawRows) || !rawRows.length) {
-      throw new Error(`El profesor ${teacherName} no contiene sesiones válidas.`);
+    if (!Array.isArray(rawRows)) {
+      throw new Error(`Las sesiones del profesor ${teacherName} deben ser una lista.`);
     }
+    if (!rawRows.length) teachersWithoutSessions.add(teacherName);
     if (!mergedTeachers.has(teacherKey)) mergedTeachers.set(teacherKey, []);
     mergedTeachers.get(teacherKey).push(...rawRows);
   });
@@ -226,7 +228,8 @@ function validateAndNormalizeAnnualSource(source, options = {}) {
     metadata: {
       teachers: Object.keys(normalizedTeachers).length,
       duplicateTeacherNames: [...duplicateTeacherNames].sort((a, b) => a.localeCompare(b, 'es')),
-      duplicateRows: duplicateRows.slice().sort((a, b) => a.localeCompare(b, 'es'))
+      duplicateRows: duplicateRows.slice().sort((a, b) => a.localeCompare(b, 'es')),
+      teachersWithoutSessions: [...teachersWithoutSessions].sort((a, b) => a.localeCompare(b, 'es'))
     }
   };
 }

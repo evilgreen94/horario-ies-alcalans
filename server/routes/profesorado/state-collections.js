@@ -31,6 +31,7 @@ function registerStateCollectionRoutes(router, deps) {
     sanitizePatioGuardia,
     sanitizePatioTeacherBlock,
     requireRole,
+    requireSameOriginWrite,
     withImmediateTransaction
   } = deps;
 
@@ -143,7 +144,7 @@ function registerStateCollectionRoutes(router, deps) {
     }
   });
 
-  router.post('/future-absences', async (req, res, next) => {
+  router.post('/future-absences', requireRole('admin'), requireSameOriginWrite, async (req, res, next) => {
     try {
       const entry = sanitizeTeacherFutureAbsence(req.body);
       const db = await getDatabase();

@@ -270,7 +270,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -315,7 +315,7 @@
         "dia": "Jueves",
         "inicio": "10:05",
         "fin": "11:00",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría",
         "grupo": "1ESOA",
         "aula": "A01"
@@ -798,7 +798,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -944,7 +944,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -953,7 +953,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -1063,7 +1063,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -1072,7 +1072,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -1117,7 +1117,7 @@
         "dia": "Viernes",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría",
         "grupo": "2 ESO PAC",
         "aula": "A11"
@@ -1200,7 +1200,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -1510,7 +1510,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -1665,7 +1665,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -1766,7 +1766,7 @@
         "dia": "Lunes",
         "inicio": "10:05",
         "fin": "11:00",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA",
         "grupo": "2 ESO D",
         "aula": "A14"
@@ -1811,7 +1811,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -2640,7 +2640,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -2694,7 +2694,7 @@
         "dia": "Jueves",
         "inicio": "10:05",
         "fin": "11:00",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría",
         "grupo": "1ESOC",
         "aula": "A03"
@@ -3204,7 +3204,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -3240,7 +3240,7 @@
         "dia": "Jueves",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría",
         "grupo": "3 ESO E",
         "aula": "A25"
@@ -3514,7 +3514,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -4698,7 +4698,7 @@
         "dia": "Viernes",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría Segundo",
         "grupo": "2 CFB ALIM",
         "aula": "E18"
@@ -4900,7 +4900,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -5064,7 +5064,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -5228,7 +5228,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -5428,7 +5428,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -5592,7 +5592,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -5875,7 +5875,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -6349,7 +6349,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -6394,7 +6394,7 @@
         "dia": "Viernes",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría",
         "grupo": "3 ESO PDC",
         "aula": "E25 PDC"
@@ -6659,7 +6659,7 @@
         "dia": "Jueves",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría Primero",
         "grupo": "1 CFB INF",
         "aula": "A09"
@@ -7299,7 +7299,7 @@
         "dia": "Lunes",
         "inicio": "10:05",
         "fin": "11:00",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría",
         "grupo": "2 ESO E",
         "aula": "A05"
@@ -7371,7 +7371,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -7517,7 +7517,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -7645,7 +7645,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -7726,7 +7726,7 @@
         "dia": "Viernes",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría",
         "grupo": "3 ESO F",
         "aula": "A26"
@@ -7913,7 +7913,7 @@
         "tipo": "guardia",
         "asignatura": "GUARDIA",
         "grupo": "",
-        "aula": "A24"
+        "aula": ""
       },
       {
         "dia": "Miércoles",
@@ -8110,7 +8110,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -8182,7 +8182,7 @@
         "dia": "Viernes",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría",
         "grupo": "2 BAT CIENTÍFIC",
         "aula": "PREF4"
@@ -8393,7 +8393,7 @@
         "dia": "Lunes",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría Primero",
         "grupo": "1 CFB ALIM",
         "aula": "ALIM"
@@ -8456,7 +8456,7 @@
         "dia": "Miércoles",
         "inicio": "10:05",
         "fin": "11:00",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría Primero",
         "grupo": "1 CFB ALIM",
         "aula": "ALIM"
@@ -9258,7 +9258,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -9741,7 +9741,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -10625,7 +10625,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -11508,7 +11508,7 @@
         "dia": "Jueves",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría Segundo",
         "grupo": "2 CFB INF",
         "aula": "A15"
@@ -11636,7 +11636,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -11800,7 +11800,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -11991,7 +11991,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -12510,7 +12510,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -12555,7 +12555,7 @@
         "dia": "Jueves",
         "inicio": "10:05",
         "fin": "11:00",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría",
         "grupo": "1ESOB",
         "aula": "A02"
@@ -13011,7 +13011,7 @@
         "dia": "Lunes",
         "inicio": "10:05",
         "fin": "11:00",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "Tutoría",
         "grupo": "2 ESO F",
         "aula": "A16"
@@ -13065,7 +13065,7 @@
         "dia": "Miércoles",
         "inicio": "08:15",
         "fin": "09:10",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 1 I 2",
         "grupo": "",
         "aula": ""
@@ -13205,7 +13205,7 @@
         "tipo": "guardia",
         "asignatura": "GUARDIA",
         "grupo": "",
-        "aula": "A08 2nGM"
+        "aula": ""
       },
       {
         "dia": "Martes",
@@ -13512,7 +13512,7 @@
         "dia": "Miércoles",
         "inicio": "09:10",
         "fin": "10:05",
-        "tipo": "reunion",
+        "tipo": "clase",
         "asignatura": "TUTORIA 2n CICLE BAT",
         "grupo": "",
         "aula": ""
@@ -13589,6 +13589,14 @@
         "grupo": "1ESOE",
         "aula": "A27 MÚSICA"
       }
+    ]
+  },
+  "metadata": {
+    "teachers": 85,
+    "duplicateTeacherNames": [],
+    "duplicateRows": [],
+    "teachersWithoutSessions": [
+      "ORIENTACIÓ"
     ]
   }
 }

@@ -10,3 +10,5 @@ server/data/
 *.sqlite-shm
 *.sqlite-wal
 server-local*.log
+/json_profes/backups/
+/js/data/backups/

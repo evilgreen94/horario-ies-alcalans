@@ -98,6 +98,34 @@ module.exports = [
     }
   },
   {
+    name: 'validateAndNormalizeAnnualSource preserves a named teacher without sessions and reports it in metadata',
+    fn() {
+      const normalized = validateAndNormalizeAnnualSource({
+        fuente: 'Importacion anual',
+        teachers: {
+          'ORIENTACIÓ': []
+        }
+      });
+
+      assert.deepEqual(normalized.teachers['ORIENTACIÓ'], []);
+      assert.deepEqual(normalized.metadata.teachersWithoutSessions, ['ORIENTACIÓ']);
+    }
+  },
+  {
+    name: 'validateAndNormalizeAnnualSource rejects a malformed teacher session collection',
+    fn() {
+      assert.throws(
+        () => validateAndNormalizeAnnualSource({
+          fuente: 'Importacion anual',
+          teachers: {
+            'Ana Perez': { dia: 'Lunes' }
+          }
+        }),
+        /sesiones del profesor Ana Perez deben ser una lista/
+      );
+    }
+  },
+  {
     name: 'validateAndNormalizeAnnualSource rejects unsupported school slot ranges',
     fn() {
       assert.throws(

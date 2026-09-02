@@ -1,7 +1,7 @@
 window.PROFESORADO_SOURCE={
   "fuente": "PROFESSORAT.pdf",
   "formato": "js_desde_json_limpio",
-  "datasetId": "6fdf8f49bb5e",
+  "datasetId": "55d2991b7536",
   "teachers": [
     {
       "nombre": "ADRIAN CAMPOS MUÑOZ",
@@ -6053,7 +6053,7 @@ window.PROFESORADO_SOURCE={
           "dia": "Martes",
           "franja": "13:15-14:10",
           "texto": "GUARDIA",
-          "aula": "A24"
+          "aula": ""
         },
         {
           "dia": "Miércoles",
@@ -6133,7 +6133,7 @@ window.PROFESORADO_SOURCE={
           "dia": "Martes",
           "franja": "13:15-14:10",
           "texto": "GUARDIA",
-          "aula": "A24"
+          "aula": ""
         },
         {
           "dia": "Miércoles",
@@ -8870,33 +8870,15 @@ window.PROFESORADO_SOURCE={
           "texto": "IMX | 2 CFB INF | A15",
           "aula": "A15"
         },
-           {
-          "dia": "Martes",
-          "franja": "11:25-12:20",
-          "texto": "IMX | 2 CFB INF | A15",
-          "aula": "A15"
-        },
         {
           "dia": "Martes",
           "franja": "12:20-13:15",
           "texto": "IMX | 2 CFB INF | A15",
           "aula": "A15"
         },
-           {
-          "dia": "Martes",
-          "franja": "13:15-14:10",
-          "texto": "IMX | 2 CFB INF | A15",
-          "aula": "A15"
-        },      
         {
           "dia": "Miércoles",
           "franja": "08:15-09:10",
-          "texto": "SOM | 1 GM | E24",
-          "aula": "E24"
-        },
-        {
-          "dia": "Miércoles",
-          "franja": "09:10-10:05",
           "texto": "SOM | 1 GM | E24",
           "aula": "E24"
         },
@@ -10245,7 +10227,7 @@ window.PROFESORADO_SOURCE={
           "dia": "Lunes",
           "franja": "13:15-14:10",
           "texto": "GUARDIA",
-          "aula": "A08 2nGM"
+          "aula": ""
         },
         {
           "dia": "Martes",
@@ -10337,7 +10319,7 @@ window.PROFESORADO_SOURCE={
           "dia": "Lunes",
           "franja": "13:15-14:10",
           "texto": "GUARDIA",
-          "aula": "A08 2nGM"
+          "aula": ""
         },
         {
           "dia": "Martes",
