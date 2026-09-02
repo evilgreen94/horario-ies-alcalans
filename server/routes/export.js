@@ -6,6 +6,7 @@ const path = require('path');
 const { DB_PATH, getDatabase, withImmediateTransaction } = require('../db');
 const { finishRestore, isRestoreInProgress, startRestore } = require('../maintenance');
 const { requireRole } = require('../session');
+const { createSqliteBackup, verifySqliteBackup } = require('../sqlite-backup');
 const { getTelemetrySnapshot } = require('../telemetry');
 const {
   FUTURE_ABSENCES_STATE_KEY,
@@ -37,6 +38,34 @@ function formatStamp() {
     second: '2-digit',
     timeZone: 'Europe/Madrid'
   }).format(new Date()).replace(/[\s:]/g, '-');
+}
+
+function wait(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+async function removeWithRetries(removeOperation, label) {
+  const attempts = 20;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await removeOperation();
+      return;
+    } catch (error) {
+      if (error.code === 'ENOENT') return;
+      if (!['EBUSY', 'ENOTEMPTY', 'EPERM'].includes(error.code) || attempt === attempts) {
+        console.error(`Failed to remove temporary SQLite backup ${label}`, error);
+        return;
+      }
+      await wait(50);
+    }
+  }
+}
+
+async function cleanupTemporarySqliteBackup(databasePath, directoryPath) {
+  for (const filename of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
+    await removeWithRetries(() => fs.promises.unlink(filename), filename);
+  }
+  await removeWithRetries(() => fs.promises.rmdir(directoryPath), directoryPath);
 }
 
 router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) => {
@@ -138,11 +167,34 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
   }
 });
 
-router.get('/database.sqlite', requireRole('superadmin'), (_req, res, next) => {
+router.get('/database.sqlite', requireRole('superadmin'), async (_req, res, next) => {
+  let temporaryDirectory = '';
+  let temporaryDatabasePath = '';
   try {
-    res.download(DB_PATH, `guardias-backup-${formatStamp()}.sqlite`);
+    temporaryDirectory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'guardias-sqlite-export-'));
+    temporaryDatabasePath = path.join(temporaryDirectory, 'guardias.sqlite');
+    await createSqliteBackup(DB_PATH, temporaryDatabasePath);
+    await verifySqliteBackup(temporaryDatabasePath);
+    await new Promise((resolve, reject) => {
+      res.download(temporaryDatabasePath, `guardias-backup-${formatStamp()}.sqlite`, error => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
   } catch (error) {
-    next(error);
+    if (res.headersSent) {
+      console.error('SQLite backup download failed after headers were sent', error);
+      res.destroy(error);
+    } else {
+      next(error);
+    }
+  } finally {
+    if (temporaryDatabasePath && temporaryDirectory) {
+      await cleanupTemporarySqliteBackup(temporaryDatabasePath, temporaryDirectory);
+    }
   }
 });
 
