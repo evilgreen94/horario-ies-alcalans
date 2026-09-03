@@ -73,7 +73,9 @@
           detail = await response.text();
         }
       } catch (_error) {}
-      throw new Error(`Request failed: ${response.status}${detail ? ` - ${detail}` : ''}`);
+      const error = new Error(`Request failed: ${response.status}${detail ? ` - ${detail}` : ''}`);
+      error.status = response.status;
+      throw error;
     }
 
     if (response.status === 204) return null;

@@ -3721,10 +3721,11 @@ async function syncPatioTeacherBlocksState(){
   }
 }
 async function syncTeacherTaskEntry(overrideKey,overrideRow,tareaKey,tareaRow){
-  if(!storage.hasBackend()) return {ok:true,localOnly:true};
+  const backendOnly=!!storage.isBackendOnly?.();
+  if(!storage.hasBackend()) return backendOnly?{ok:false,error:new Error('Backend unavailable')}:{ok:true,localOnly:true};
   if(backendSyncInFlight){
-    backendSyncPendingTeacher=true;
-    return {ok:true,queued:true};
+    const idle=await waitForBackendSyncIdle();
+    if(!idle) return {ok:false,error:new Error('Backend synchronization is busy')};
   }
   backendSyncInFlight=true;
   renderSuperAdminMonitor();
@@ -3763,10 +3764,12 @@ async function syncTeacherTaskEntry(overrideKey,overrideRow,tareaKey,tareaRow){
     return {ok:true};
   }catch(error){
     console.warn('Teacher task backend sync failed',error);
-    backendSyncPendingTeacher=true;
+    if(!backendOnly) backendSyncPendingTeacher=true;
     setSuperAdminError('Fallo en la sincronización de tarea de profesorado.');
     pushSuperAdminEvent('Error de sincronización',`Profesorado: ${String(error?.message||error)}`);
-    return {ok:true,localOnly:true,syncError:true};
+    return backendOnly
+      ?{ok:false,error,status:Number(error?.status)||0}
+      :{ok:true,localOnly:true,syncError:true};
   }finally{
     backendSyncInFlight=false;
     drainPendingBackendSync();
@@ -4587,13 +4590,16 @@ async function deleteTeacherFutureAbsenceEntry(id){
     return {ok:true,localOnly:true,syncError:true};
   }
 }
+function hasSuccessfulBackendRead(results){
+  return Array.isArray(results)&&results.some(result=>result?.status==='fulfilled');
+}
 async function hydrateFromBackend(){
   if(!storage.hasBackend()) return;
   if(backendHydrated) return;
   if(backendHydrationPromise) return backendHydrationPromise;
   backendHydrationPromise=(async()=>{
     try{
-    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult,groupStatesResult]=await Promise.allSettled([
+    const backendReadResults=await Promise.allSettled([
       storage.fetchGuardias(),
       storage.fetchHistorial(),
       storage.fetchTareasProfesorado(),
@@ -4608,6 +4614,8 @@ async function hydrateFromBackend(){
       storage.fetchGuardiaMonthlyLoad(),
       storage.fetchGroups()
     ]);
+    if(!hasSuccessfulBackendRead(backendReadResults)) throw new Error('No se pudo completar ninguna lectura del backend.');
+    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult,groupStatesResult]=backendReadResults;
     const guardiasRows=guardiasResult.status==='fulfilled'?guardiasResult.value:null;
     const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
     const tareasRows=tareasResult.status==='fulfilled'?tareasResult.value:null;
@@ -4832,7 +4840,7 @@ async function pollBackendState(force=false){
   renderSuperAdminMonitor();
   try{
     const previousSnapshot=makeBackendSnapshot();
-    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult,groupStatesResult]=await Promise.allSettled([
+    const backendReadResults=await Promise.allSettled([
       storage.fetchGuardias(),
       storage.fetchHistorial(),
       storage.fetchTareasProfesorado(),
@@ -4847,6 +4855,8 @@ async function pollBackendState(force=false){
       storage.fetchGuardiaMonthlyLoad(),
       storage.fetchGroups()
     ]);
+    if(!hasSuccessfulBackendRead(backendReadResults)) throw new Error('No se pudo completar ninguna lectura del backend.');
+    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult,groupStatesResult]=backendReadResults;
     const guardiasRows=guardiasResult.status==='fulfilled'?guardiasResult.value:null;
     const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
     const tareasRows=tareasResult.status==='fulfilled'?tareasResult.value:null;
@@ -6927,6 +6937,8 @@ async function saveTeacherTask(dia,hora,exitAfter){
     detalle:sesionBase.detalle||'',
     aula:sesionBase.aula||''
   };
+  const previousOverrides={...sessionOverrides};
+  const previousTareas={...tareasProfesorado};
   if(JSON.stringify(nextOverride)===JSON.stringify(normalizedBase)){
     delete sessionOverrides[overrideKey];
   }else{
@@ -6946,15 +6958,30 @@ async function saveTeacherTask(dia,hora,exitAfter){
     tareaKey,
     tareasProfesorado[tareaKey]?{...tareasProfesorado[tareaKey]}:null
   );
+  if(syncResult?.ok===false){
+    sessionOverrides=previousOverrides;
+    tareasProfesorado=previousTareas;
+    persistSessionOverrides(sessionOverrides);
+    persistTareas(tareasProfesorado);
+    showToast(getTeacherTaskWriteFailureMessage(syncResult.error||syncResult),'error');
+    return syncResult;
+  }
   if(exitAfter){
     renderTable();
     showToast(syncResult?.syncError?'Tarea guardada en local. Pendiente de sincronizar con el servidor.':'Tarea guardada correctamente.','success');
     closeTeacherPanel();
-    return;
+    return syncResult;
   }
   renderTeacherPanel();
   renderTable();
   showToast(syncResult?.syncError?'Tarea guardada en local. Pendiente de sincronizar con el servidor.':'Tarea guardada correctamente.','success');
+  return syncResult;
+}
+function getTeacherTaskWriteFailureMessage(error){
+  const status=Number(error?.status)||0;
+  if(status===401) return 'No se ha podido guardar la tarea. La sesión no es válida; accede de nuevo o contacta con Jefatura de Estudios.';
+  if(status===403) return 'No se ha podido guardar la tarea porque no tienes autorización.';
+  return 'No se ha podido guardar la tarea. Comprueba la conexión e inténtalo de nuevo.';
 }
 async function toggleTeacherPatioTeamMeeting(dia,hora){
   if(!isTeacherCurrentWeek()){

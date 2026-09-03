@@ -693,6 +693,10 @@
     }
     try{
       const result = await createEntry(entry);
+      if(!result || result.ok === false){
+        showToast(getFutureAbsenceWriteFailureMessage(result && (result.error || result)), 'error');
+        return result;
+      }
       closeTeacherModal();
       showToast(result && result.syncError ? 'Aviso guardado en local. Pendiente de sincronizar con el servidor.' : 'Aviso de ausencia futura enviado.', 'success');
       return result;
@@ -701,6 +705,13 @@
       showToast('No se pudo enviar el aviso.', 'error');
       return null;
     }
+  }
+
+  function getFutureAbsenceWriteFailureMessage(error){
+    const status = Number(error && error.status) || 0;
+    if(status === 401) return 'No se ha podido guardar la ausencia futura. La sesión no es válida; accede de nuevo o contacta con Jefatura de Estudios.';
+    if(status === 403) return 'No se ha podido guardar la ausencia futura porque no tienes autorización.';
+    return 'No se ha podido guardar la ausencia futura. Comprueba la conexión e inténtalo de nuevo.';
   }
 
   function syncAdminFilterInputs(){
@@ -779,8 +790,11 @@
 
   async function createEntry(entry){
     const storage = readHostValue('storage');
-    const normalized = upsertRowLocal(entry);
+    const normalized = normalizeTeacherFutureAbsence(entry);
+    const backendOnly = !!(storage && typeof storage.isBackendOnly === 'function' && storage.isBackendOnly());
+    if(!backendOnly) upsertRowLocal(normalized);
     if(!storage || typeof storage.hasBackend !== 'function' || !storage.hasBackend()){
+      if(backendOnly) return { ok: false, error: new Error('Backend unavailable') };
       return { ok: true, localOnly: true, entry: normalized };
     }
     try{
@@ -792,6 +806,9 @@
       pushSuperAdminEvent('Ausencia futura', `Nuevo aviso futuro registrado para ${saved.profesor}.`);
       return result || { ok: true, entry: saved };
     }catch(error){
+      if(backendOnly){
+        return { ok: false, error, status: Number(error && error.status) || 0 };
+      }
       console.warn('Teacher future absence create backend sync failed; keeping local state', error);
       state.syncFlags.add(`upsert:${normalized.id}`);
       setSuperAdminError('Hay avisos futuros pendientes de sincronizar.');
@@ -804,8 +821,11 @@
 
   async function updateEntry(entry){
     const storage = readHostValue('storage');
-    const normalized = upsertRowLocal(entry);
+    const normalized = normalizeTeacherFutureAbsence(entry);
+    const backendOnly = !!(storage && typeof storage.isBackendOnly === 'function' && storage.isBackendOnly());
+    if(!backendOnly) upsertRowLocal(normalized);
     if(!storage || typeof storage.hasBackend !== 'function' || !storage.hasBackend()){
+      if(backendOnly) return { ok: false, error: new Error('Backend unavailable') };
       return { ok: true, localOnly: true, entry: normalized };
     }
     try{
@@ -817,6 +837,9 @@
       pushSuperAdminEvent('Ausencia futura', `Aviso futuro actualizado para ${saved.profesor}.`);
       return result || { ok: true, entry: saved };
     }catch(error){
+      if(backendOnly){
+        return { ok: false, error, status: Number(error && error.status) || 0 };
+      }
       console.warn('Teacher future absence update backend sync failed; keeping local state', error);
       state.syncFlags.add(`upsert:${normalized.id}`);
       setSuperAdminError('Hay avisos futuros pendientes de sincronizar.');
@@ -830,19 +853,25 @@
   async function deleteEntry(id){
     const storage = readHostValue('storage');
     const targetId = cleanText(id);
-    removeRowLocal(targetId);
+    const backendOnly = !!(storage && typeof storage.isBackendOnly === 'function' && storage.isBackendOnly());
+    if(!backendOnly) removeRowLocal(targetId);
     if(!storage || typeof storage.hasBackend !== 'function' || !storage.hasBackend()){
+      if(backendOnly) return { ok: false, error: new Error('Backend unavailable') };
       return { ok: true, localOnly: true };
     }
     try{
       state.syncFlags.delete(`upsert:${targetId}`);
       state.syncFlags.delete(`delete:${targetId}`);
       const result = await requireStorageMethod('deleteTeacherFutureAbsence', 'future absence delete')(targetId);
+      if(backendOnly) removeRowLocal(targetId);
       clearSuperAdminError();
       pushSuperAdminEvent('Ausencia futura', 'Aviso futuro eliminado en el servidor.');
       notifyStateChange();
-      return result;
+      return result || { ok: true };
     }catch(error){
+      if(backendOnly){
+        return { ok: false, error, status: Number(error && error.status) || 0 };
+      }
       console.warn('Teacher future absence delete backend sync failed; keeping local state', error);
       state.syncFlags.add(`delete:${targetId}`);
       setSuperAdminError('Hay eliminaciones pendientes de sincronizar.');
@@ -996,6 +1025,10 @@
     if(!await askConfirm('Eliminar aviso', 'Se eliminará este aviso de ausencia futura.', 'Eliminar')) return null;
     try{
       const result = await deleteEntry(id);
+      if(!result || result.ok === false){
+        showToast(getFutureAbsenceWriteFailureMessage(result && (result.error || result)), 'error');
+        return result;
+      }
       showToast(result && result.syncError ? 'Aviso eliminado en local. Pendiente de sincronizar con el servidor.' : 'Aviso eliminado.', 'success');
       return result;
     }catch(error){
@@ -1021,6 +1054,10 @@
     const nextEntry = { ...current, status: normalizeStatus(status), reviewerNote, reviewedAt: new Date().toISOString() };
     try{
       const result = await updateEntry(nextEntry);
+      if(!result || result.ok === false){
+        showToast(getFutureAbsenceWriteFailureMessage(result && (result.error || result)), 'error');
+        return result;
+      }
       if(status === 'approved') await applyApprovedForCurrentWeek();
       showToast(
         result && result.syncError

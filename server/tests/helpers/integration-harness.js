@@ -51,7 +51,7 @@ async function waitForExit(child, timeoutMs = 5000) {
 
 async function startServer(options) {
   assertSafeTestDatabase(options.dbPath);
-  const port = await getFreePort();
+  const port = options.port || await getFreePort();
   const output = [];
   const child = spawn(process.execPath, ['server/app.js'], {
     cwd: PROJECT_ROOT,

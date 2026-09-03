@@ -1230,6 +1230,8 @@
         detalle:sesionBase.detalle || '',
         aula:sesionBase.aula || ''
       };
+      const previousOverrides={...state.sessionOverrides};
+      const previousTareas={...state.tareasProfesorado};
       const nextOverrides={...state.sessionOverrides};
       if(JSON.stringify(nextOverride)===JSON.stringify(normalizedBase)){
         delete nextOverrides[overrideKey];
@@ -1257,18 +1259,32 @@
             state.tareasProfesorado[tareaKey] ? {...state.tareasProfesorado[tareaKey]} : null
           );
         }catch(error){
-          syncResult={syncError:error};
+          syncResult={ok:false,error,status:Number(error && error.status) || 0};
         }
+      }
+      if(syncResult && syncResult.ok === false){
+        persistSessionOverrides(previousOverrides);
+        persistTareas(previousTareas);
+        showToast(getTeacherTaskWriteFailureMessage(syncResult.error || syncResult), 'error');
+        return syncResult;
       }
       if(exitAfter){
         if(typeof hooks.renderTable==='function') hooks.renderTable();
         showToast(syncResult?.syncError ? 'Tarea guardada en local. Pendiente de sincronizar con el servidor.' : 'Tarea guardada correctamente.','success');
         closeTeacherPanel();
-        return;
+        return syncResult || {ok:true};
       }
       renderTeacherPanel();
       if(typeof hooks.renderTable==='function') hooks.renderTable();
       showToast(syncResult?.syncError ? 'Tarea guardada en local. Pendiente de sincronizar con el servidor.' : 'Tarea guardada correctamente.','success');
+      return syncResult || {ok:true};
+    }
+
+    function getTeacherTaskWriteFailureMessage(error){
+      const status=Number(error && error.status) || 0;
+      if(status===401) return 'No se ha podido guardar la tarea. La sesión no es válida; accede de nuevo o contacta con Jefatura de Estudios.';
+      if(status===403) return 'No se ha podido guardar la tarea porque no tienes autorización.';
+      return 'No se ha podido guardar la tarea. Comprueba la conexión e inténtalo de nuevo.';
     }
 
     function getTeacherFutureAbsences(){
