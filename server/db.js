@@ -7,6 +7,7 @@ const sqlite3 = require('sqlite3');
 const { ADMIN_ROLE, SUPERADMIN_ROLE, hashPassword } = require('./auth');
 
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
+const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 const LEGACY_DATA_DIR = path.join(__dirname, 'data');
 const LEGACY_DB_PATH = path.join(LEGACY_DATA_DIR, 'guardias.sqlite');
 const PROJECT_DB_PATH = path.join(__dirname, '..', 'BD', 'guardias.sqlite');
@@ -68,6 +69,7 @@ async function getDatabase() {
       await db.exec('PRAGMA journal_mode = WAL');
       await db.exec('PRAGMA synchronous = NORMAL');
       await db.exec('PRAGMA busy_timeout = 5000');
+      await db.exec('PRAGMA foreign_keys = ON');
       return db;
     });
   }
@@ -121,10 +123,40 @@ async function initializeDatabase() {
   const db = await getDatabase();
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
   await db.exec(schema);
+  await applyMigrations(db);
   await ensureAlumnosFueraAulaConstraints(db);
   await seedDefaultCredentials(db);
   await ensureWeeklyResetIfNeeded(db);
   return db;
+}
+
+async function applyMigrations(db) {
+  await db.exec(
+    `CREATE TABLE IF NOT EXISTS schema_migrations (
+      name TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`
+  );
+
+  if (!fs.existsSync(MIGRATIONS_DIR)) return [];
+  const migrationNames = fs.readdirSync(MIGRATIONS_DIR)
+    .filter(name => /^\d+_[a-z0-9_-]+\.sql$/.test(name))
+    .sort((left, right) => left.localeCompare(right, 'en'));
+  const appliedRows = await db.all('SELECT name FROM schema_migrations');
+  const appliedNames = new Set(appliedRows.map(row => row.name));
+  const appliedNow = [];
+
+  for (const name of migrationNames) {
+    if (appliedNames.has(name)) continue;
+    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, name), 'utf8');
+    await withImmediateTransaction(db, async () => {
+      await db.exec(sql);
+      await db.run('INSERT INTO schema_migrations (name) VALUES (?)', [name]);
+    }, { label: `migration:${name}` });
+    appliedNow.push(name);
+  }
+
+  return appliedNow;
 }
 
 async function ensureAlumnosFueraAulaConstraints(db) {
@@ -255,6 +287,7 @@ async function seedDefaultCredentials(db) {
 
 module.exports = {
   DB_PATH,
+  applyMigrations,
   ensureWeeklyResetIfNeeded,
   formatDateKey,
   getDatabase,

@@ -7,11 +7,13 @@ const {
   createConsistentBackup,
   createTestEnvironment,
   login,
+  loginIndividual,
   openDatabase,
   request,
   startServer,
   stopServer
 } = require('./helpers/integration-harness');
+const { hashPassword, verifyPassword } = require('../auth');
 
 const INITIAL_ADMIN_PASSWORD = 'Admin-integration-2026';
 const CHANGED_ADMIN_PASSWORD = 'Admin-changed-2026';
@@ -31,7 +33,24 @@ async function assertQuickCheck(dbPath) {
 async function readDatabaseSnapshot(dbPath) {
   const db = await openDatabase(dbPath);
   try {
-    const tables = ['ausencias', 'biblioteca_guardias', 'historial', 'tareas_profesorado', 'alumnos_fuera_aula', 'session_overrides', 'auth_credentials', 'app_state', 'grupos_estado'];
+    const tables = [
+      'ausencias',
+      'biblioteca_guardias',
+      'historial',
+      'tareas_profesorado',
+      'alumnos_fuera_aula',
+      'session_overrides',
+      'auth_credentials',
+      'app_state',
+      'grupos_estado',
+      'users',
+      'roles',
+      'user_roles',
+      'teacher_profiles',
+      'teacher_assignments',
+      'audit_log',
+      'schema_migrations'
+    ];
     const existingTables = await db.all("SELECT name FROM sqlite_master WHERE type = 'table'");
     const existingNames = new Set(existingTables.map(row => row.name));
     assert.ok(
@@ -193,6 +212,106 @@ async function testHttpLifecycle() {
   }
 }
 
+async function testIndividualAuthenticationLifecycle() {
+  const environment = createTestEnvironment();
+  let server = null;
+  try {
+    server = await startServer({
+      dbPath: environment.dbPath,
+      adminPassword: INITIAL_ADMIN_PASSWORD,
+      superadminPassword: SUPERADMIN_PASSWORD
+    });
+    const credential = hashPassword('Teacher-integration-2026');
+    const victimCredential = hashPassword('Victim-integration-2026');
+    const db = await openDatabase(environment.dbPath);
+    const user = await db.run(
+      `INSERT INTO users (username, display_name, password_hash, password_salt)
+       VALUES ('teacher.integration', 'Teacher Integration', ?, ?)`,
+      [credential.hash, credential.salt]
+    );
+    const victim = await db.run(
+      `INSERT INTO users (username, display_name, password_hash, password_salt)
+       VALUES ('victim.integration', 'Victim Integration', ?, ?)`,
+      [victimCredential.hash, victimCredential.salt]
+    );
+    await db.run(
+      `INSERT INTO user_roles (user_id, role_id)
+       SELECT ?, id FROM roles WHERE key = 'teacher'`,
+      [user.lastID]
+    );
+    await db.close();
+
+    const denied = await loginIndividual(server.baseUrl, 'teacher.integration', 'Wrong-teacher-password');
+    assert.strictEqual(denied.response.status, 401);
+
+    const authenticated = await loginIndividual(
+      server.baseUrl,
+      'TEACHER.INTEGRATION',
+      'Teacher-integration-2026',
+      { userId: victim.lastID, role: 'superadmin', roles: ['superadmin'] }
+    );
+    assert.strictEqual(authenticated.response.status, 200);
+    assert.strictEqual(authenticated.body.username, 'teacher.integration');
+    assert.deepStrictEqual(authenticated.body.roles, ['teacher']);
+    assert.strictEqual(authenticated.body.isAdmin, false);
+
+    const session = await request(server.baseUrl, '/api/auth/session', {}, authenticated.jar);
+    assert.strictEqual(session.body.authenticated, true);
+    assert.strictEqual(session.body.userId, user.lastID);
+    assert.strictEqual(session.body.role, 'teacher');
+
+    const forbiddenAdminWrite = await request(server.baseUrl, '/api/guardias', {
+      method: 'POST',
+      body: { dia: 0, hora: 1, ausente: 'NO_DEBE_GUARDARSE' }
+    }, authenticated.jar);
+    assert.strictEqual(forbiddenAdminWrite.response.status, 403);
+
+    const changed = await request(server.baseUrl, '/api/auth/change-password', {
+      method: 'POST',
+      body: {
+        currentPassword: 'Teacher-integration-2026',
+        newPassword: 'Teacher-changed-2026',
+        userId: victim.lastID,
+        username: 'victim.integration',
+        role: 'superadmin'
+      }
+    }, authenticated.jar);
+    assert.strictEqual(changed.response.status, 200);
+
+    const afterDb = await openDatabase(environment.dbPath);
+    const stored = await afterDb.get(
+      'SELECT password_hash, password_salt FROM users WHERE id = ?',
+      [user.lastID]
+    );
+    const victimStored = await afterDb.get(
+      'SELECT password_hash, password_salt FROM users WHERE id = ?',
+      [victim.lastID]
+    );
+    const audit = await afterDb.all(
+      'SELECT action, outcome FROM audit_log WHERE actor_user_id = ? ORDER BY id',
+      [user.lastID]
+    );
+    await afterDb.close();
+    assert.notStrictEqual(stored.password_hash, 'Teacher-changed-2026');
+    assert.ok(verifyPassword('Teacher-changed-2026', stored.password_salt, stored.password_hash));
+    assert.ok(verifyPassword('Victim-integration-2026', victimStored.password_salt, victimStored.password_hash));
+    assert.equal(verifyPassword('Teacher-changed-2026', victimStored.password_salt, victimStored.password_hash), false);
+    assert.deepStrictEqual(audit, [
+      { action: 'auth.login', outcome: 'failure' },
+      { action: 'auth.login', outcome: 'success' },
+      { action: 'auth.password_changed', outcome: 'success' }
+    ]);
+
+    const oldPassword = await loginIndividual(server.baseUrl, 'teacher.integration', 'Teacher-integration-2026');
+    assert.strictEqual(oldPassword.response.status, 401);
+    const newPassword = await loginIndividual(server.baseUrl, 'teacher.integration', 'Teacher-changed-2026');
+    assert.strictEqual(newPassword.response.status, 200);
+  } finally {
+    await stopServer(server).catch(() => {});
+    cleanupTestEnvironment(environment);
+  }
+}
+
 async function testWeeklyReset() {
   const environment = createTestEnvironment();
   let server = null;
@@ -218,7 +337,24 @@ async function testWeeklyReset() {
       await db.exec('ROLLBACK');
       throw error;
     }
-    const tables = ['ausencias', 'historial', 'biblioteca_guardias', 'tareas_profesorado', 'alumnos_fuera_aula', 'session_overrides', 'grupos_estado', 'auth_credentials', 'app_state'];
+    const tables = [
+      'ausencias',
+      'historial',
+      'biblioteca_guardias',
+      'tareas_profesorado',
+      'alumnos_fuera_aula',
+      'session_overrides',
+      'grupos_estado',
+      'auth_credentials',
+      'app_state',
+      'users',
+      'roles',
+      'user_roles',
+      'teacher_profiles',
+      'teacher_assignments',
+      'audit_log',
+      'schema_migrations'
+    ];
     const before = {};
     for (const table of tables) before[table] = (await db.get(`SELECT COUNT(*) AS total FROM ${table}`)).total;
     await db.close();
@@ -237,6 +373,11 @@ async function testWeeklyReset() {
     }
     assert.strictEqual(after.grupos_estado, 1);
     assert.strictEqual(after.auth_credentials, 2);
+    assert.strictEqual(after.roles, 3);
+    assert.strictEqual(after.schema_migrations, 1);
+    for (const table of ['users', 'user_roles', 'teacher_profiles', 'teacher_assignments', 'audit_log']) {
+      assert.strictEqual(after[table], before[table], `${table} should survive weekly maintenance`);
+    }
     assert.strictEqual(preservedState.value, 'yes');
     assert.notStrictEqual(storedWeek.value, '1900-01-01');
     assert.ok(after.app_state >= 2);
@@ -249,5 +390,6 @@ async function testWeeklyReset() {
 
 module.exports = [
   { name: 'local HTTP integration covers auth, Jefatura, restart, backup/restore and basic concurrency', fn: testHttpLifecycle },
+  { name: 'individual teacher auth supports sessions, permissions, audit and own password changes', fn: testIndividualAuthenticationLifecycle },
   { name: 'weekly maintenance clears only the characterized operational tables', fn: testWeeklyReset }
 ];

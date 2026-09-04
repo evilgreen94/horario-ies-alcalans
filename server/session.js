@@ -38,9 +38,40 @@ function isSecureRequest(req) {
   return forwardedProto === 'https';
 }
 
-function serializeSessionCookie(role, req) {
+function normalizeRoles(values) {
+  const roles = Array.isArray(values) ? values : [values];
+  return [...new Set(roles.map(value => String(value || '').trim().toLowerCase()).filter(Boolean))];
+}
+
+function getPrimaryRole(roles) {
+  if (roles.includes('superadmin')) return 'superadmin';
+  if (roles.includes('admin')) return 'admin';
+  if (roles.includes('teacher')) return 'teacher';
+  return roles[0] || '';
+}
+
+function serializeSessionCookie(subject, req) {
+  let sessionPayload;
+  if (typeof subject === 'string') {
+    sessionPayload = { role: subject };
+  } else {
+    const userId = Number(subject?.userId);
+    const username = String(subject?.username || '').trim();
+    const roles = normalizeRoles([...normalizeRoles(subject?.roles), subject?.role]);
+    if (!Number.isSafeInteger(userId) || userId <= 0 || !username || !roles.length) {
+      throw new Error('Invalid individual session identity.');
+    }
+    sessionPayload = {
+      userId,
+      username,
+      displayName: String(subject?.displayName || '').trim(),
+      roles,
+      role: getPrimaryRole(roles)
+    };
+  }
+
   const payload = toBase64Url(JSON.stringify({
-    role,
+    ...sessionPayload,
     exp: Date.now() + SESSION_MAX_AGE_MS
   }));
   const signature = signPayload(payload);
@@ -80,6 +111,20 @@ function readSessionFromRequest(req) {
   try {
     const parsed = JSON.parse(fromBase64Url(payload));
     if (!parsed?.role || !parsed?.exp || parsed.exp < Date.now()) return null;
+    if (parsed.userId != null) {
+      const roles = normalizeRoles(parsed.roles);
+      if (!Number.isSafeInteger(parsed.userId) || parsed.userId <= 0 || !parsed.username || !roles.length) return null;
+      const role = getPrimaryRole(roles);
+      return {
+        userId: parsed.userId,
+        username: String(parsed.username),
+        displayName: String(parsed.displayName || ''),
+        roles,
+        role,
+        isAdmin: roles.includes('admin') || roles.includes('superadmin'),
+        isSuperAdmin: roles.includes('superadmin')
+      };
+    }
     return {
       role: parsed.role,
       isAdmin: parsed.role === 'admin' || parsed.role === 'superadmin',
@@ -90,16 +135,27 @@ function readSessionFromRequest(req) {
   }
 }
 
+function requireAuthenticated(req, res, next) {
+  const session = readSessionFromRequest(req);
+  if (!session) {
+    return res.status(401).json({ error: 'Sesion no valida.' });
+  }
+  req.sessionUser = session;
+  next();
+}
+
 function requireRole(role) {
   return (req, res, next) => {
     const session = readSessionFromRequest(req);
     if (!session) {
       return res.status(401).json({ error: 'Sesion no valida.' });
     }
-    if (role === 'admin' && !session.isAdmin) {
-      return res.status(403).json({ error: 'Permisos insuficientes.' });
-    }
-    if (role === 'superadmin' && !session.isSuperAdmin) {
+    const allowed = role === 'admin'
+      ? session.isAdmin
+      : role === 'superadmin'
+        ? session.isSuperAdmin
+        : Array.isArray(session.roles) && session.roles.includes(role);
+    if (!allowed) {
       return res.status(403).json({ error: 'Permisos insuficientes.' });
     }
     req.sessionUser = session;
@@ -112,6 +168,7 @@ module.exports = {
   COOKIE_NAME,
   getSessionSecret,
   readSessionFromRequest,
+  requireAuthenticated,
   requireRole,
   serializeSessionCookie
 };

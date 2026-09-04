@@ -129,6 +129,15 @@ async function login(baseUrl, role, password) {
   return { ...result, jar };
 }
 
+async function loginIndividual(baseUrl, username, password, extraBody = {}) {
+  const jar = createCookieJar();
+  const result = await request(baseUrl, '/api/auth/login', {
+    method: 'POST',
+    body: { ...extraBody, username, password }
+  }, jar);
+  return { ...result, jar };
+}
+
 async function openDatabase(dbPath) {
   assertSafeTestDatabase(dbPath);
   return open({ filename: dbPath, driver: sqlite3.Database });
@@ -163,6 +172,7 @@ module.exports = {
   createConsistentBackup,
   createTestEnvironment,
   login,
+  loginIndividual,
   openDatabase,
   request,
   startServer,
