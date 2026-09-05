@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDatabase, withImmediateTransaction } = require('../db');
-const { parseAnnualXml, validateAndNormalizeAnnualSource, writeAnnualSourceArtifacts } = require('../annual-source');
+const { buildCanonicalSchedule, parseAnnualXml } = require('../annual-source');
+const { importScheduleDataset, validateCanonicalSchedule } = require('../schedule-model');
 const {
   ensureArray,
   ensureRequiredString,
@@ -72,9 +73,11 @@ registerStateCollectionRoutes(router, {
 });
 
 registerAnnualImportRoutes(router, {
+  buildCanonicalSchedule,
+  getDatabase,
+  importScheduleDataset,
   parseAnnualXml,
-  validateAndNormalizeAnnualSource,
-  writeAnnualSourceArtifacts,
+  validateCanonicalSchedule,
   normalizeAnnualImportRequest,
   ensureRequiredString,
   requireRole,

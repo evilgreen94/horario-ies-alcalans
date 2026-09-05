@@ -1,10 +1,10 @@
-const path = require('path');
-
 function registerAnnualImportRoutes(router, deps) {
   const {
+    buildCanonicalSchedule,
+    getDatabase,
+    importScheduleDataset,
     parseAnnualXml,
-    validateAndNormalizeAnnualSource,
-    writeAnnualSourceArtifacts,
+    validateCanonicalSchedule,
     normalizeAnnualImportRequest,
     ensureRequiredString,
     requireRole,
@@ -15,15 +15,18 @@ function registerAnnualImportRoutes(router, deps) {
     try {
       const { xmlText, fileName } = normalizeAnnualImportRequest(req.body, ensureRequiredString);
       const source = parseAnnualXml(xmlText, fileName);
-      const normalized = validateAndNormalizeAnnualSource(source, {
+      const canonical = buildCanonicalSchedule(source, {
         sourceLabel: fileName
       });
+      const validated = validateCanonicalSchedule(canonical);
       res.json({
         ok: true,
         previewedAt: new Date().toISOString(),
-        teachers: Object.keys(normalized.teachers || {}).length,
-        sourceLabel: normalized.fuente,
-        importMetadata: normalized.metadata || null
+        academicYear: validated.academicYear,
+        teachers: validated.teacherSourceCodes.length,
+        sessions: validated.sessions.length,
+        sourceLabel: validated.label,
+        validationReport: validated.report
       });
     } catch (error) {
       next(error);
@@ -34,21 +37,18 @@ function registerAnnualImportRoutes(router, deps) {
     try {
       const { xmlText, fileName } = normalizeAnnualImportRequest(req.body, ensureRequiredString);
       const source = parseAnnualXml(xmlText, fileName);
-      const result = writeAnnualSourceArtifacts(source, {
-        sourceLabel: fileName,
-        xmlText
-      });
+      const canonical = buildCanonicalSchedule(source, { sourceLabel: fileName });
+      const result = await importScheduleDataset(await getDatabase(), canonical);
       res.json({
         ok: true,
         importedAt: new Date().toISOString(),
-        sourceFile: path.basename(result.sourcePath),
-        outputFile: path.basename(result.outputPath),
-        xmlSnapshotFile: result.xmlSnapshotPath ? path.basename(result.xmlSnapshotPath) : null,
-        datasetId: result.payload.datasetId,
-        teachers: result.payload.teachers.length,
-        sourceLabel: result.payload.fuente,
-        backups: result.backups,
-        importMetadata: result.normalizedSource?.metadata || null
+        datasetId: result.datasetId,
+        datasetStatus: result.status,
+        activated: false,
+        teachers: result.report.teachersCovered,
+        sessions: result.report.sessions,
+        sourceLabel: canonical.label,
+        validationReport: result.report
       });
     } catch (error) {
       next(error);

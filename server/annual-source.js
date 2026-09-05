@@ -1,13 +1,4 @@
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
-
-const ROOT_DIR = path.join(__dirname, '..');
-const DEFAULT_SOURCE_PATH = path.join(ROOT_DIR, 'json_profes', 'profesorado_horarios_guardias_con_guardias_updated.json');
-const OUTPUT_PATH = path.join(ROOT_DIR, 'js', 'data', 'profesorado_horarios_guardias.js');
-const IMPORT_XML_PATH = path.join(ROOT_DIR, 'json_profes', 'horario_anual_importado.xml');
-const JSON_BACKUP_DIR = path.join(ROOT_DIR, 'json_profes', 'backups');
-const JS_BACKUP_DIR = path.join(ROOT_DIR, 'js', 'data', 'backups');
 const DAY_ORDER = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const DAY_INDEX = Object.fromEntries(DAY_ORDER.map((day, index) => [day, index]));
 const DAY_ALIASES = {
@@ -18,7 +9,11 @@ const DAY_ALIASES = {
   jueves: 'Jueves',
   viernes: 'Viernes'
 };
-const VALID_FRANJAS = new Set([
+// Provisional input-adapter configuration for the 2026/27 annual XML/PDF
+// sources. Canonical schedules receive their period definitions as data and
+// must not depend on this template.
+const PROVISIONAL_2026_27_ACADEMIC_YEAR = '2026/27';
+const PROVISIONAL_2026_27_VALID_FRANJAS = new Set([
   '08:15-09:10',
   '09:10-10:05',
   '10:05-11:00',
@@ -29,6 +24,21 @@ const VALID_FRANJAS = new Set([
   '14:10-14:25',
   '14:25-15:20'
 ]);
+const PROVISIONAL_2026_27_PERIOD_DEFINITIONS = [
+  { key: 'P1', position: 1, type: 'teaching', label: 'Primera', starts_at: '08:15', ends_at: '09:10' },
+  { key: 'P2', position: 2, type: 'teaching', label: 'Segunda', starts_at: '09:10', ends_at: '10:05' },
+  { key: 'P3', position: 3, type: 'teaching', label: 'Tercera', starts_at: '10:05', ends_at: '11:00' },
+  { key: 'BREAK1', position: 4, type: 'break', label: 'Recreo', starts_at: '11:00', ends_at: '11:25' },
+  { key: 'P4', position: 5, type: 'teaching', label: 'Cuarta', starts_at: '11:25', ends_at: '12:20' },
+  { key: 'P5', position: 6, type: 'teaching', label: 'Quinta', starts_at: '12:20', ends_at: '13:15' },
+  { key: 'P6', position: 7, type: 'teaching', label: 'Sexta', starts_at: '13:15', ends_at: '14:10' },
+  { key: 'BREAK2', position: 8, type: 'break', label: 'Recreo vespertino', starts_at: '14:10', ends_at: '14:25' },
+  { key: 'P7', position: 9, type: 'teaching', label: 'Séptima', starts_at: '14:25', ends_at: '15:20' }
+];
+const PROVISIONAL_2026_27_PERIOD_BY_FRANJA = new Map(PROVISIONAL_2026_27_PERIOD_DEFINITIONS.map(period => [
+  `${period.starts_at}-${period.ends_at}`,
+  period
+]));
 
 function cleanText(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -95,82 +105,94 @@ function buildFranja(inicio, fin) {
   const normalizedFin = normalizeTime(fin);
   if (!normalizedInicio || !normalizedFin) return '';
   const franja = `${normalizedInicio}-${normalizedFin}`;
-  return VALID_FRANJAS.has(franja) ? franja : '';
+  return PROVISIONAL_2026_27_VALID_FRANJAS.has(franja) ? franja : '';
 }
 
 function normalizeSessionType(value) {
   return normalizeText(value) === 'guardia' ? 'guardia' : 'clase';
 }
 
-function sortTeachersAndRows(teachers) {
-  return Object.fromEntries(
-    Object.entries(teachers)
-      .sort((a, b) => a[0].localeCompare(b[0], 'es'))
-      .map(([teacherName, rows]) => [
-        teacherName,
-        rows.slice().sort((a, b) =>
-          DAY_INDEX[a.dia] - DAY_INDEX[b.dia] ||
-          buildFranja(a.inicio, a.fin).localeCompare(buildFranja(b.inicio, b.fin), 'es') ||
-          cleanText(a.asignatura).localeCompare(cleanText(b.asignatura), 'es') ||
-          cleanText(a.grupo).localeCompare(cleanText(b.grupo), 'es') ||
-          cleanText(a.aula).localeCompare(cleanText(b.aula), 'es')
-        )
-      ])
-  );
+function normalizeTeacherSourceCode(value) {
+  const code = cleanText(value).toUpperCase();
+  if (!code) return '';
+  if (!/^[A-Z0-9_-]{2,64}$/.test(code)) {
+    throw new Error(`Código externo de profesorado inválido: "${code}".`);
+  }
+  return code;
 }
 
 function validateAndNormalizeAnnualSource(source, options = {}) {
   const normalizedSource = normalizeInput(source);
-  const teacherEntries = Object.entries(normalizedSource?.teachers || {});
-  if (!teacherEntries.length) {
+  const teacherEntries = normalizedSource?.teachers;
+  if (!Array.isArray(teacherEntries) || !teacherEntries.length) {
     throw new Error('La fuente anual no contiene profesorado.');
   }
 
-  const mergedTeachers = new Map();
-  const teacherDisplayNames = new Map();
-  const duplicateTeacherNames = new Set();
-  const teachersWithoutSessions = new Set();
+  const teachersBySourceCode = new Map();
+  const duplicateSourceCodes = new Set();
+  const duplicateRows = [];
+  const teachersWithoutSessions = [];
 
-  teacherEntries.forEach(([rawTeacherName, rawRows]) => {
-    const teacherName = normalizeTeacherName(rawTeacherName);
-    if (!teacherName) {
-      throw new Error('La fuente anual contiene un bloque de profesorado sin nombre.');
+  teacherEntries.forEach((rawTeacher, teacherIndex) => {
+    if (!rawTeacher || typeof rawTeacher !== 'object' || Array.isArray(rawTeacher)) {
+      throw new Error(`El bloque de profesorado ${teacherIndex + 1} no es válido.`);
     }
-    const teacherKey = normalizeText(teacherName);
-    if (!teacherKey) {
-      throw new Error(`Nombre de profesorado inválido: "${rawTeacherName}"`);
+
+    const sourceCode = normalizeTeacherSourceCode(rawTeacher.source_code || rawTeacher.sourceCode);
+    if (!sourceCode) {
+      throw new Error(`El bloque de profesorado ${teacherIndex + 1} no tiene source_code.`);
     }
-    if (teacherDisplayNames.has(teacherKey)) duplicateTeacherNames.add(teacherName);
-    else teacherDisplayNames.set(teacherKey, teacherName);
-    if (!Array.isArray(rawRows)) {
-      throw new Error(`Las sesiones del profesor ${teacherName} deben ser una lista.`);
+
+    const displayName = normalizeTeacherName(
+      rawTeacher.display_name || rawTeacher.displayName || rawTeacher.nombre || rawTeacher.name
+    );
+    if (!displayName) {
+      throw new Error(`El profesor ${sourceCode} no tiene display_name.`);
     }
-    if (!rawRows.length) teachersWithoutSessions.add(teacherName);
-    if (!mergedTeachers.has(teacherKey)) mergedTeachers.set(teacherKey, []);
-    mergedTeachers.get(teacherKey).push(...rawRows);
+
+    const rawSessions = rawTeacher.sessions;
+    if (!Array.isArray(rawSessions)) {
+      throw new Error(`Las sesiones del profesor ${sourceCode} (${displayName}) deben ser una lista.`);
+    }
+
+    const existing = teachersBySourceCode.get(sourceCode);
+    if (existing) {
+      if (existing.display_name !== displayName) {
+        throw new Error(
+          `El source_code ${sourceCode} tiene identidades docentes contradictorias: ` +
+          `"${existing.display_name}" y "${displayName}".`
+        );
+      }
+      duplicateSourceCodes.add(sourceCode);
+      existing.rawSessions.push(...rawSessions);
+    } else {
+      teachersBySourceCode.set(sourceCode, {
+        source_code: sourceCode,
+        display_name: displayName,
+        rawSessions: rawSessions.slice()
+      });
+    }
   });
 
-  const normalizedTeachers = {};
-  const conflicts = [];
-  const duplicateRows = [];
-
-  for (const [teacherKey, teacherRows] of mergedTeachers.entries()) {
-    const teacherName = teacherDisplayNames.get(teacherKey) || teacherKey;
+  const teachers = [];
+  for (const teacher of teachersBySourceCode.values()) {
     const slots = new Map();
+    if (!teacher.rawSessions.length) teachersWithoutSessions.push(teacher.source_code);
 
-    teacherRows.forEach((rawRow, index) => {
+    teacher.rawSessions.forEach((rawRow, index) => {
       const dia = normalizeDayLabel(rawRow?.dia);
       const inicio = normalizeTime(rawRow?.inicio);
       const fin = normalizeTime(rawRow?.fin);
       const franja = buildFranja(rawRow?.inicio, rawRow?.fin);
+      const teacherRef = `${teacher.source_code} (${teacher.display_name})`;
       if (!dia) {
-        throw new Error(`Profesor ${teacherName}: día no soportado en la sesión ${index + 1} ("${cleanText(rawRow?.dia)}").`);
+        throw new Error(`Profesor ${teacherRef}: día no soportado en la sesión ${index + 1} ("${cleanText(rawRow?.dia)}").`);
       }
       if (!inicio || !fin) {
-        throw new Error(`Profesor ${teacherName}: formato de hora inválido en la sesión ${index + 1} (${cleanText(rawRow?.inicio)}-${cleanText(rawRow?.fin)}).`);
+        throw new Error(`Profesor ${teacherRef}: formato de hora inválido en la sesión ${index + 1} (${cleanText(rawRow?.inicio)}-${cleanText(rawRow?.fin)}).`);
       }
       if (!franja) {
-        throw new Error(`Profesor ${teacherName}: franja no soportada en la sesión ${index + 1} (${inicio}-${fin}).`);
+        throw new Error(`Profesor ${teacherRef}: franja no soportada en la sesión ${index + 1} (${inicio}-${fin}).`);
       }
 
       const row = {
@@ -198,38 +220,45 @@ function validateAndNormalizeAnnualSource(source, options = {}) {
       }
 
       if (existing.signature === signature) {
-        duplicateRows.push(`${teacherName} · ${dia} ${franja}`);
+        duplicateRows.push(`${teacher.source_code} · ${teacher.display_name} · ${dia} ${franja}`);
         return;
       }
 
-      conflicts.push({
-        teacherName,
-        slotKey,
-        current: existing.row,
-        incoming: row
-      });
+      throw new Error(
+        `Conflicto de importación para ${teacher.source_code} (${teacher.display_name}) en ${slotKey}. ` +
+        `Hay dos sesiones distintas en el mismo tramo.`
+      );
     });
 
-    normalizedTeachers[teacherName] = [...slots.values()].map(item => item.row);
+    const sessions = [...slots.values()]
+      .map(item => item.row)
+      .sort((left, right) =>
+        DAY_INDEX[left.dia] - DAY_INDEX[right.dia] ||
+        buildFranja(left.inicio, left.fin).localeCompare(buildFranja(right.inicio, right.fin), 'es') ||
+        cleanText(left.asignatura).localeCompare(cleanText(right.asignatura), 'es') ||
+        cleanText(left.grupo).localeCompare(cleanText(right.grupo), 'es') ||
+        cleanText(left.aula).localeCompare(cleanText(right.aula), 'es')
+      );
+    teachers.push({
+      source_code: teacher.source_code,
+      display_name: teacher.display_name,
+      sessions
+    });
   }
 
-  if (conflicts.length) {
-    const first = conflicts[0];
-    throw new Error(
-      `Conflicto de importación para ${first.teacherName} en ${first.slotKey}. ` +
-      `Hay dos sesiones distintas en el mismo tramo.`
-    );
-  }
+  teachers.sort((left, right) => left.source_code.localeCompare(right.source_code, 'en'));
 
   return {
+    academicYear: cleanText(normalizedSource?.academicYear || normalizedSource?.academic_year),
+    sourceSystem: cleanText(normalizedSource?.sourceSystem || normalizedSource?.source_system) || 'Peñalara Software',
     fuente: cleanText(normalizedSource?.fuente) || cleanText(options.sourceLabel || 'importado'),
     formato: cleanText(normalizedSource?.formato) || 'fuente_normalizada',
-    teachers: sortTeachersAndRows(normalizedTeachers),
+    teachers,
     metadata: {
-      teachers: Object.keys(normalizedTeachers).length,
-      duplicateTeacherNames: [...duplicateTeacherNames].sort((a, b) => a.localeCompare(b, 'es')),
-      duplicateRows: duplicateRows.slice().sort((a, b) => a.localeCompare(b, 'es')),
-      teachersWithoutSessions: [...teachersWithoutSessions].sort((a, b) => a.localeCompare(b, 'es'))
+      teachers: teachers.length,
+      duplicateSourceCodes: [...duplicateSourceCodes].sort((left, right) => left.localeCompare(right, 'en')),
+      duplicateRows: duplicateRows.slice().sort((left, right) => left.localeCompare(right, 'es')),
+      teachersWithoutSessions: teachersWithoutSessions.sort((left, right) => left.localeCompare(right, 'en'))
     }
   };
 }
@@ -261,12 +290,11 @@ function toLegacyEntry(entry) {
 
 function buildPayload(source) {
   const preparedSource = validateAndNormalizeAnnualSource(source);
-  const teacherEntries = Object.entries(preparedSource.teachers || {});
-  const teachers = teacherEntries.map(([nombre, rows]) => {
-    const horario = (Array.isArray(rows) ? rows : []).map(toLegacyEntry);
+  const teachers = preparedSource.teachers.map((teacher) => {
+    const horario = teacher.sessions.map(toLegacyEntry);
     const guardias = horario.filter(row => cleanText(row.texto).toUpperCase() === 'GUARDIA');
     return {
-      nombre: cleanText(nombre),
+      nombre: teacher.display_name,
       horario,
       guardias
     };
@@ -286,16 +314,58 @@ function buildPayload(source) {
   };
 }
 
-function loadJsonSource(inputPath) {
-  if (!fs.existsSync(inputPath)) {
-    throw new Error(`No existe la fuente anual indicada: ${inputPath}`);
+function buildCanonicalSchedule(source, options = {}) {
+  const preparedSource = validateAndNormalizeAnnualSource(source, options);
+  const academicYear = cleanText(options.academicYear || preparedSource.academicYear);
+  if (!academicYear) {
+    throw new Error('El XML debe indicar el curso académico (academic_year).');
   }
-  const raw = fs.readFileSync(inputPath, 'utf8');
-  try {
-    return normalizeInput(JSON.parse(raw));
-  } catch (error) {
-    throw new Error(`La fuente anual indicada no es JSON válido: ${inputPath}\n${error.message}`);
+  if (academicYear !== PROVISIONAL_2026_27_ACADEMIC_YEAR) {
+    throw new Error(
+      `El adaptador anual provisional solo define periodos para ${PROVISIONAL_2026_27_ACADEMIC_YEAR}.`
+    );
   }
+
+  const teacherSourceCodes = [];
+  const sessions = [];
+  for (const teacher of preparedSource.teachers) {
+    const sourceCode = teacher.source_code;
+    teacherSourceCodes.push(sourceCode);
+
+    for (const row of teacher.sessions) {
+      const period = PROVISIONAL_2026_27_PERIOD_BY_FRANJA.get(formatFranja(row));
+      if (!period) throw new Error(`Franja no canónica para ${sourceCode}: ${formatFranja(row)}.`);
+      sessions.push({
+        teacher_source_code: sourceCode,
+        weekday: DAY_INDEX[row.dia],
+        period_key: period.key,
+        type: row.tipo === 'guardia' ? 'guardia' : 'class',
+        subject: row.tipo === 'guardia' ? '' : row.asignatura,
+        group: row.tipo === 'guardia' ? '' : row.grupo,
+        room: row.tipo === 'guardia' ? '' : row.aula,
+        source_ref: `${sourceCode} · ${teacher.display_name} · ${row.dia} ${formatFranja(row)}`
+      });
+    }
+  }
+
+  return {
+    schema_version: 1,
+    academic_year: academicYear,
+    label: cleanText(preparedSource.fuente) || `Horario ${academicYear}`,
+    source: {
+      system: cleanText(options.sourceSystem || preparedSource.sourceSystem) || 'Peñalara Software',
+      format: cleanText(options.sourceFormat || 'xml').toLowerCase(),
+      provisional: !!options.provisional
+    },
+    teacher_source_codes: [...new Set(teacherSourceCodes)].sort((left, right) => left.localeCompare(right, 'en')),
+    periods: PROVISIONAL_2026_27_PERIOD_DEFINITIONS.map(period => ({ ...period })),
+    sessions,
+    anomalies: [
+      ...preparedSource.metadata.duplicateSourceCodes.map(code => `Bloque source_code duplicado y fusionado: ${code}`),
+      ...preparedSource.metadata.duplicateRows.map(row => `Sesión duplicada descartada: ${row}`),
+      ...preparedSource.metadata.teachersWithoutSessions.map(code => `Docente sin sesiones: ${code}`)
+    ]
+  };
 }
 
 function decodeXmlEntities(value) {
@@ -388,21 +458,35 @@ function parseAnnualXml(xmlText, sourceLabel = 'import.xml') {
   const rootFuente = getAttrValue(rootAttrs, ['fuente', 'source', 'origen']) ||
     getTagValue(normalizedXml, ['fuente', 'source', 'origen']) ||
     cleanText(sourceLabel);
+  const academicYear = getAttrValue(rootAttrs, ['academic_year', 'academicYear', 'curso', 'course']) ||
+    getTagValue(normalizedXml, ['academic_year', 'academicYear', 'curso', 'course']);
+  const sourceSystem = getAttrValue(rootAttrs, ['source_system', 'sourceSystem', 'sistema']) ||
+    getTagValue(normalizedXml, ['source_system', 'sourceSystem', 'sistema']) ||
+    'Peñalara Software';
 
   const teacherNodes = collectNodeMatches(normalizedXml, ['teacher', 'profesor', 'docente'], false);
   if (!teacherNodes.length) {
     throw new Error('El XML no contiene nodos de profesorado reconocibles.');
   }
 
-  const teachers = {};
-  const unnamedTeacherNodes = [];
+  const teachersBySourceCode = new Map();
   for (const teacherNode of teacherNodes) {
-    const teacherName = getNodeValue(teacherNode.attrs, teacherNode.body, ['nombre', 'name', 'profesor', 'docente']);
+    const displayName = getNodeValue(teacherNode.attrs, teacherNode.body, ['nombre', 'name', 'profesor', 'docente']);
+    const teacherSourceCode = getAttrValue(
+      teacherNode.attrs,
+      ['source_code', 'sourceCode', 'external_key', 'externalKey', 'codigo', 'codi', 'code', 'id']
+    ) || getTagValue(
+      teacherNode.body,
+      ['source_code', 'sourceCode', 'external_key', 'externalKey', 'codigo', 'codi', 'code']
+    );
     const sessionNodes = collectNodeMatches(teacherNode.body, ['session', 'sesion', 'entry', 'row', 'tramo'], true);
-    if (!teacherName) {
-      if (sessionNodes.length) unnamedTeacherNodes.push('sin nombre');
-      continue;
+    if (!displayName) {
+      throw new Error('El XML contiene un bloque de profesorado sin display_name.');
     }
+    if (!teacherSourceCode) {
+      throw new Error(`El profesor ${displayName} no tiene source_code en el XML.`);
+    }
+    const sourceCode = normalizeTeacherSourceCode(teacherSourceCode);
     const rows = sessionNodes
       .map(sessionNode => ({
         dia: getNodeValue(sessionNode.attrs, sessionNode.body, ['dia', 'day']),
@@ -419,91 +503,43 @@ function parseAnnualXml(xmlText, sourceLabel = 'import.xml') {
         tipo: cleanText(row.tipo).toLowerCase() === 'guardia' ? 'guardia' : 'clase'
       }));
 
-    if (rows.length) {
-      teachers[teacherName] = rows;
+    const existing = teachersBySourceCode.get(sourceCode);
+    if (existing) {
+      if (existing.display_name !== displayName) {
+        throw new Error(
+          `El source_code ${sourceCode} tiene identidades docentes contradictorias: ` +
+          `"${existing.display_name}" y "${displayName}".`
+        );
+      }
+      existing.sessions.push(...rows);
+    } else {
+      teachersBySourceCode.set(sourceCode, {
+        source_code: sourceCode,
+        display_name: displayName,
+        sessions: rows
+      });
     }
   }
 
-  if (unnamedTeacherNodes.length) {
-    throw new Error('El XML contiene nodos de profesorado con sesiones pero sin nombre.');
-  }
-
-  if (!Object.keys(teachers).length) {
+  const teachers = [...teachersBySourceCode.values()];
+  if (!teachers.some(teacher => teacher.sessions.length)) {
     throw new Error('El XML no contiene sesiones válidas para importar.');
   }
 
   return normalizeInput({
+    academicYear,
+    sourceSystem,
     fuente: rootFuente,
     formato: 'xml_importado',
     teachers
   });
 }
 
-function formatStamp() {
-  return new Intl.DateTimeFormat('sv-SE', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    timeZone: 'Europe/Madrid'
-  }).format(new Date()).replace(/[\s:]/g, '-');
-}
-
-function backupIfExists(filePath, backupDir) {
-  if (!fs.existsSync(filePath)) return null;
-  fs.mkdirSync(backupDir, { recursive: true });
-  const backupPath = path.join(
-    backupDir,
-    `${path.basename(filePath, path.extname(filePath))}-${formatStamp()}${path.extname(filePath)}`
-  );
-  fs.copyFileSync(filePath, backupPath);
-  return backupPath;
-}
-
-function writeAnnualSourceArtifacts(source, options = {}) {
-  const normalizedSource = validateAndNormalizeAnnualSource(source, options);
-  const payload = buildPayload(normalizedSource);
-  if (!payload.fuente) payload.fuente = cleanText(options.sourceLabel || 'importado');
-
-  fs.mkdirSync(path.dirname(DEFAULT_SOURCE_PATH), { recursive: true });
-  fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
-
-  const jsonBackupPath = backupIfExists(DEFAULT_SOURCE_PATH, JSON_BACKUP_DIR);
-  const jsBackupPath = backupIfExists(OUTPUT_PATH, JS_BACKUP_DIR);
-
-  fs.writeFileSync(DEFAULT_SOURCE_PATH, `${JSON.stringify(normalizedSource, null, 2)}\n`, 'utf8');
-  fs.writeFileSync(OUTPUT_PATH, `window.PROFESORADO_SOURCE=${JSON.stringify(payload, null, 2)};\n`, 'utf8');
-
-  let xmlSnapshotPath = null;
-  if (options.xmlText) {
-    fs.writeFileSync(IMPORT_XML_PATH, String(options.xmlText), 'utf8');
-    xmlSnapshotPath = IMPORT_XML_PATH;
-  }
-
-  return {
-    payload,
-    normalizedSource,
-    sourcePath: DEFAULT_SOURCE_PATH,
-    outputPath: OUTPUT_PATH,
-    xmlSnapshotPath,
-    backups: {
-      json: jsonBackupPath,
-      js: jsBackupPath
-    }
-  };
-}
-
 module.exports = {
-  DEFAULT_SOURCE_PATH,
-  OUTPUT_PATH,
-  IMPORT_XML_PATH,
+  buildCanonicalSchedule,
   buildPayload,
   cleanText,
-  loadJsonSource,
   normalizeText,
   parseAnnualXml,
-  validateAndNormalizeAnnualSource,
-  writeAnnualSourceArtifacts
+  validateAndNormalizeAnnualSource
 };

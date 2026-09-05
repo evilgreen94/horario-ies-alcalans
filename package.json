@@ -12,7 +12,6 @@
     "db:init": "node server/scripts/init-db.js",
     "smoke": "node server/scripts/smoke-test.js",
     "stability:guardias": "node server/scripts/guardias-stability-check.js",
-    "annual:build": "node server/scripts/build-profesorado-source.js",
     "course:reset": "node server/scripts/reset-course.js",
     "schedule:prepare": "node server/scripts/prepare-canonical-schedule.js",
     "schedule:activate": "node server/scripts/activate-canonical-schedule.js",

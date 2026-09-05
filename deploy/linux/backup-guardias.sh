@@ -15,7 +15,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 DB_PATH="${GUARDIAS_DB_PATH:-$PROJECT_ROOT/BD/guardias.sqlite}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/guardias}"
-JSON_BACKUP_ENABLED="${JSON_BACKUP_ENABLED:-0}"
 
 DAILY_KEEP="${DAILY_KEEP:-14}"
 WEEKLY_KEEP="${WEEKLY_KEEP:-8}"
@@ -62,15 +61,6 @@ sqlite3 "$DB_PATH" ".backup '$TMP_FILE'"
 mv -f "$TMP_FILE" "$TARGET_FILE"
 chmod 600 "$TARGET_FILE"
 
-if [[ "$JSON_BACKUP_ENABLED" == "1" ]]; then
-  JSON_TARGET="${TARGET_FILE%.sqlite}.json"
-  if [[ -f "$PROJECT_ROOT/BD/backups/latest-guardias-backup.json" ]]; then
-    cp "$PROJECT_ROOT/BD/backups/latest-guardias-backup.json" "$JSON_TARGET"
-    chmod 600 "$JSON_TARGET"
-  fi
-fi
-
 find "$TARGET_DIR" -maxdepth 1 -type f -name 'guardias-*.sqlite' | sort -r | awk "NR>$KEEP" | xargs -r rm -f
-find "$TARGET_DIR" -maxdepth 1 -type f -name 'guardias-*.json' | sort -r | awk "NR>$KEEP" | xargs -r rm -f
 
 echo "Backup $KIND creado en $TARGET_FILE"

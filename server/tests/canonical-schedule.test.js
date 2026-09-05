@@ -89,6 +89,35 @@ module.exports = [
     }
   },
   {
+    name: 'canonical SQLite runtime keeps equal display names ordered and isolated by external key',
+    async fn() {
+      await withDatabase(async db => {
+        await importTeacherProfiles(db, {
+          schema_version: 1,
+          academic_year: '2026/27',
+          source_system: 'Peñalara Software',
+          teacher_count: 2,
+          teachers: [
+            { source_code: 'JGP2', display_name: 'JOSE GARCIA PEREZ', active: true },
+            { source_code: 'JGP1', display_name: 'JOSE GARCIA PEREZ', active: true }
+          ]
+        }, { expectedCount: 2 });
+
+        const duplicateNamesSchedule = schedule('xml', 'JGP1', 'nombres-duplicados');
+        duplicateNamesSchedule.sessions = [
+          { teacher_source_code: 'JGP2', weekday: 1, period_key: 'P-B', type: 'class', subject: 'LENG', group: '2B', room: 'B2' },
+          { teacher_source_code: 'JGP1', weekday: 0, period_key: 'P-A', type: 'class', subject: 'MAT', group: '1A', room: 'A1' }
+        ];
+        const imported = await importScheduleDataset(db, duplicateNamesSchedule);
+        await activateScheduleDataset(db, imported.datasetId);
+
+        const active = await loadCanonicalDataset(db);
+        assert.deepEqual(active.teachers.map(teacher => teacher.sourceCode), ['JGP1', 'JGP2']);
+        assert.deepEqual(active.teachers.map(teacher => teacher.sessions[0].subject), ['MAT', 'LENG']);
+      });
+    }
+  },
+  {
     name: 'dataset activation is explicit transactional and preserves the exact external identity',
     async fn() {
       await withDatabase(async db => {

@@ -450,7 +450,10 @@ async function loadCanonicalDataset(db) {
      JOIN teacher_profiles profile ON profile.id = session.teacher_profile_id
      JOIN teacher_external_identities identity ON identity.id = session.teacher_external_identity_id
      WHERE session.dataset_id = ?
-     ORDER BY profile.display_name COLLATE NOCASE, session.weekday, period.position`,
+     ORDER BY profile.display_name COLLATE NOCASE,
+              identity.external_key COLLATE NOCASE,
+              session.weekday,
+              period.position`,
     [dataset.id]
   );
   const profiles = await db.all(
@@ -459,7 +462,7 @@ async function loadCanonicalDataset(db) {
      JOIN teacher_profiles profile ON profile.id = roster.teacher_profile_id
      JOIN teacher_external_identities identity ON identity.id = roster.teacher_external_identity_id
      WHERE roster.dataset_id = ?
-     ORDER BY profile.display_name COLLATE NOCASE`,
+     ORDER BY profile.display_name COLLATE NOCASE, identity.external_key COLLATE NOCASE`,
     [dataset.id]
   );
   return {

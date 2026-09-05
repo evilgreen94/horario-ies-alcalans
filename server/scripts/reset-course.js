@@ -2,8 +2,11 @@ const fs = require('fs');
 const path = require('path');
 
 const { DB_PATH, getDatabase } = require('../db');
+const { createSqliteBackup, verifySqliteBackup } = require('../sqlite-backup');
 
-const BACKUP_DIR = path.join(__dirname, '..', '..', 'BD', 'backups');
+const BACKUP_DIR = process.env.GUARDIAS_BACKUP_DIR
+  ? path.resolve(process.env.GUARDIAS_BACKUP_DIR)
+  : path.join(path.dirname(DB_PATH), 'backups');
 const APP_STATE_KEYS_TO_CLEAR = [
   'school_week_key',
   'guardia_monthly_load',
@@ -33,58 +36,16 @@ function ensureConfirmed() {
   process.exit(1);
 }
 
-async function buildArchive(db) {
-  const [guardias, biblioteca, historial, tareasProfesorado, sessionOverrides, appState] = await Promise.all([
-    db.all('SELECT * FROM ausencias ORDER BY dia, hora, id'),
-    db.all('SELECT dia, hora, profesor FROM biblioteca_guardias ORDER BY dia, hora'),
-    db.all('SELECT * FROM historial ORDER BY ts DESC'),
-    db.all('SELECT * FROM tareas_profesorado ORDER BY profesor, dia, hora'),
-    db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora'),
-    db.all('SELECT key, value, updated_at FROM app_state ORDER BY key')
-  ]);
-
-  const appStateMap = Object.fromEntries(appState.map(row => [row.key, row.value]));
-
-  return {
-    exportedAt: new Date().toISOString(),
-    kind: 'course-archive',
-    dbPath: DB_PATH,
-    guardias: guardias.map(row => ({ ...row, faena: !!row.faena })),
-    biblioteca,
-    historial: historial.map(row => ({
-      id: row.id,
-      title: row.title,
-      detail: row.detail,
-      type: row.type,
-      actor: row.actor,
-      ts: row.ts,
-      undoState: row.undo_state ? JSON.parse(row.undo_state) : null
-    })),
-    tareasProfesorado: tareasProfesorado.map(row => ({
-      id: row.id,
-      profesor: row.profesor,
-      dia: row.dia,
-      hora: row.hora,
-      dejada: !!row.dejada,
-      tarea: row.tarea || ''
-    })),
-    sessionOverrides,
-    substitutions: JSON.parse(appStateMap.teacher_substitutions || '[]'),
-    futureAbsences: JSON.parse(appStateMap.teacher_future_absences || '[]'),
-    schoolWeekKey: appStateMap.school_week_key || ''
-  };
-}
-
 async function main() {
   ensureConfirmed();
 
   const db = await getDatabase();
   const stamp = formatStamp();
-  const archive = await buildArchive(db);
 
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
-  const archivePath = path.join(BACKUP_DIR, `course-archive-${stamp}.json`);
-  fs.writeFileSync(archivePath, JSON.stringify(archive, null, 2), 'utf8');
+  const archivePath = path.join(BACKUP_DIR, `course-archive-${stamp}.sqlite`);
+  await createSqliteBackup(DB_PATH, archivePath);
+  await verifySqliteBackup(archivePath);
 
   await db.exec('BEGIN TRANSACTION');
   try {

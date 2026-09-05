@@ -41,7 +41,6 @@ horario-ies-alcalans/
 |   |   |-- guardias-core.js
 |   |   `-- storage.js
 |   `-- data/
-|       |-- profesorado_horarios_guardias.js
 |       `-- patio_guardias.js
 |-- server/
 |   |-- app.js
@@ -79,7 +78,9 @@ horario-ies-alcalans/
 
 ### Datos
 
-- Horario anual del profesorado: `js/data/profesorado_horarios_guardias.js`
+- Perfiles, identidades externas y datasets horarios: SQLite.
+- La importacion anual XML crea un dataset canónico `validated` en SQLite; una
+  cuenta `superadmin` debe activarlo explícitamente.
 - Configuracion de patio: `js/data/patio_guardias.js`
 - Base de datos operativa: `BD/guardias.sqlite`
 
@@ -94,6 +95,7 @@ En SQLite se guardan:
 - faltas futuras
 - avisos TV
 - configuraciones operativas auxiliares
+- cursos académicos, perfiles docentes, identidades y horarios versionados
 
 ## URLs utiles
 
@@ -197,6 +199,8 @@ pm2 stop guardias
 ## Backups
 
 Los timers y scripts estan en `deploy/linux/`.
+Todas las copias persistentes del backend usan el formato SQLite; no se generan
+copias laterales JSON.
 
 Ficheros importantes:
 

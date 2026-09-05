@@ -5764,7 +5764,7 @@ async function importAnnualXmlFile(file){
   if(!file||!isAdmin||!storage.hasBackend()) return;
   const confirmed=await askConfirm(
     'Importar XML anual',
-    'Se actualizará la plantilla anual de profesorado, horario y guardias del curso. La vista actual necesitará recargarse para usar la nueva fuente.',
+    'El XML se validará y guardará como un nuevo dataset canónico en SQLite. No se activará automáticamente.',
     'Importar XML'
   );
   if(!confirmed) return;
@@ -5774,15 +5774,9 @@ async function importAnnualXmlFile(file){
     if(saveTs) saveTs.textContent=`Importando ${file.name}...`;
     const xmlText=await file.text();
     const result=await storage.importAnnualXml(file.name,xmlText);
-    const summary=`XML anual importado · ${result?.teachers ?? 0} profesores · dataset ${result?.datasetId || '-'}`;
+    const summary=`XML validado en SQLite · ${result?.teachers ?? 0} profesores · ${result?.sessions ?? 0} sesiones · dataset ${result?.datasetId || '-'}`;
     if(saveTs) saveTs.textContent=summary;
-    showToast('Plantilla anual actualizada. Recarga la aplicación para usarla.','success');
-    const shouldReload=await askConfirm(
-      'Importación completada',
-      `${summary}. La aplicación debe recargarse para reconstruir horarios y guardias con la nueva fuente.`,
-      'Recargar ahora'
-    );
-    if(shouldReload) window.location.reload();
+    showToast('Dataset validado. Debe activarlo una cuenta superadmin para usarlo.','success');
   }catch(error){
     console.warn('Annual XML import failed',error);
     if(saveTs) saveTs.textContent=previousStatus||'No se pudo importar el XML anual.';
