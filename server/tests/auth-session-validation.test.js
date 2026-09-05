@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
-const { hashPassword, verifyPassword } = require('../auth');
+const { hashPassword, verifyPassword, SCRYPT_OPTIONS } = require('../auth');
 const validation = require('../routes/validation');
 
 function loadSessionModule(secret) {
@@ -32,6 +32,8 @@ module.exports = [
       assert.ok(verifyPassword('secreta', salt, first.hash));
       assert.equal(verifyPassword('otra', salt, first.hash), false);
       assert.equal(verifyPassword('secreta', salt, 'abcd'), false);
+      assert.deepEqual(SCRYPT_OPTIONS, { N: 16384, r: 8, p: 1, maxmem: 33554432 });
+      assert.equal(first.hash.length, 128);
     }
   },
   {
@@ -180,7 +182,7 @@ module.exports = [
         profesor: 'Ada',
         date: '2026-05-04',
         note: 'Reunion externa',
-        hours: [1, 2, 3, 4],
+        hours: [1, 2, 3, 4, 9],
         status: 'approved',
         reviewedAt: '2026-04-30T10:15:00.000Z',
         reviewerNote: 'ok',

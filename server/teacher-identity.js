@@ -27,19 +27,24 @@ async function resolveActiveTeacherProfile(db, userId, date = new Date()) {
        ta.replaces_assignment_id,
        tp.id AS teacher_profile_id,
        tp.schedule_key,
-       tp.display_name
+       tp.display_name,
+       ay.id AS academic_year_id,
+       ay.code AS academic_year
      FROM teacher_assignments ta
      JOIN users u ON u.id = ta.user_id AND u.is_active = 1
      JOIN teacher_profiles tp ON tp.id = ta.teacher_profile_id AND tp.is_active = 1
+     JOIN academic_years ay ON ay.id = ta.academic_year_id
      WHERE ta.user_id = ?
        AND ta.starts_on <= ?
        AND (ta.ends_on IS NULL OR ta.ends_on >= ?)
+       AND ay.starts_on <= ?
+       AND ay.ends_on >= ?
      ORDER BY
        CASE ta.assignment_type WHEN 'sustituto' THEN 0 ELSE 1 END,
        ta.starts_on DESC,
        ta.id DESC
      LIMIT 1`,
-    [normalizedUserId, dateKey, dateKey]
+    [normalizedUserId, dateKey, dateKey, dateKey, dateKey]
   );
 
   if (!row) return null;
@@ -55,6 +60,8 @@ async function resolveActiveTeacherProfile(db, userId, date = new Date()) {
     },
     teacherProfile: {
       id: row.teacher_profile_id,
+      academicYearId: row.academic_year_id,
+      academicYear: row.academic_year,
       scheduleKey: row.schedule_key || null,
       displayName: row.display_name
     }

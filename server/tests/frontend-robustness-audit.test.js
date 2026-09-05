@@ -9,6 +9,7 @@ const {
   createTestEnvironment,
   login,
   request,
+  seedActiveSchedule,
   startServer,
   stopServer
 } = require('./helpers/integration-harness');
@@ -94,6 +95,7 @@ async function testHttpEdgeCasesAndTwoClients() {
   let server = null;
   try {
     server = await startServer({ dbPath: environment.dbPath });
+    await seedActiveSchedule(environment.dbPath);
     const clientA = await login(server.baseUrl, 'admin', 'Admin-integration-2026');
     const clientB = await login(server.baseUrl, 'admin', 'Admin-integration-2026');
     assert.strictEqual(clientA.response.status, 200);
@@ -123,7 +125,7 @@ async function testHttpEdgeCasesAndTwoClients() {
     assert.strictEqual(invalidEmpty.response.status, 400);
     const invalidHour = await request(server.baseUrl, '/api/guardias', {
       method: 'POST',
-      body: { dia: 0, hora: 99, ausente: 'DOCENTE QA' }
+      body: { dia: 0, hora: -1, ausente: 'DOCENTE QA' }
     }, clientA.jar);
     assert.strictEqual(invalidHour.response.status, 400);
 

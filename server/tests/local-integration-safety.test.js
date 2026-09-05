@@ -10,6 +10,7 @@ const {
   loginIndividual,
   openDatabase,
   request,
+  seedActiveSchedule,
   startServer,
   stopServer
 } = require('./helpers/integration-harness');
@@ -48,6 +49,12 @@ async function readDatabaseSnapshot(dbPath) {
       'user_roles',
       'teacher_profiles',
       'teacher_assignments',
+      'academic_years',
+      'teacher_external_identities',
+      'schedule_datasets',
+      'schedule_dataset_teachers',
+      'schedule_periods',
+      'teacher_schedule_sessions',
       'audit_log',
       'schema_migrations'
     ];
@@ -79,6 +86,7 @@ async function testHttpLifecycle() {
       adminPassword: INITIAL_ADMIN_PASSWORD,
       superadminPassword: SUPERADMIN_PASSWORD
     });
+    await seedActiveSchedule(environment.dbPath);
 
     const anonymous = await request(server.baseUrl, '/api/guardias', {
       method: 'POST',
@@ -266,6 +274,12 @@ async function testIndividualAuthenticationLifecycle() {
     }, authenticated.jar);
     assert.strictEqual(forbiddenAdminWrite.response.status, 403);
 
+    const forbiddenDatasetActivation = await request(server.baseUrl, '/api/schedule/datasets/1/activate', {
+      method: 'POST',
+      body: {}
+    }, authenticated.jar);
+    assert.strictEqual(forbiddenDatasetActivation.response.status, 403);
+
     const changed = await request(server.baseUrl, '/api/auth/change-password', {
       method: 'POST',
       body: {
@@ -352,6 +366,12 @@ async function testWeeklyReset() {
       'user_roles',
       'teacher_profiles',
       'teacher_assignments',
+      'academic_years',
+      'teacher_external_identities',
+      'schedule_datasets',
+      'schedule_dataset_teachers',
+      'schedule_periods',
+      'teacher_schedule_sessions',
       'audit_log',
       'schema_migrations'
     ];
@@ -374,7 +394,7 @@ async function testWeeklyReset() {
     assert.strictEqual(after.grupos_estado, 1);
     assert.strictEqual(after.auth_credentials, 2);
     assert.strictEqual(after.roles, 3);
-    assert.strictEqual(after.schema_migrations, 1);
+    assert.strictEqual(after.schema_migrations, 2);
     for (const table of ['users', 'user_roles', 'teacher_profiles', 'teacher_assignments', 'audit_log']) {
       assert.strictEqual(after[table], before[table], `${table} should survive weekly maintenance`);
     }

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#12372a">
+  <title>Mi horario · IES Alcalans</title>
+  <link rel="stylesheet" href="/app/app.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <p class="eyebrow">IES Alcalans</p>
+      <h1>Mi jornada</h1>
+      <p id="datasetLabel" class="muted">Horario docente individual</p>
+    </header>
+
+    <section id="loginPanel" class="card auth-card">
+      <h2>Acceso docente</h2>
+      <p class="muted">Usa tu cuenta individual. Las claves de jefatura no abren esta vista.</p>
+      <form id="loginForm">
+        <label>Usuario<input id="username" name="username" autocomplete="username" required></label>
+        <label>Contraseña<input id="password" name="password" type="password" autocomplete="current-password" minlength="6" required></label>
+        <button type="submit">Entrar</button>
+      </form>
+    </section>
+
+    <section id="schedulePanel" hidden>
+      <article class="card now-card">
+        <div>
+          <p id="teacherCode" class="eyebrow"></p>
+          <h2 id="teacherName"></h2>
+          <p id="dateLabel" class="muted"></p>
+        </div>
+        <span id="currentState" class="state-pill"></span>
+      </article>
+      <ol id="periodList" class="period-list"></ol>
+      <button id="logoutButton" class="secondary" type="button">Cerrar sesión</button>
+    </section>
+    <p id="message" class="message" role="status" aria-live="polite"></p>
+  </main>
+  <script src="/app/app.js" defer></script>
+</body>
+</html>

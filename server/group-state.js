@@ -1,11 +1,4 @@
-const fs = require('fs');
-const path = require('path');
-
-const SOURCE_PATH = path.join(__dirname, '..', 'js', 'data', 'profesorado_horarios_guardias.js');
-
-let cachedSource = null;
-let cachedSourceMtimeMs = -1;
-let cachedGroups = [];
+const { loadCanonicalDataset } = require('./schedule-model');
 
 function cleanText(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -30,43 +23,29 @@ function normalizeGroupKey(value) {
     .replace(/[^a-z0-9]+/g, '');
 }
 
-function loadTeacherSource() {
-  const stat = fs.statSync(SOURCE_PATH);
-  if (cachedSource && cachedSourceMtimeMs === stat.mtimeMs) return cachedSource;
-  const raw = fs.readFileSync(SOURCE_PATH, 'utf8').trim();
-  const prefix = 'window.PROFESORADO_SOURCE=';
-  if (!raw.startsWith(prefix)) {
-    throw new Error(`Formato no reconocido en ${SOURCE_PATH}`);
-  }
-  const payload = JSON.parse(raw.slice(prefix.length).replace(/;$/, ''));
-  cachedSource = payload;
-  cachedSourceMtimeMs = stat.mtimeMs;
-  cachedGroups = [];
-  return payload;
-}
-
-function detectGroupsFromSource() {
-  if (cachedGroups.length) return cachedGroups.slice();
-  const payload = loadTeacherSource();
+async function detectGroupsFromSource(db) {
+  const payload = await loadCanonicalDataset(db);
   const groups = new Map();
   (payload?.teachers || []).forEach(teacher => {
-    (teacher?.horario || []).forEach(entry => {
-      const texto = cleanText(entry?.texto);
-      if (!texto || normalizeText(texto).includes('guardia')) return;
-      const parts = texto.split('|').map(part => cleanText(part)).filter(Boolean);
-      const grupo = parts.length >= 3 ? parts[1] : '';
+    (teacher?.sessions || []).forEach(entry => {
+      if (entry?.type !== 'class') return;
+      const grupo = cleanText(entry?.group);
       if (!grupo) return;
       const key = normalizeText(grupo);
       if (!key || groups.has(key)) return;
       groups.set(key, grupo);
     });
   });
-  cachedGroups = [...groups.values()].sort((a, b) => a.localeCompare(b, 'es'));
-  return cachedGroups.slice();
+  return [...groups.values()].sort((a, b) => a.localeCompare(b, 'es'));
 }
 
 async function ensureGroupsSynced(db) {
-  const detectedGroups = detectGroupsFromSource();
+  let detectedGroups = [];
+  try {
+    detectedGroups = await detectGroupsFromSource(db);
+  } catch (error) {
+    if (error?.code !== 'SCHEDULE_DATASET_UNAVAILABLE') throw error;
+  }
   const existingRows = await db.all('SELECT grupo, activo, updated_at FROM grupos_estado ORDER BY grupo COLLATE NOCASE');
   const existingByRaw = new Map(existingRows.map(row => [cleanText(row.grupo), row]));
   const existingByKey = new Map(existingRows.map(row => [normalizeGroupKey(row.grupo), row]).filter(([key]) => key));

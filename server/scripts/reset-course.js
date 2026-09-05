@@ -93,6 +93,8 @@ async function main() {
     await db.exec('DELETE FROM historial');
     await db.exec('DELETE FROM tareas_profesorado');
     await db.exec('DELETE FROM session_overrides');
+    await db.exec("UPDATE schedule_datasets SET status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE status = 'active'");
+    await db.exec("UPDATE academic_years SET status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE status = 'active'");
 
     for (const key of APP_STATE_KEYS_TO_CLEAR) {
       await db.run('DELETE FROM app_state WHERE key = ?', [key]);
@@ -107,7 +109,7 @@ async function main() {
   console.log('Curso operativo reiniciado correctamente.');
   console.log(`- Backup archivado en: ${archivePath}`);
   console.log(`- Base de datos: ${DB_PATH}`);
-  console.log('Siguiente paso recomendado: regenerar la fuente anual con npm run annual:build (usa por defecto json_profes/profesorado_horarios_guardias_con_guardias_updated.json; para otras fuentes, pasa --source <ruta>)');
+  console.log('Siguiente paso: importar y validar un dataset canónico del nuevo curso y activarlo explícitamente.');
 }
 
 main().catch(error => {

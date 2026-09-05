@@ -1,5 +1,17 @@
 ﻿const HORA_MAP={1:{label:'1a',rango:'08:15-09:10'},2:{label:'2a',rango:'09:10-10:05'},3:{label:'3a',rango:'10:05-11:00'},4:{label:'4a',rango:'11:00-11:25'},5:{label:'5a',rango:'11:25-12:20'},6:{label:'6a',rango:'12:20-13:15'},7:{label:'7a',rango:'13:15-14:10'},8:{label:'8a',rango:'14:10-14:25'},9:{label:'9a',rango:'14:25-15:20'}};
-const HORAS_PATIO=new Set([4,8,9]);
+const HORAS_PATIO=new Set([4,8]);
+const DATASET_PERIODS=Array.isArray(window.PROFESORADO_SOURCE?.periods)?window.PROFESORADO_SOURCE.periods:[];
+if(DATASET_PERIODS.length){
+  Object.keys(HORA_MAP).forEach(key=>delete HORA_MAP[key]);
+  HORAS_PATIO.clear();
+  DATASET_PERIODS.forEach(period=>{
+    const position=Number(period.position);
+    if(!Number.isInteger(position)) return;
+    HORA_MAP[position]={label:period.label||period.key||String(position),rango:`${period.startsAt}-${period.endsAt}`};
+    if(period.type==='break') HORAS_PATIO.add(position);
+  });
+}
+const ALL_HORAS=Object.keys(HORA_MAP).map(Number).filter(Number.isInteger).sort((a,b)=>a-b);
 const DIAS=['Lunes','Martes','Mi\u00e9rcoles','Jueves','Viernes'];
 const KEY='IES_Alcalans_Guardias';
 const KEY_ORDEN='IES_Alcalans_Guardias_OrdenHora';
@@ -64,7 +76,7 @@ const {
   showToast
 }=window.GuardiasUi;
 const RAW_PROFESORADO=(window.PROFESORADO_SOURCE&&Array.isArray(window.PROFESORADO_SOURCE.teachers))?window.PROFESORADO_SOURCE.teachers:[];
-const ANNUAL_DATASET_ID=cleanText(window.PROFESORADO_SOURCE?.datasetId||'legacy');
+const ANNUAL_DATASET_ID=cleanText(window.PROFESORADO_SOURCE?.datasetId||'unavailable');
 const GRUPOS_PROFESORADO={};
 const storage=window.GuardiasStorage;
 function escapeHtml(value){
@@ -76,7 +88,7 @@ function escapeHtml(value){
     .replace(/'/g,'&#39;');
 }
 function getCurrentSchoolSlot(){
-  if(Number.isInteger(FORCE_TV_HORA)&&FORCE_TV_HORA>=1&&FORCE_TV_HORA<=9){
+  if(Number.isInteger(FORCE_TV_HORA)&&esHoraValida(FORCE_TV_HORA)){
     const forcedDay=Number.isInteger(FORCE_TV_DIA)&&FORCE_TV_DIA>=0&&FORCE_TV_DIA<=4
       ? FORCE_TV_DIA
       : (()=>{const weekday=formatNowParts().date.getDay(); return weekday>=1&&weekday<=5?weekday-1:0;})();
@@ -99,7 +111,7 @@ function getCurrentSchoolSlot(){
 }
 const DIA_INDEX={'lunes':0,'martes':1,'miercoles':2,'mi\u00e9rcoles':2,'jueves':3,'viernes':4};
 const HORA_INDEX=Object.fromEntries(Object.entries(HORA_MAP).map(([hora,info])=>[info.rango,+hora]));
-function esHoraValida(hora){return Number.isInteger(Number(hora))&&Number(hora)>=1&&Number(hora)<=9;}
+function esHoraValida(hora){return Number.isInteger(Number(hora))&&Object.hasOwn(HORA_MAP,Number(hora));}
 function logInvalidAbsenceHour(context,details={}){
   try{
     console.warn(`[ausencias] ${context}`,details);
@@ -128,7 +140,7 @@ function buildProfesoradoData(){
   const guardiasPorHora={};
   for(let dia=0;dia<5;dia++){
     guardiasPorHora[dia]={};
-    for(let hora=1;hora<=9;hora++) guardiasPorHora[dia][hora]=[];
+    for(const hora of ALL_HORAS) guardiasPorHora[dia][hora]=[];
   }
   RAW_PROFESORADO.forEach((teacher,index)=>{
     const nombre=formatTeacherName(teacher.nombre)||`Profesor ${index+1}`;
@@ -136,7 +148,7 @@ function buildProfesoradoData(){
     const gruposProfesor=new Set();
     (teacher.horario||[]).forEach(item=>{
       const dia=resolveDiaIndex(item.dia);
-      const hora=normalizaHora(item.franja);
+      const hora=esHoraValida(item.slot)?Number(item.slot):normalizaHora(item.franja);
       if(dia==null||hora==null) return;
       if(!horario[dia]) horario[dia]={};
       const sesion=parseSesion(item);
@@ -151,7 +163,7 @@ function buildProfesoradoData(){
     const guardiasUnicas=new Set();
     [...(teacher.guardias||[]),...(teacher.horario||[]).filter(item=>isGuardiaTexto(item.texto))].forEach(item=>{
       const dia=resolveDiaIndex(item.dia);
-      const hora=normalizaHora(item.franja);
+      const hora=esHoraValida(item.slot)?Number(item.slot):normalizaHora(item.franja);
       if(dia==null||hora==null) return;
       if(HORAS_PATIO.has(hora)) return;
       const key=`${dia}-${hora}`;
@@ -593,7 +605,7 @@ function normalizePracticasGuardiasSlot(row){
   const profesor=resolveTeacherCanonicalName(row?.profesor);
   const dia=Number(row?.dia);
   const hora=Number(row?.hora);
-  if(!getProfesor(profesor)||!Number.isInteger(dia)||dia<0||dia>4||!Number.isInteger(hora)||hora<1||hora>9||HORAS_PATIO.has(hora)) return null;
+  if(!getProfesor(profesor)||!Number.isInteger(dia)||dia<0||dia>4||!esHoraValida(hora)||HORAS_PATIO.has(hora)) return null;
   return {profesor,dia,hora};
 }
 function loadTeacherPracticasGuardiasTramos(){
@@ -614,7 +626,7 @@ function normalizePatioGuardiaRow(row){
   const mappedSector=PATIO_SECTORS_BY_ID[positionId]||null;
   const positionType=cleanText(row?.positionType||(mappedSector?'sector':'extra')).toLowerCase()==='extra'?'extra':'sector';
   const positionLabel=cleanText(row?.positionLabel||mappedSector?.label||row?.label);
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(weekKey)||!Number.isInteger(dia)||dia<0||dia>4||!Number.isInteger(hora)||hora<1||hora>9||!positionId) return null;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(weekKey)||!Number.isInteger(dia)||dia<0||dia>4||!esHoraValida(hora)||!positionId) return null;
   return {
     weekKey,
     dia,
@@ -773,7 +785,7 @@ function normalizeAlumnosFueraRow(row){
   const dia=Number(row?.dia);
   const hora=Number(row?.hora);
   const cantidad=Math.max(0,Number(row?.cantidad)||0);
-  if(!getProfesor(profesor)||!Number.isInteger(dia)||dia<0||dia>4||!Number.isInteger(hora)||hora<1||hora>9||HORAS_PATIO.has(hora)) return null;
+  if(!getProfesor(profesor)||!Number.isInteger(dia)||dia<0||dia>4||!esHoraValida(hora)||HORAS_PATIO.has(hora)) return null;
   return {
     profesor,
     dia,
@@ -1126,12 +1138,12 @@ function closeWorkflowOverlays(ids){
 }
 function shuffle(arr){const copy=[...arr];for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}return copy;}
 function makeOrdenHora(dia,hora){return shuffle(getProfesHora(dia,hora)).map((nombre,index)=>({nombre,numero:index+1}));}
-function buildInitialOrden(){const orden={};for(let dia=0;dia<5;dia++){orden[dia]={};for(let hora=1;hora<=9;hora++){orden[dia][hora]=makeOrdenHora(dia,hora);}}persistOrden(orden);return orden;}
+function buildInitialOrden(){const orden={};for(let dia=0;dia<5;dia++){orden[dia]={};for(const hora of ALL_HORAS){orden[dia][hora]=makeOrdenHora(dia,hora);}}persistOrden(orden);return orden;}
 function ensureOrden(base){
   const orden={...base};
   for(let dia=0;dia<5;dia++){
     if(!orden[dia]) orden[dia]={};
-    for(let hora=1;hora<=9;hora++){
+    for(const hora of ALL_HORAS){
       const esperados=getProfesHora(dia,hora);
       const actuales=Array.isArray(orden[dia][hora])?orden[dia][hora]:[];
       const nombresNormalizados=new Set(actuales.map(item=>normalizeText(item.nombre)));
@@ -1298,7 +1310,7 @@ function getOrdenHoraDisponible(dia,hora,excluidos){
 function assignGuardiasForRows(rowsSource){
   const rows=(rowsSource||[]).map(row=>({...row}));
   for(let diaIndex=0;diaIndex<5;diaIndex++){
-    for(let hora=1;hora<=9;hora++){
+    for(const hora of ALL_HORAS){
       if(HORAS_PATIO.has(hora)) continue;
       reassignGuardiasForSlot(diaIndex,hora,rows);
     }
@@ -1433,7 +1445,7 @@ function getSchoolDayGuardiaHours(){
 }
 function reassignAllGuardias(){
   for(let dia=0;dia<5;dia++){
-    for(let hora=1;hora<=9;hora++){
+    for(const hora of ALL_HORAS){
       if(HORAS_PATIO.has(hora)) continue;
       reassignGuardiasForSlot(dia,hora);
     }
@@ -2842,7 +2854,7 @@ const practicasGuardiasDomain=auxPanelsSuite?.createPracticasGuardiasDomain({
 function serializeBibliotecaAssignments(){
   const rows=[];
   for(let dia=0;dia<5;dia++){
-    for(let hora=1;hora<=9;hora++){
+    for(const hora of ALL_HORAS){
       if(HORAS_PATIO.has(hora)) continue;
       const profesor=getBibliotecaAsignada(dia,hora)||'';
       if(profesor) rows.push({dia,hora,profesor});
@@ -5189,7 +5201,7 @@ function renderGuardiaBoard(){
   let firstMobileCard=true;
   const rowsSource=getRowsForWeekOffset(weekOffset);
   const coverageCounter=buildGuardiaCoverageCounter({rowsSource});
-  for(let hora=1;hora<=9;hora++){
+  for(const hora of ALL_HORAS){
     if(PATIO_RENDER_HORAS.has(hora)){
       cards.push(renderPatioCard(hora));
       firstMobileCard=false;
@@ -5407,7 +5419,7 @@ async function sortearGuardiasDia(){
     'Sortear y guardar'
   );
   if(!confirmed) return;
-  for(let hora=1;hora<=9;hora++){
+  for(const hora of ALL_HORAS){
     ordenGuardias[day][hora]=makeOrdenHora(day,hora);
   }
   persistOrden(ordenGuardias);
@@ -6033,7 +6045,7 @@ function renderPracticasGuardiasConfig(){
   const rows=[];
   for(let dia=0;dia<5;dia++){
     const chips=[];
-    for(let hora=1;hora<=9;hora++){
+    for(const hora of ALL_HORAS){
       if(HORAS_PATIO.has(hora)) continue;
       const sesion=resolveTeacherSession(nombre,dia,hora);
       const eligible=isPracticasSessionEligible(sesion);
@@ -8271,6 +8283,14 @@ window.addEventListener('guardias-auth-invalid',()=>{
   renderTable();
   showToast('La sesi\u00f3n ha caducado.','error');
 });
+
+if(window.PROFESORADO_SOURCE_ERROR){
+  const banner=document.createElement('div');
+  banner.setAttribute('role','alert');
+  banner.style.cssText='position:sticky;top:0;z-index:9999;padding:12px 18px;background:#8b1e1e;color:white;font-weight:800;text-align:center';
+  banner.textContent=window.PROFESORADO_SOURCE_ERROR;
+  document.body.prepend(banner);
+}
 
 
 

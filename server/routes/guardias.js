@@ -152,11 +152,6 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
       logAusenciasDayComplete('dia completo solicitado', { profesor: payload.profesor, dia: payload.dia });
       const sesionesCubribles = await getSesionesCubriblesProfesor(db, payload.profesor, payload.dia);
       logAusenciasDayComplete('sesiones cubribles encontradas', { profesor: payload.profesor, dia: payload.dia, total: sesionesCubribles.length });
-      for (let hora = 1; hora <= 9; hora += 1) {
-        if (!sesionesCubribles.some(item => item.hora === hora)) {
-          logAusenciasDayComplete('skip', { profesor: payload.profesor, dia: payload.dia, hora, motivo: 'sin sesión cubrible' });
-        }
-      }
       if (!sesionesCubribles.length) {
         throw conflict('Ese profesor no tiene sesiones cubribles registradas ese día.');
       }

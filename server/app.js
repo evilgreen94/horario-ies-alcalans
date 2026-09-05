@@ -15,6 +15,7 @@ const exportRouter = require('./routes/export');
 const authRouter = require('./routes/auth');
 const avisosRouter = require('./routes/avisos');
 const gruposRouter = require('./routes/grupos');
+const scheduleRouter = require('./routes/schedule');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -126,6 +127,8 @@ app.use((req, res, next) => {
     pathname === '/guardias.html' ||
     pathname.startsWith('/js/app/') ||
     pathname.startsWith('/js/data/') ||
+    pathname === '/app' ||
+    pathname.startsWith('/app/') ||
     pathname.startsWith('/css/')
   ) {
     res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -150,6 +153,7 @@ app.use('/api/export', exportRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/avisos', avisosRouter);
 app.use('/api/grupos', gruposRouter);
+app.use('/api/schedule', scheduleRouter);
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'guardias.html'));
@@ -161,6 +165,10 @@ app.get('/tv', (_req, res) => {
 
 app.get('/print', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'guardias.html'));
+});
+
+app.get('/app', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'app', 'index.html'));
 });
 
 app.use((error, _req, res, _next) => {

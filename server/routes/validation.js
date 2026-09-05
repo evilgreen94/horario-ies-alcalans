@@ -73,7 +73,7 @@ function sanitizeAusencia(row) {
   const input = ensureObject(row, 'Ausencia');
   const horaRaw = input.hora;
   const horaNum = Number(horaRaw);
-  if (!Number.isInteger(horaNum) || horaNum < 1 || horaNum > 9) {
+  if (!Number.isInteger(horaNum) || horaNum < 0 || horaNum > 10000) {
     console.warn('[ausencias] sanitizeAusencia hora inválida', {
       profesor: input.ausente ?? input.profesor ?? '',
       dia: input.dia,
@@ -85,7 +85,7 @@ function sanitizeAusencia(row) {
   return {
     id: ensureOptionalId(input.id, 'id'),
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
-    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    hora: normalizeInteger(input.hora, 'hora', 0, 10000),
     ausente: ensureRequiredString(input.ausente, 'ausente'),
     guardia: normalizeString(input.guardia),
     aula: normalizeString(input.aula),
@@ -98,7 +98,7 @@ function sanitizeBiblioteca(row) {
   const input = ensureObject(row, 'Guardia de biblioteca');
   return {
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
-    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    hora: normalizeInteger(input.hora, 'hora', 0, 10000),
     profesor: ensureRequiredString(input.profesor, 'profesor')
   };
 }
@@ -122,7 +122,7 @@ function sanitizeTareaProfesorado(row) {
     id: ensureRequiredString(input.id, 'id'),
     profesor: ensureRequiredString(input.profesor, 'profesor'),
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
-    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    hora: normalizeInteger(input.hora, 'hora', 0, 10000),
     dejada: normalizeBoolean(input.dejada),
     tarea: normalizeString(input.tarea)
   };
@@ -137,7 +137,7 @@ function sanitizeAlumnosFueraAula(row) {
     id: ensureOptionalId(input.id, 'id'),
     profesor: ensureRequiredString(input.profesor, 'profesor'),
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
-    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    hora: normalizeInteger(input.hora, 'hora', 0, 10000),
     cantidad,
     lastExitAt: lastExitAt ? ensureTimestamp(lastExitAt, 'lastExitAt') : '',
     lastReturnAt: lastReturnAt ? ensureTimestamp(lastReturnAt, 'lastReturnAt') : ''
@@ -150,7 +150,7 @@ function sanitizeSessionOverride(row) {
     id: ensureRequiredString(input.id, 'id'),
     profesor: ensureRequiredString(input.profesor, 'profesor'),
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
-    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    hora: normalizeInteger(input.hora, 'hora', 0, 10000),
     materia: normalizeString(input.materia),
     grupo: normalizeString(input.grupo),
     detalle: normalizeString(input.detalle),
@@ -178,7 +178,7 @@ function sanitizeTeacherPracticeGuardiaSlot(row) {
   return {
     profesor: ensureRequiredString(input.profesor, 'profesor'),
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
-    hora: normalizeInteger(input.hora, 'hora', 1, 9)
+    hora: normalizeInteger(input.hora, 'hora', 0, 10000)
   };
 }
 
@@ -187,7 +187,7 @@ function sanitizePatioGuardia(row) {
   return {
     weekKey: ensureRequiredString(input.weekKey, 'weekKey'),
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
-    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    hora: normalizeInteger(input.hora, 'hora', 0, 10000),
     sectorId: ensureRequiredString(input.sectorId, 'sectorId'),
     covered: normalizeBoolean(input.covered),
     responsable: normalizeString(input.responsable),
@@ -219,7 +219,7 @@ function sanitizeTeacherFutureAbsence(row) {
     throw badRequest('status inv\u00e1lido.');
   }
   const hours = Array.isArray(input.hours)
-    ? input.hours.map(value => normalizeInteger(value, 'hours', 1, 9)).filter(value => ![8, 9].includes(value))
+    ? input.hours.map(value => normalizeInteger(value, 'hours', 0, 10000))
     : [];
   return {
     id: ensureRequiredString(input.id, 'id'),

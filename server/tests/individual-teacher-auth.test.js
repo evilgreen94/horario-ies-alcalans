@@ -46,6 +46,10 @@ function createResponse() {
 }
 
 async function seedIdentity(db) {
+  const academicYear = await db.run(
+    `INSERT INTO academic_years (code, starts_on, ends_on, status)
+     VALUES ('2026/27', '2026-09-01', '2027-08-31', 'active')`
+  );
   const titularCredential = hashPassword('shared-password');
   const substituteCredential = hashPassword('shared-password');
   const titular = await db.run(
@@ -59,28 +63,30 @@ async function seedIdentity(db) {
     [substituteCredential.hash, substituteCredential.salt]
   );
   const titularProfile = await db.run(
-    "INSERT INTO teacher_profiles (schedule_key, display_name) VALUES ('TEST_TITULAR', 'Perfil Titular')"
+    "INSERT INTO teacher_profiles (academic_year_id, schedule_key, display_name) VALUES (?, 'TEST_TITULAR', 'Perfil Titular')",
+    [academicYear.lastID]
   );
   const substituteProfile = await db.run(
-    "INSERT INTO teacher_profiles (schedule_key, display_name) VALUES ('TEST_SUSTITUTO', 'Perfil Sustituto')"
+    "INSERT INTO teacher_profiles (academic_year_id, schedule_key, display_name) VALUES (?, 'TEST_SUSTITUTO', 'Perfil Sustituto')",
+    [academicYear.lastID]
   );
   const titularAssignment = await db.run(
     `INSERT INTO teacher_assignments
-      (user_id, teacher_profile_id, assignment_type, starts_on)
-     VALUES (?, ?, 'titular', '2026-09-01')`,
-    [titular.lastID, titularProfile.lastID]
+      (user_id, teacher_profile_id, academic_year_id, assignment_type, starts_on)
+     VALUES (?, ?, ?, 'titular', '2026-09-01')`,
+    [titular.lastID, titularProfile.lastID, academicYear.lastID]
   );
   await db.run(
     `INSERT INTO teacher_assignments
-      (user_id, teacher_profile_id, assignment_type, starts_on)
-     VALUES (?, ?, 'titular', '2026-09-01')`,
-    [substitute.lastID, substituteProfile.lastID]
+      (user_id, teacher_profile_id, academic_year_id, assignment_type, starts_on)
+     VALUES (?, ?, ?, 'titular', '2026-09-01')`,
+    [substitute.lastID, substituteProfile.lastID, academicYear.lastID]
   );
   await db.run(
     `INSERT INTO teacher_assignments
-      (user_id, teacher_profile_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
-     VALUES (?, ?, 'sustituto', '2026-09-10', '2026-09-20', ?)`,
-    [substitute.lastID, titularProfile.lastID, titularAssignment.lastID]
+      (user_id, teacher_profile_id, academic_year_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
+     VALUES (?, ?, ?, 'sustituto', '2026-09-10', '2026-09-20', ?)`,
+    [substitute.lastID, titularProfile.lastID, academicYear.lastID, titularAssignment.lastID]
   );
   return {
     titularCredential,
@@ -89,7 +95,8 @@ async function seedIdentity(db) {
     substitute,
     titularProfile,
     substituteProfile,
-    titularAssignment
+    titularAssignment,
+    academicYear
   };
 }
 
@@ -105,7 +112,7 @@ module.exports = [
            VALUES ('legacy-test', 'preserved-hash', 'preserved-salt')`
         );
 
-        assert.deepEqual(await applyMigrations(db), ['001_individual_teacher_auth.sql']);
+        assert.deepEqual(await applyMigrations(db), ['001_individual_teacher_auth.sql', '002_academic_schedule_model.sql']);
         assert.deepEqual(await applyMigrations(db), []);
 
         const tables = new Set((await db.all("SELECT name FROM sqlite_master WHERE type = 'table'")).map(row => row.name));
@@ -116,7 +123,7 @@ module.exports = [
           await db.get("SELECT password_hash, salt FROM auth_credentials WHERE role = 'legacy-test'"),
           { password_hash: 'preserved-hash', salt: 'preserved-salt' }
         );
-        assert.equal((await db.get('SELECT COUNT(*) AS total FROM schema_migrations')).total, 1);
+        assert.equal((await db.get('SELECT COUNT(*) AS total FROM schema_migrations')).total, 2);
         assert.equal(
           (await db.get("SELECT COUNT(*) AS total FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_teacher_assignments_%'")).total,
           2
@@ -180,9 +187,9 @@ module.exports = [
         await assert.rejects(
           db.run(
             `INSERT INTO teacher_assignments
-              (user_id, teacher_profile_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
-             VALUES (?, ?, 'sustituto', '2026-09-15', '2026-09-25', ?)`,
-            [seeded.substitute.lastID, seeded.titularProfile.lastID, seeded.titularAssignment.lastID]
+              (user_id, teacher_profile_id, academic_year_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
+             VALUES (?, ?, ?, 'sustituto', '2026-09-15', '2026-09-25', ?)`,
+            [seeded.substitute.lastID, seeded.titularProfile.lastID, seeded.academicYear.lastID, seeded.titularAssignment.lastID]
           ),
           /overlapping teacher assignment/
         );
@@ -195,27 +202,27 @@ module.exports = [
         await assert.rejects(
           db.run(
             `INSERT INTO teacher_assignments
-              (user_id, teacher_profile_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
-             VALUES (?, ?, 'sustituto', '2026-09-12', '2026-09-18', ?)`,
-            [thirdUser.lastID, seeded.titularProfile.lastID, seeded.titularAssignment.lastID]
+              (user_id, teacher_profile_id, academic_year_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
+             VALUES (?, ?, ?, 'sustituto', '2026-09-12', '2026-09-18', ?)`,
+            [thirdUser.lastID, seeded.titularProfile.lastID, seeded.academicYear.lastID, seeded.titularAssignment.lastID]
           ),
           /overlapping teacher assignment/
         );
         await assert.rejects(
           db.run(
             `INSERT INTO teacher_assignments
-              (user_id, teacher_profile_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
-             VALUES (?, ?, 'sustituto', '2026-08-01', '2026-08-31', ?)`,
-            [seeded.substitute.lastID, seeded.titularProfile.lastID, seeded.titularAssignment.lastID]
+              (user_id, teacher_profile_id, academic_year_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
+             VALUES (?, ?, ?, 'sustituto', '2026-08-01', '2026-08-31', ?)`,
+            [seeded.substitute.lastID, seeded.titularProfile.lastID, seeded.academicYear.lastID, seeded.titularAssignment.lastID]
           ),
-          /invalid titular assignment for substitute/
+          /invalid titular assignment for substitute|teacher assignment academic year mismatch/
         );
 
         const nonOverlapping = await db.run(
           `INSERT INTO teacher_assignments
-            (user_id, teacher_profile_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
-           VALUES (?, ?, 'sustituto', '2026-09-21', '2026-09-30', ?)`,
-          [seeded.substitute.lastID, seeded.titularProfile.lastID, seeded.titularAssignment.lastID]
+            (user_id, teacher_profile_id, academic_year_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
+           VALUES (?, ?, ?, 'sustituto', '2026-09-21', '2026-09-30', ?)`,
+          [seeded.substitute.lastID, seeded.titularProfile.lastID, seeded.academicYear.lastID, seeded.titularAssignment.lastID]
         );
         assert.ok(nonOverlapping.lastID > 0);
       });
@@ -232,15 +239,15 @@ module.exports = [
 
         await db.run(
           `INSERT INTO teacher_assignments
-            (user_id, teacher_profile_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
-           VALUES (?, ?, 'sustituto', '2026-09-15', '2026-09-18', ?)`,
-          [seeded.substitute.lastID, seeded.titularProfile.lastID, seeded.titularAssignment.lastID]
+            (user_id, teacher_profile_id, academic_year_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
+           VALUES (?, ?, ?, 'sustituto', '2026-09-15', '2026-09-18', ?)`,
+          [seeded.substitute.lastID, seeded.titularProfile.lastID, seeded.academicYear.lastID, seeded.titularAssignment.lastID]
         );
         const latest = await db.run(
           `INSERT INTO teacher_assignments
-            (user_id, teacher_profile_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
-           VALUES (?, ?, 'sustituto', '2026-09-15', '2026-09-18', ?)`,
-          [seeded.substitute.lastID, seeded.titularProfile.lastID, seeded.titularAssignment.lastID]
+            (user_id, teacher_profile_id, academic_year_id, assignment_type, starts_on, ends_on, replaces_assignment_id)
+           VALUES (?, ?, ?, 'sustituto', '2026-09-15', '2026-09-18', ?)`,
+          [seeded.substitute.lastID, seeded.titularProfile.lastID, seeded.academicYear.lastID, seeded.titularAssignment.lastID]
         );
 
         const resolved = await resolveActiveTeacherProfile(db, seeded.substitute.lastID, '2026-09-16');
@@ -286,7 +293,9 @@ module.exports = [
               cookie: 'cookie-secret',
               authorizationToken: 'token-secret',
               sessionSecret: 'session-secret'
-            }
+            },
+            harmlessKey: 'guardias_session=opaque-cookie-secret',
+            opaqueValue: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
           }
         });
         const row = await db.get("SELECT details_json FROM audit_log WHERE action = 'auth.redaction_test'");
@@ -295,7 +304,9 @@ module.exports = [
 
         assert.equal(details.safeField, 'visible');
         assert.equal(details.password, '[REDACTED]');
-        for (const secret of ['plain-secret', 'hash-secret', 'salt-secret', 'cookie-secret', 'token-secret', 'session-secret']) {
+        assert.equal(details.harmlessKey, '[REDACTED]');
+        assert.equal(details.opaqueValue, '[REDACTED]');
+        for (const secret of ['plain-secret', 'hash-secret', 'salt-secret', 'cookie-secret', 'token-secret', 'session-secret', 'opaque-cookie-secret', '0123456789abcdef']) {
           assert.equal(serialized.includes(secret), false);
         }
       });

@@ -143,6 +143,33 @@ async function openDatabase(dbPath) {
   return open({ filename: dbPath, driver: sqlite3.Database });
 }
 
+async function seedActiveSchedule(dbPath) {
+  const db = await openDatabase(dbPath);
+  try {
+    await db.exec('PRAGMA foreign_keys = ON');
+    await db.run(
+      `INSERT OR IGNORE INTO academic_years (code, starts_on, ends_on, status)
+       VALUES ('2026/27', '2026-09-01', '2027-08-31', 'active')`
+    );
+    const year = await db.get("SELECT id FROM academic_years WHERE code = '2026/27'");
+    await db.run(
+      `INSERT OR IGNORE INTO schedule_datasets
+        (academic_year_id,label,source_system,source_format,source_fingerprint,status,validation_report_json,validated_at,activated_at)
+       VALUES (?, 'Integration canonical schedule', 'test', 'test', 'integration-canonical-v1', 'active', '{"valid":true}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      [year.id]
+    );
+    const dataset = await db.get("SELECT id FROM schedule_datasets WHERE source_fingerprint = 'integration-canonical-v1'");
+    await db.run(
+      `INSERT OR IGNORE INTO schedule_periods
+        (dataset_id,period_key,position,period_type,label,starts_at,ends_at)
+       VALUES (?, 'P1', 1, 'teaching', '1ª hora', '08:15', '09:10')`,
+      [dataset.id]
+    );
+  } finally {
+    await db.close();
+  }
+}
+
 async function createConsistentBackup(sourcePath, targetPath) {
   assertSafeTestDatabase(sourcePath);
   assert.ok(path.resolve(targetPath).startsWith(path.dirname(path.resolve(sourcePath)) + path.sep), 'Backup must remain in the isolated test directory');
@@ -175,6 +202,7 @@ module.exports = {
   loginIndividual,
   openDatabase,
   request,
+  seedActiveSchedule,
   startServer,
   stopServer
 };

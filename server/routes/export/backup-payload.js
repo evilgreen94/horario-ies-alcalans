@@ -59,7 +59,7 @@ function sanitizeRestoreAusencia(row) {
   return {
     id: ensureOptionalId(input.id, 'id'),
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
-    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    hora: normalizeInteger(input.hora, 'hora', 0, 10000),
     ausente: ensureRequiredString(input.ausente, 'ausente'),
     guardia: normalizeString(input.guardia),
     aula: normalizeString(input.aula),
@@ -94,7 +94,7 @@ function sanitizeRestoreAlumnosFueraAula(row) {
     id: ensureOptionalId(input.id, 'id'),
     profesor: ensureRequiredString(input.profesor, 'profesor'),
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
-    hora: normalizeInteger(input.hora, 'hora', 1, 9),
+    hora: normalizeInteger(input.hora, 'hora', 0, 10000),
     cantidad: normalizeInteger(input.cantidad, 'cantidad', 0, 10),
     lastExitAt: normalizeString(input.lastExitAt ?? input.last_exit_at),
     lastReturnAt: normalizeString(input.lastReturnAt ?? input.last_return_at),
