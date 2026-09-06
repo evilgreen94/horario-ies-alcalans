@@ -81,6 +81,46 @@ function renderActiveAnnouncementList(entry) {
   return list.innerHTML;
 }
 
+function renderUnallocatedPatioDuties() {
+  const panel = { innerHTML: '' };
+  const badge = { textContent: '' };
+  const document = {
+    getElementById(id) { return id === 'patioPanel' ? panel : id === 'patioBadge' ? badge : null; }
+  };
+  const window = { document, location: { search: '' } };
+  vm.runInNewContext(auxPanelsSource, { window, console, URL, URLSearchParams, Date, Math, Set, Map, performance });
+  let requestedSlot = null;
+  const domain = window.GuardiasAuxPanels.createTvPanelDomain({
+    document,
+    window,
+    horaMap: { 4: { label: 'Recreo', rango: '11:00-11:25' } },
+    horasPatio: new Set([4]),
+    dias: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'],
+    getRowsForWeekOffset: () => [],
+    getVisibleTeacherName: value => value,
+    resolveAulaRegistro: () => '',
+    assignGuardiasForRows: rows => rows,
+    getBibliotecaAsignada: () => '',
+    getBanosAsignado: () => '',
+    getPatioCoverageSummary: () => ({
+      total: 1,
+      covered: 1,
+      pending: 0,
+      unresolved: 1,
+      states: [{ sectorId: '0.1', covered: true, statusKind: 'covered', statusLabel: 'Cubierto', responsable: 'DOCENTE QB' }]
+    }),
+    getPatioSectors: (dia, hora) => {
+      requestedSlot = { dia, hora };
+      return [{ id: '0.1', label: '0.1 · Biblioteca (dins)', shortLabel: '0.1', mapClass: 'patio-sector-01' }];
+    },
+    getPatioExtraPosts: () => [
+      { id: 'unallocated-patio-test', label: 'Guardia de patio', responsable: 'DOCENTE QA', covered: false, statusKind: 'pending', statusLabel: 'Sin puesto' }
+    ]
+  });
+  domain.renderTvSlotPanel('patioPanel', { dia: 2, hora: 4 }, 'patioBadge', [], { isCurrentSlot: true });
+  return { html: panel.innerHTML, requestedSlot };
+}
+
 function createExpiredAdminJar() {
   const payload = Buffer.from(JSON.stringify({ role: 'admin', exp: Date.now() - 1000 })).toString('base64url');
   const signature = crypto.createHmac('sha256', 'integration-session-secret-2026').update(payload).digest('base64url');
@@ -261,6 +301,20 @@ module.exports = [
       assert.ok(html.includes('&lt;img src=x onerror=&quot;window.__xss_test=1&quot;&gt;'));
       assert.ok(!html.includes('<b>TEST-XSS</b>'));
       assert.ok(!html.includes('<img src=x'));
+    }
+  },
+  {
+    name: 'patio panel keeps imported break duties visible and explicitly unallocated',
+    fn() {
+      const result = renderUnallocatedPatioDuties();
+      assert.deepStrictEqual(result.requestedSlot, { dia: 2, hora: 4 });
+      assert.ok(result.html.includes('1 obligación sin puesto'));
+      assert.ok(result.html.includes('Guardia de patio'));
+      assert.ok(result.html.includes('Biblioteca (dins)'));
+      assert.ok(result.html.includes('DOCENTE QA'));
+      assert.ok(result.html.includes('DOCENTE QB'));
+      assert.ok(result.html.includes('Sin puesto'));
+      assert.ok(!result.html.includes('No hay configuraci'));
     }
   },
   {

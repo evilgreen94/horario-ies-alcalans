@@ -112,6 +112,52 @@ function classifyCell(lines) {
   return { type: 'other', subject: '', group: '', room: '', label };
 }
 
+function classifyBreakCell(lines) {
+  const filtered = lines.filter(line => normalizeToken(line.text) !== 'RECREO');
+  if (!filtered.length) return null;
+  const label = filtered.map(line => line.text).join(' | ');
+  const normalized = normalizeToken(label);
+  if (/^GUARD(?:IA|IES) PATI$/.test(normalized)) {
+    return { type: 'guardia', subject: '', group: '', room: '', label };
+  }
+  if (normalized === 'BIBLIOTECA PATI') {
+    return { type: 'other', subject: '', group: '', room: '', label };
+  }
+  return { type: 'other', subject: '', group: '', room: '', label, unclassified: true };
+}
+
+function reconcileSplitTeachingCells(sessions) {
+  const periodByKey = new Map(PERIOD_LAYOUT.map(period => [period.key, period]));
+  const sessionBySlot = new Map(sessions.map(session => [
+    `${session.teacher_source_code}|${session.weekday}|${session.period_key}`,
+    session
+  ]));
+
+  for (const session of sessions) {
+    if (session.type !== 'other' || session.label.includes('|')) continue;
+    const period = periodByKey.get(session.period_key);
+    if (!period || period.type !== 'teaching') continue;
+    const nextPeriod = PERIOD_LAYOUT.find(candidate => candidate.position === period.position + 1);
+    if (!nextPeriod || nextPeriod.type !== 'teaching') continue;
+    const next = sessionBySlot.get(`${session.teacher_source_code}|${session.weekday}|${nextPeriod.key}`);
+    const nextParts = String(next?.label || '').split('|').map(cleanLabel).filter(Boolean);
+    if (
+      next?.type !== 'class' ||
+      next.subject ||
+      !next.group ||
+      !next.room ||
+      nextParts.length !== 2
+    ) continue;
+
+    const subject = cleanLabel(session.label);
+    const label = [subject, next.group, next.room].join(' | ');
+    Object.assign(session, { type: 'class', subject, group: next.group, room: next.room, label });
+    Object.assign(next, { subject, label });
+  }
+
+  return sessions;
+}
+
 function getPageHeader(items) {
   return items.find(item => item.y >= 715 && item.y <= 725 && /\([A-Z0-9_-]{2,64}\)\s*$/.test(item.text)) || null;
 }
@@ -140,12 +186,31 @@ function extractCanonicalScheduleFromPdf(buffer, censusPayload, options = {}) {
     seenCodes.add(sourceCode);
 
     for (const day of DAY_COLUMNS) {
-      for (const period of PERIOD_LAYOUT.filter(row => row.type === 'teaching')) {
+      for (const period of PERIOD_LAYOUT) {
         const lines = items
           .filter(item => item.x >= day.left && item.x < day.right && item.y > period.bottom && item.y < period.top)
           .sort((left, right) => right.y - left.y || left.x - right.x);
         if (!lines.length) continue;
         const uniqueLines = lines.filter((line, index) => index === 0 || line.text !== lines[index - 1].text || line.y !== lines[index - 1].y);
+        if (period.type === 'break') {
+          const classified = classifyBreakCell(uniqueLines);
+          if (!classified) continue;
+          if (classified.unclassified) {
+            anomalies.push(`page ${pageNumber} ${sourceCode} weekday ${day.weekday} ${period.key}: unclassified break-time text`);
+          }
+          sessions.push({
+            teacher_source_code: sourceCode,
+            weekday: day.weekday,
+            period_key: period.key,
+            type: classified.type,
+            subject: '',
+            group: '',
+            room: '',
+            label: classified.label,
+            source_ref: `page:${pageNumber}`
+          });
+          continue;
+        }
         if (uniqueLines.length > 4) anomalies.push(`page ${pageNumber} ${sourceCode} weekday ${day.weekday} ${period.key}: ${uniqueLines.length} text lines`);
         const classified = classifyCell(uniqueLines);
         sessions.push({
@@ -163,6 +228,8 @@ function extractCanonicalScheduleFromPdf(buffer, censusPayload, options = {}) {
     }
   });
 
+  reconcileSplitTeachingCells(sessions);
+
   const missingCodes = [...censusCodes].filter(code => !seenCodes.has(code));
   missingCodes.forEach(code => anomalies.push(`census teacher without PDF page: ${code}`));
   const countsByType = sessions.reduce((counts, row) => {
@@ -175,6 +242,14 @@ function extractCanonicalScheduleFromPdf(buffer, censusPayload, options = {}) {
   const otherLabelSummary = [...otherLabels.entries()]
     .map(([label, count]) => ({ label, count }))
     .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, 'es'));
+  const breakDuties = sessions.filter(row => {
+    const period = PERIOD_LAYOUT.find(item => item.key === row.period_key);
+    return period?.type === 'break';
+  });
+  const teachingSessions = sessions.filter(row => {
+    const period = PERIOD_LAYOUT.find(item => item.key === row.period_key);
+    return period?.type === 'teaching';
+  });
   return {
     dataset: {
       schema_version: 1,
@@ -193,6 +268,19 @@ function extractCanonicalScheduleFromPdf(buffer, censusPayload, options = {}) {
       teachersMissingFromPdf: missingCodes.length,
       sessions: sessions.length,
       countsByType,
+      breakDuties: {
+        total: breakDuties.length,
+        patio: breakDuties.filter(row => row.type === 'guardia').length,
+        library: breakDuties.filter(row => normalizeToken(row.label) === 'BIBLIOTECA PATI').length
+      },
+      operationalCounts: {
+        class: teachingSessions.filter(row => row.type === 'class').length,
+        guardia: teachingSessions.filter(row => row.type === 'guardia').length,
+        meeting: teachingSessions.filter(row => row.type === 'meeting').length,
+        other: teachingSessions.filter(row => row.type === 'other').length,
+        patioDuty: breakDuties.filter(row => row.type === 'guardia').length,
+        libraryBreakDuty: breakDuties.filter(row => normalizeToken(row.label) === 'BIBLIOTECA PATI').length
+      },
       manualReview: {
         otherSessions: countsByType.other,
         reason: 'Celdas con texto que no se pueden clasificar como clase, guardia o reunión mediante reglas estructurales.',
@@ -210,9 +298,11 @@ function cleanLabel(value) {
 module.exports = {
   DAY_COLUMNS,
   PERIOD_LAYOUT,
+  classifyBreakCell,
   classifyCell,
   decodePdfLiteral,
   extractCanonicalScheduleFromPdf,
   extractPdfStreams,
-  extractTextItems
+  extractTextItems,
+  reconcileSplitTeachingCells
 };

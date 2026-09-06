@@ -501,8 +501,9 @@ async function loadCanonicalDataset(db) {
 
 function buildLegacySchedulePayload(canonical) {
   const periodsByKey = new Map(canonical.periods.map(period => [period.key, period]));
+  const breakDuties = [];
   const teachers = canonical.teachers.map(teacher => {
-    const horario = teacher.sessions.map(session => {
+    const horario = teacher.sessions.filter(session => periodsByKey.get(session.periodKey)?.type === 'teaching').map(session => {
       const period = periodsByKey.get(session.periodKey);
       const text = session.type === 'guardia'
         ? 'GUARDIA'
@@ -514,6 +515,24 @@ function buildLegacySchedulePayload(canonical) {
         texto: text,
         aula: session.room || ''
       };
+    });
+    teacher.sessions.filter(session => periodsByKey.get(session.periodKey)?.type === 'break').forEach(session => {
+      const period = periodsByKey.get(session.periodKey);
+      const normalizedLabel = normalizeComparableText(session.label);
+      breakDuties.push({
+        sourceCode: teacher.sourceCode,
+        teacherName: teacher.displayName,
+        weekday: session.weekday,
+        day: WEEKDAYS[session.weekday],
+        periodKey: session.periodKey,
+        slot: period.position,
+        startsAt: period.startsAt,
+        endsAt: period.endsAt,
+        kind: normalizedLabel === 'BIBLIOTECA PATI' ? 'library' : session.type === 'guardia' ? 'patio' : 'other',
+        label: session.label || session.type,
+        sourceRef: session.sourceRef,
+        positionId: null
+      });
     });
     return {
       sourceCode: teacher.sourceCode,
@@ -528,8 +547,13 @@ function buildLegacySchedulePayload(canonical) {
     datasetId: canonical.datasetId,
     academicYear: canonical.academicYear,
     periods: canonical.periods,
+    breakDuties,
     teachers
   };
+}
+
+function normalizeComparableText(value) {
+  return cleanText(value).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
 module.exports = {

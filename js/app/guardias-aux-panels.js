@@ -577,7 +577,9 @@
         label,
         responsible,
         covered,
-        note:shared.cleanText(row.note||row.notes||row.meta||row.description)
+        note:shared.cleanText(row.note||row.notes||row.meta||row.description),
+        statusKind:shared.cleanText(row.statusKind),
+        statusLabel:shared.cleanText(row.statusLabel)
       };
     }
     function normalizePatioExtraPosts(items){
@@ -594,11 +596,11 @@
     }
     function renderTvPatioPanel(container,slot,renderOptions){
       const localOptions=renderOptions||{};
-      const sectors=getPatioSectors();
+      const sectors=getPatioSectors(slot.dia,slot.hora);
       const summary=getPatioCoverageSummary?getPatioCoverageSummary(slot.dia,slot.hora):null;
       const states=summary&&Array.isArray(summary.states)?summary.states:[];
       const extraPosts=resolvePatioExtraPosts(slot,summary);
-      if(!summary||!sectors.length){
+      if(!summary||(!sectors.length&&!extraPosts.length)){
         container.innerHTML='<div class="tv-empty">No hay configuración de patio disponible para este tramo.</div>';
         return;
       }
@@ -617,9 +619,13 @@
           </div>
         </div>`;
       }).join('');
+      const extrasTitle=extraPosts.some(item=>item.statusLabel==='Sin puesto')?'Obligaciones sin puesto':'Puestos extra';
+      const summaryPending=Number(summary.pending)||Number(summary.unresolved);
+      const unresolvedCount=Number(summary.unresolved)||0;
+      const summaryLabel=unresolvedCount?`${unresolvedCount} ${unresolvedCount===1?'obligación':'obligaciones'} sin puesto`:`${summary.covered}/${summary.total} sectores cubiertos`;
       const extrasMarkup=extraPosts.length?`<div class="tv-patio-extras">
         <div class="tv-patio-extras-head">
-          <span class="tv-patio-extras-title">Puestos extra</span>
+          <span class="tv-patio-extras-title">${escapeHtml(extrasTitle)}</span>
           <span class="tv-patio-extras-count">${extraPosts.length}</span>
         </div>
         <div class="tv-patio-extras-list">
@@ -634,7 +640,7 @@
       </div>`:'';
       if(localOptions.compact){
         container.innerHTML=`<div class="tv-patio-shell tv-patio-shell-preview">
-          <div class="tv-patio-status ${summary.pending?'is-pending':'is-covered'}">${summary.covered}/${summary.total} sectores cubiertos</div>
+          <div class="tv-patio-status ${summaryPending?'is-pending':'is-covered'}">${escapeHtml(summaryLabel)}</div>
           <div class="tv-patio-side">
             <div class="tv-patio-legend">${legendMarkup}</div>
             ${extrasMarkup}
@@ -643,7 +649,7 @@
         return;
       }
       container.innerHTML=`<div class="tv-patio-shell">
-        <div class="tv-patio-status ${summary.pending?'is-pending':'is-covered'}">${summary.covered}/${summary.total} sectores cubiertos</div>
+        <div class="tv-patio-status ${summaryPending?'is-pending':'is-covered'}">${escapeHtml(summaryLabel)}</div>
         <div class="tv-patio-layout">
           <div class="tv-patio-side">
             <div class="tv-patio-legend">${legendMarkup}</div>

@@ -1,4 +1,4 @@
-const labels={class:'Clase',guardia:'Guardia',free:'Libre',break:'Recreo',outside:'Fuera de horario',meeting:'Reunión',other:'Otra actividad'};
+const labels={class:'Clase',guardia:'Guardia',free:'Libre',break:'Recreo',outside:'Fuera de horario',meeting:'Reunión',other:'Otra actividad','patio-duty':'Guardia de patio','library-break-duty':'Biblioteca patio','break-duty':'Actividad de recreo'};
 const $=selector=>document.querySelector(selector);
 
 async function request(url,options={}){
@@ -9,8 +9,7 @@ async function request(url,options={}){
 }
 
 function detailFor(period){
-  if(period.type==='break') return 'Pausa definida por el horario del curso';
-  if(!period.session) return 'Sin actividad asignada';
+  if(!period.session) return period.type==='break'?'Pausa definida por el horario del curso':'Sin actividad asignada';
   const session=period.session;
   return [session.subject,session.group,session.room,session.label].filter(Boolean).join(' · ')||labels[period.state];
 }

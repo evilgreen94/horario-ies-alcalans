@@ -163,6 +163,39 @@ module.exports = [
     }
   },
   {
+    name: 'break duties persist canonically and remain separate from teaching-period legacy sessions',
+    async fn() {
+      await withDatabase(async db => {
+        await importTeacherProfiles(db, census(), { expectedCount: 2 });
+        const dutySchedule = schedule();
+        dutySchedule.teacher_source_codes = ['RMLL', 'ABCD'];
+        dutySchedule.sessions.push(
+          { teacher_source_code: 'RMLL', weekday: 1, period_key: 'BREAK-A', type: 'guardia', label: 'GUÀRDIES PATI', source_ref: 'page:1' },
+          { teacher_source_code: 'ABCD', weekday: 2, period_key: 'BREAK-A', type: 'other', label: 'BIBLIOTECA PATI', source_ref: 'page:2' }
+        );
+        const imported = await importScheduleDataset(db, dutySchedule);
+        assert.equal(imported.status, 'validated');
+        assert.equal((await db.get('SELECT COUNT(*) AS total FROM teacher_schedule_sessions')).total, 4);
+        const repeated = await importScheduleDataset(db, dutySchedule);
+        assert.equal(repeated.datasetId, imported.datasetId);
+        assert.equal((await db.get('SELECT COUNT(*) AS total FROM teacher_schedule_sessions')).total, 4);
+        await activateScheduleDataset(db, imported.datasetId);
+
+        const active = await loadCanonicalDataset(db);
+        const legacy = buildLegacySchedulePayload(active);
+        assert.deepEqual(
+          legacy.breakDuties.map(row => ({ sourceCode: row.sourceCode, weekday: row.weekday, slot: row.slot, kind: row.kind, label: row.label, sourceRef: row.sourceRef, positionId: row.positionId })),
+          [
+            { sourceCode: 'ABCD', weekday: 2, slot: 20, kind: 'library', label: 'BIBLIOTECA PATI', sourceRef: 'page:2', positionId: null },
+            { sourceCode: 'RMLL', weekday: 1, slot: 20, kind: 'patio', label: 'GUÀRDIES PATI', sourceRef: 'page:1', positionId: null }
+          ]
+        );
+        assert.equal(legacy.teachers.find(teacher => teacher.sourceCode === 'RMLL').horario.some(row => row.slot === 20), false);
+        assert.equal(legacy.teachers.find(teacher => teacher.sourceCode === 'ABCD').horario.some(row => row.slot === 20), false);
+      });
+    }
+  },
+  {
     name: 'database triggers reject cross-year external identities and schedule links',
     async fn() {
       await withDatabase(async db => {

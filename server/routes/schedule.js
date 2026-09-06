@@ -18,6 +18,15 @@ function currentTimeKey(date) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function resolvePeriodState(period, session) {
+  if (period.type !== 'break') return session ? session.type : 'free';
+  if (!session) return 'break';
+  const label = String(session.label || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (label === 'BIBLIOTECA PATI') return 'library-break-duty';
+  if (session.type === 'guardia') return 'patio-duty';
+  return 'break-duty';
+}
+
 router.get('/active', async (_req, res, next) => {
   try {
     res.setHeader('Cache-Control', 'no-store');
@@ -63,7 +72,7 @@ router.get('/me', requireAuthenticated, async (req, res, next) => {
     const time = currentTimeKey(now);
     const periods = canonical.periods.map(period => {
       const session = sessions.get(period.key) || null;
-      const state = period.type === 'break' ? 'break' : session ? session.type : 'free';
+      const state = resolvePeriodState(period, session);
       return { ...period, state, session };
     });
     const currentPeriod = isToday

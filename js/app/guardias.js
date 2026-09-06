@@ -38,7 +38,7 @@ const KEY_GROUP_STATES='IES_Alcalans_Grupos_Estado';
 const MAX_ALUMNOS_FUERA_AULA=10;
 const PATIO_PRIMARY_HORA=4;
 const PATIO_AUTO_HORARIOS={'11:00-11:25':4,'14:10-14:25':8};
-const PATIO_RENDER_HORAS=new Set([4,8]);
+const PATIO_RENDER_HORAS=new Set(HORAS_PATIO);
 const PATIO_SECTORS=[
   {id:'0',label:"0 · Porta d'entrada de cristall",shortLabel:'0',mapClass:'patio-sector-0'},
   {id:'0.1',label:'0.1 · Biblioteca (dins)',shortLabel:'0.1',mapClass:'patio-sector-01'},
@@ -48,7 +48,11 @@ const PATIO_SECTORS=[
   {id:'4',label:'4 · Banys exteriors',shortLabel:'4',mapClass:'patio-sector-4'},
   {id:'5',label:'5 · Barracons',shortLabel:'5',mapClass:'patio-sector-5'}
 ];
-const PATIO_SECTORS_BY_ID=Object.fromEntries(PATIO_SECTORS.map(sector=>[sector.id,sector]));
+const PATIO_SECTORS_BY_ID=Object.fromEntries(PATIO_SECTORS.map((sector,index)=>[
+  sector.id,
+  {...sector,type:'sector',capacity:1,isPhysical:true,order:index}
+]));
+const CANONICAL_BREAK_DUTIES=Array.isArray(window.PROFESORADO_SOURCE?.breakDuties)?window.PROFESORADO_SOURCE.breakDuties:[];
 const RAW_PATIO_GUARDIAS_SOURCE=window.PATIO_GUARDIAS_SOURCE||null;
 const {
   cleanText,
@@ -171,7 +175,7 @@ function buildProfesoradoData(){
       guardiasUnicas.add(key);
       guardiasPorHora[dia][hora].push(nombre);
     });
-    profesoresBase[nombre]={nombre,nombreCompleto:nombre,departamento:'Profesorado',grupos:[...gruposProfesor],horario};
+    profesoresBase[nombre]={nombre,nombreCompleto:nombre,sourceCode:cleanText(teacher.sourceCode),departamento:'Profesorado',grupos:[...gruposProfesor],horario};
   });
   Object.keys(guardiasPorHora).forEach(dia=>{
     Object.keys(guardiasPorHora[dia]).forEach(hora=>{
@@ -1772,18 +1776,48 @@ function getPatioTeacherAssignmentsForSlot(dia,hora,weekKey=getSelectedWeekKey()
   return (getPatioSlotConfigForWeek(dia,hora,weekKey).rotation||[]).map(item=>({
     positionId:item.positionId,
     teachers:normalizePatioTeachersForDay(item.teachers||[]),
+    teacherSourceCodes:(item.teacherSourceCodes||[]).map(value=>cleanText(value).toUpperCase()).filter(Boolean),
     responsable:cleanText(item.responsable)
   }));
+}
+function getPatioUnallocatedDutiesForSlot(dia,hora,weekKey=getSelectedWeekKey()){
+  return (getPatioSlotConfigForWeek(dia,hora,weekKey).duties||[]).filter(duty=>!duty.positionId);
 }
 function getTeacherPatioAssignmentsForSlot(profesor,dia,hora,weekKey=getSelectedWeekKey()){
   const canonical=resolveTeacherCanonicalName(profesor);
   if(!canonical) return [];
-  return getPatioTeacherAssignmentsForSlot(dia,hora,weekKey)
-    .filter(item=>item.teachers.includes(canonical))
+  const sourceCode=cleanText(getProfesor(canonical)?.sourceCode).toUpperCase();
+  const slot=getPatioSlotConfigForWeek(dia,hora,weekKey);
+  const positioned=(slot.rotation||[])
+    .map(item=>({...item,teachers:normalizePatioTeachersForDay(item.teachers||[])}))
+    .filter(item=>sourceCode
+      ?(item.teacherSourceCodes||[]).includes(sourceCode)
+      :item.teachers.includes(canonical))
+    .map(item=>{
+      const canonicalDuty=(slot.duties||[]).find(duty=>
+        duty.positionId===item.positionId&&sourceCode&&duty.sourceCode===sourceCode
+      );
+      return {
+        ...item,
+        label:getPatioSectorDefinition(item.positionId)?.label||item.positionId,
+        dutyLabel:canonicalDuty?.label||item.dutyLabel||'',
+        kind:canonicalDuty?.kind||item.kind||'',
+        sourceCode:canonicalDuty?.sourceCode||item.sourceCode||''
+      };
+    });
+  const unallocated=(slot.duties||[]).filter(duty=>!duty.positionId)
+    .filter(item=>sourceCode&&item.sourceCode===sourceCode)
     .map(item=>({
-      ...item,
-      label:getPatioSectorDefinition(item.positionId)?.label||item.positionId
+      positionId:'',
+      teachers:[canonical],
+      responsable:canonical,
+      label:'Sin puesto asignado',
+      dutyLabel:item.label,
+      kind:item.kind,
+      sourceCode:item.sourceCode,
+      unallocated:true
     }));
+  return [...positioned,...unallocated];
 }
 function resolvePatioTeacherBlockNote(block){
   if(!block) return '';
@@ -1848,7 +1882,8 @@ function replacePatioSectorState(nextRow){
 function getPatioCoverageSummary(dia,hora,weekKey=getSelectedWeekKey()){
   const states=getPatioPhysicalPositionsForSlot(dia,hora,weekKey).map(position=>getPatioSectorState(dia,hora,position.id,weekKey));
   const covered=states.filter(item=>item.covered).length;
-  return {total:states.length,covered,pending:Math.max(states.length-covered,0),states};
+  const unresolved=getPatioUnallocatedDutiesForSlot(dia,hora,weekKey).length;
+  return {total:states.length,covered,pending:Math.max(states.length-covered,0),unresolved,states};
 }
 function normalizePatioExtraPost(item,index){
   const row=item&&typeof item==='object'&&!Array.isArray(item)?item:{label:item};
@@ -1863,7 +1898,9 @@ function normalizePatioExtraPost(item,index){
     label,
     responsable,
     covered,
-    note:cleanText(row.note||row.notes||row.meta||row.description)
+    note:cleanText(row.note||row.notes||row.meta||row.description),
+    statusKind:cleanText(row.statusKind),
+    statusLabel:cleanText(row.statusLabel)
   };
 }
 function normalizePatioExtraPosts(items){
@@ -1878,7 +1915,7 @@ function getPatioExtraPostsSummaryExtras(summary){
 }
 function getPatioExtraPostsForSlot(dia,hora,weekKey=getSelectedWeekKey()){
   const slotRows=getPatioGuardiaRowsForSlot(dia,hora,weekKey);
-  return normalizePatioExtraPosts(getPatioExtraPositionsForSlot(dia,hora,weekKey).map(position=>{
+  const configured=getPatioExtraPositionsForSlot(dia,hora,weekKey).map(position=>{
     const rawState=slotRows.find(row=>row.positionId===position.id)||{
       weekKey:cleanText(weekKey),
       dia:Number(dia),
@@ -1901,7 +1938,17 @@ function getPatioExtraPostsForSlot(dia,hora,weekKey=getSelectedWeekKey()){
       statusKind:state?.statusKind||'pending',
       statusLabel:state?.statusLabel||'Pendiente'
     };
+  });
+  const unresolved=getPatioUnallocatedDutiesForSlot(dia,hora,weekKey).map(duty=>({
+    id:`unallocated-${duty.kind}-${duty.sourceCode}`,
+    label:duty.kind==='library'?'Biblioteca patio':'Guardia de patio',
+    responsable:getVisibleTeacherName(duty.teacherName),
+    covered:false,
+    note:duty.label,
+    statusKind:'pending',
+    statusLabel:'Sin puesto'
   }));
+  return normalizePatioExtraPosts([...configured,...unresolved]);
 }
 function isSchoolSlotActiveNow(targetDay,targetHora){
   const {hours,minutes,date}=formatNowParts();
@@ -1945,7 +1992,8 @@ function renderPatioCard(hora=PATIO_PRIMARY_HORA){
   const isCurrent=isSchoolSlotActiveNow(day,hora);
   const cardClasses=['guardia-card','guardia-card-patio','is-open'];
   if(isCurrent) cardClasses.push('guardia-card-current');
-  const statusClass=summary.pending?'patio-status-pending':'patio-status-covered';
+  const statusClass=summary.pending||summary.unresolved?'patio-status-pending':'patio-status-covered';
+  const statusLabel=summary.unresolved?`${summary.unresolved} sin puesto`:`${summary.covered}/${summary.total} sectores`;
   const sectorsMarkup=physicalPositions.map(sector=>{
     const state=summary.states.find(item=>item.sectorId===sector.id)||getPatioSectorState(day,hora,sector.id,getSelectedWeekKey());
     const label=state.statusLabel||(state.covered?'Cubierto':'Pendiente');
@@ -1980,9 +2028,10 @@ function renderPatioCard(hora=PATIO_PRIMARY_HORA){
       </div>
     `;
   }).join('');
+  const extrasTitle=extraPosts.some(item=>item.statusLabel==='Sin puesto')?'Obligaciones sin puesto':'Puestos extra';
   const extrasMarkup=extraPosts.length?`<div class="patio-extras">
     <div class="patio-extras-head">
-      <span class="patio-extras-title">Puestos extra</span>
+      <span class="patio-extras-title">${escapeHtml(extrasTitle)}</span>
       <span class="patio-extras-count">${extraPosts.length}</span>
     </div>
     <div class="patio-extras-list">
@@ -2001,7 +2050,7 @@ function renderPatioCard(hora=PATIO_PRIMARY_HORA){
     <div class="guardia-card-toggle guardia-card-toggle-static">
       <span class="guardia-card-head">
         <span class="guardia-num">${escapeHtml(getPatioCardTitle(hora))}</span>
-        <span class="guardia-count"><span class="patio-status ${statusClass}">${summary.covered}/${summary.total} sectores</span></span>
+        <span class="guardia-count"><span class="patio-status ${statusClass}">${escapeHtml(statusLabel)}</span></span>
       </span>
     </div>
     <div class="guardia-card-body">
@@ -2239,6 +2288,15 @@ function resolvePatioTeacherCanonicalName(nombre){
 function normalizePatioTeachersForDay(list){
   return [...new Set((Array.isArray(list)?list:[]).map(resolvePatioTeacherCanonicalName).filter(nombre=>getProfesor(nombre)))].sort((a,b)=>a.localeCompare(b,'es'));
 }
+function resolveUniqueTeacherSourceCode(nombre){
+  const normalized=normalizeText(cleanText(nombre));
+  if(!normalized) return '';
+  const matches=[...new Set(RAW_PROFESORADO
+    .filter(teacher=>normalizeText(formatTeacherName(teacher?.nombre)||teacher?.nombre)===normalized)
+    .map(teacher=>cleanText(teacher?.sourceCode).toUpperCase())
+    .filter(Boolean))];
+  return matches.length===1?matches[0]:'';
+}
 function normalizePatioDayLabel(value){
   return stripDiacritics(cleanText(value)).toLowerCase();
 }
@@ -2295,19 +2353,40 @@ function normalizePatioSlotAssignments(source,positions){
     return {
       positionId,
       teachers,
+      teacherSourceCodes:teachers.map(resolveUniqueTeacherSourceCode).filter(Boolean),
       responsable:teachers.join(' · '),
       order:index
     };
   }).filter(Boolean);
 }
+function resolveCanonicalPatioDutyTeacher(row){
+  const sourceCode=cleanText(row?.sourceCode).toUpperCase();
+  if(!sourceCode) return null;
+  const rawTeacher=RAW_PROFESORADO.find(teacher=>cleanText(teacher?.sourceCode).toUpperCase()===sourceCode);
+  if(!rawTeacher) return null;
+  const teacherName=cleanText(rawTeacher.nombre);
+  if(!teacherName) return null;
+  return {sourceCode,teacherName};
+}
+function normalizePatioSlotDuties(rows){
+  return (Array.isArray(rows)?rows:[]).map(row=>{
+    const identity=resolveCanonicalPatioDutyTeacher(row);
+    const kind=['patio','library','other'].includes(cleanText(row?.kind).toLowerCase())?cleanText(row.kind).toLowerCase():'other';
+    const label=cleanText(row?.label)||(kind==='library'?'BIBLIOTECA PATI':'GUÀRDIES PATI');
+    const positionId=cleanText(row?.positionId).toLowerCase();
+    return identity?{...identity,kind,label,positionId}:null;
+  }).filter(Boolean);
+}
 function normalizePatioSlotConfig(source,dayIndex,hora,legacyDays={},defaultPositions=PATIO_SECTORS){
   const positions=normalizePatioSlotPositions(source,defaultPositions);
+  const duties=normalizePatioSlotDuties(source?.duties);
   const assignments=normalizePatioSlotAssignments(source,positions);
   return {
     dayIndex,
     hora,
     tramo:cleanText(source?.tramo||source?.horario||HORA_MAP[hora]?.rango||''),
     teachers:normalizePatioSlotTeachers(source,dayIndex,hora,legacyDays),
+    duties,
     positions,
     assignments,
     physicalPositionIds:positions.filter(position=>position.isPhysical).map(position=>position.id),
@@ -2403,7 +2482,11 @@ function assignPatioRotationForSlot(slot,previousRotation,rotationSeed){
       return {
         positionId:position.id,
         teachers,
+        teacherSourceCodes:match?.teacherSourceCodes||teachers.map(resolveUniqueTeacherSourceCode).filter(Boolean),
         responsable:match?.responsable||teachers.join(' · '),
+        kind:match?.kind||'',
+        dutyLabel:match?.dutyLabel||'',
+        sourceCode:match?.sourceCode||'',
         repeated:false
       };
     });
@@ -2440,6 +2523,7 @@ function assignPatioRotationForSlot(slot,previousRotation,rotationSeed){
     return {
       positionId:position.id,
       teachers:assignedTeachers,
+      teacherSourceCodes:assignedTeachers.map(resolveUniqueTeacherSourceCode).filter(Boolean),
       responsable:assignedTeachers.join(' · '),
       repeated:false
     };
@@ -2477,7 +2561,9 @@ function normalizePatioGuardiasConfig(source){
   const base=safeSource&&typeof safeSource==='object'&&!Array.isArray(safeSource)?safeSource:{};
   const refreshMonths=Math.max(1,Math.min(12,Math.round(Number(base.refreshMonths)||2)));
   const rotationStart=/^\d{4}-\d{2}-\d{2}$/.test(cleanText(base.rotationStart))?cleanText(base.rotationStart):'2026-09-01';
-  const rawPeriods=Array.isArray(base.periods)&&base.periods.length?base.periods:buildObjectFallbackPatioPeriods(base);
+  const rawPeriods=Array.isArray(base.periods)&&base.periods.length
+    ?base.periods
+    :buildObjectFallbackPatioPeriods(base);
   const periods=withPatioPeriodRotations(rawPeriods.map((period,index)=>normalizePatioPeriodConfig(period,index,{
     defaultPositions:Array.isArray(base.positions)&&base.positions.length?base.positions:(Array.isArray(base.sectors)&&base.sectors.length?base.sectors:PATIO_SECTORS),
     legacyDays:base.teachersByDay&&typeof base.teachersByDay==='object'&&!Array.isArray(base.teachersByDay)?base.teachersByDay:{},
@@ -2505,11 +2591,15 @@ function getPatioPeriodForWeek(weekKey=getSelectedWeekKey()){
     if(period.end&&isoDate>period.end) return false;
     return true;
   }).sort((a,b)=>String(b.start||'').localeCompare(String(a.start||''))||a.id.localeCompare(b.id,'es'));
-  return matches[0]||periods[0]||null;
+  return matches[0]||null;
 }
 function getPatioSlotConfigForWeek(dia,hora,weekKey=getSelectedWeekKey()){
   const period=getPatioPeriodForWeek(weekKey);
-  return period?.slots?.[makePatioSlotKey(dia,hora)]||normalizePatioSlotConfig({},dia,hora,{},[]);
+  const configuredSlot=period?.slots?.[makePatioSlotKey(dia,hora)]||normalizePatioSlotConfig({},dia,hora,{},[]);
+  const duties=normalizePatioSlotDuties(CANONICAL_BREAK_DUTIES.filter(duty=>
+    Number(duty?.weekday)===Number(dia)&&Number(duty?.slot)===Number(hora)
+  ));
+  return window.GuardiasPatioDutyMerge.mergePatioSlot(configuredSlot,duties,PATIO_SECTORS_BY_ID);
 }
 function getPatioPhysicalPositionsForSlot(dia,hora,weekKey=getSelectedWeekKey()){
   const slot=getPatioSlotConfigForWeek(dia,hora,weekKey);
@@ -2781,7 +2871,7 @@ const tvPanelDomain=auxPanelsSuite?.createTvPanelDomain({
   getBibliotecaAsignada,
   getBanosAsignado,
   getPatioCoverageSummary:(dia,hora)=>getPatioCoverageSummary(dia,hora,getCurrentSchoolWeekKey()),
-  getPatioSectors:()=>PATIO_SECTORS,
+  getPatioSectors:(dia,hora)=>getPatioPhysicalPositionsForSlot(dia,hora,getCurrentSchoolWeekKey()),
   getPatioExtraPosts:(dia,hora)=>getPatioExtraPostsForSlot(dia,hora,getCurrentSchoolWeekKey()),
   getSelectedWeekKey,
   getPrintScheduleSnapshot:()=>storage.readJson(KEY_PRINT_SNAPSHOT,null),
@@ -7131,14 +7221,16 @@ function renderTeacherPanel(){
   }
   document.getElementById('teacherSessions').innerHTML=horas.map(hora=>{
     const patioAssignments=getTeacherPatioAssignmentsForSlot(teacherName,teacherDay,hora,getTeacherSelectedWeekKey());
+    const unallocatedPatioAssignments=patioAssignments.filter(item=>item.unallocated);
+    const hasLibraryBreakDuty=patioAssignments.some(item=>item.kind==='library');
     const patioBlock=getPatioTeacherBlock(teacherName,teacherDay,hora,getTeacherSelectedWeekKey());
     const sesion=patioAssignments.length&&!sesiones?.[hora]
       ?{
         tipo:'patio',
-        materia:hora===8?'Patio bachiller':'Patio',
-        detalle:patioAssignments.map(item=>item.label).join(' · '),
+        materia:hasLibraryBreakDuty?'Biblioteca patio':(hora===8?'Patio bachiller':'Guardia de patio'),
+        detalle:patioAssignments.map(item=>item.dutyLabel||item.label).join(' · '),
         grupo:'',
-        aula:'Patio'
+        aula:unallocatedPatioAssignments.length?'Sin puesto asignado':(hasLibraryBreakDuty?'Biblioteca':'Patio')
       }
       :resolveTeacherSession(teacherName,teacherDay,hora);
     const grupo=sesion.grupo?GRUPOS_PROFESORADO[sesion.grupo]?.nombre||sesion.grupo:'';
@@ -7149,7 +7241,7 @@ function renderTeacherPanel(){
     const detalleVisible=grupo||sesion.detalle||'Sin detalle adicional';
     const guardiaTasks=sesion.tipo==='guardia'?dutyAssignments.filter(item=>item.hora===hora):[];
     const dutyBadge=guardiaTasks.length?`<span class="badge teacher-duty-badge">${currentTeacherWeek?'Te toca cubrir':'Cobertura prevista'}</span>`:'';
-    const patioBadge=patioAssignments.length?`<span class="badge ${patioBlock?'b-warn':'b-ok'}">${patioBlock?'Equipo docente':'Patio asignado'}</span>`:'';
+    const patioBadge=patioAssignments.length?`<span class="badge ${patioBlock||unallocatedPatioAssignments.length?'b-warn':'b-ok'}">${patioBlock?'Equipo docente':hasLibraryBreakDuty?'Biblioteca patio':unallocatedPatioAssignments.length?'Patio sin puesto':'Patio asignado'}</span>`:'';
     const openByDefault=(!!activeSlot&&activeSlot.dia===teacherDay&&activeSlot.hora===hora)||checked||!!texto||guardiaTasks.length||patioAssignments.length||!!patioBlock;
     const guardiaTasksMarkup=guardiaTasks.length?`<div class="teacher-guardia-tasks">${guardiaTasks.map(item=>`
       <article class="teacher-guardia-task">
