@@ -18,6 +18,7 @@ const gruposRouter = require('./routes/grupos');
 const scheduleRouter = require('./routes/schedule');
 
 const app = express();
+const HOST = '127.0.0.1';
 const PORT = process.env.PORT || 3000;
 const TRUST_PROXY = (process.env.GUARDIAS_TRUST_PROXY || '').trim();
 const CORS_ORIGINS = String(process.env.GUARDIAS_CORS_ORIGINS || '')
@@ -181,8 +182,8 @@ app.use((error, _req, res, _next) => {
 
 initializeDatabase()
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Server listening on http://localhost:${PORT}`);
+    app.listen(PORT, HOST, () => {
+      console.log(`Server listening on http://${HOST}:${PORT}`);
     });
   })
   .catch(error => {
