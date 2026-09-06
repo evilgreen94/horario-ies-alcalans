@@ -270,6 +270,10 @@ sqlite3 -header -column "$DB" \
   "SELECT name, applied_at FROM schema_migrations ORDER BY name;"
 ```
 
+`db:init` aplica esquema, restricciones y migraciones sin ejecutar el reset
+semanal de datos operativos. Ese mantenimiento conserva su comportamiento normal
+al arrancar la aplicación, pero no forma parte del paso explícito de migración.
+
 Deben figurar:
 
 ```text
@@ -289,6 +293,8 @@ sqlite3 "$DB" \
 ```
 
 Si falla cualquier paso, no arrancar: aplicar el rollback de migración.
+Si las migraciones terminan pero la aplicación no arranca o falla el smoke,
+mantenerla detenida y aplicar 11.2 para restaurar DB y código conjuntamente.
 
 ## 6. Runtime y smoke de código antes del dataset
 
@@ -380,6 +386,9 @@ npm run schedule:prepare -- \
   --db "$WORK_DB" \
   --import | tee "$BACKUP_ROOT/dataset-import-$STAMP.txt"
 ```
+
+Si la importación falla, no instalar `$WORK_DB`: conservarla junto al informe
+para diagnóstico y arrancar de nuevo contra `$DB`, que no se habrá modificado.
 
 La salida debe indicar `activated: false` y `status: validated`. Ejecutar todas
 las consultas de la sección 7.3 sobre `$WORK_DB` antes de instalarla.
@@ -760,8 +769,10 @@ Restaurar código y la DB final previa. Node debe estar detenido:
 
 ```bash
 sudo -iu "$PM2_USER" pm2 stop guardias
-sudo mv "$DB" "$DB.failed-$STAMP"
-sudo rm -f "$DB-wal" "$DB-shm"
+export FAILED_DB="$DB.failed-$STAMP"
+sudo mv "$DB" "$FAILED_DB"
+sudo test ! -e "$DB-wal" || sudo mv "$DB-wal" "$FAILED_DB-wal"
+sudo test ! -e "$DB-shm" || sudo mv "$DB-shm" "$FAILED_DB-shm"
 sudo install -o "$APP_USER" -g "$APP_GROUP" -m 600 "$FINAL_DB_BACKUP" "$DB"
 sudo sqlite3 "$DB" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
 # Restaurar aplicación como en 11.1 y arrancar.
@@ -779,8 +790,10 @@ rollback soportado es restaurar inmediatamente el backup preactivación:
 
 ```bash
 sudo -iu "$PM2_USER" pm2 stop guardias
-sudo mv "$DB" "$DB.bad-activation-$STAMP"
-sudo rm -f "$DB-wal" "$DB-shm"
+export BAD_ACTIVATION_DB="$DB.bad-activation-$STAMP"
+sudo mv "$DB" "$BAD_ACTIVATION_DB"
+sudo test ! -e "$DB-wal" || sudo mv "$DB-wal" "$BAD_ACTIVATION_DB-wal"
+sudo test ! -e "$DB-shm" || sudo mv "$DB-shm" "$BAD_ACTIVATION_DB-shm"
 sudo install -o "$APP_USER" -g "$APP_GROUP" -m 600 "$PRE_ACTIVATION_BACKUP" "$DB"
 sudo sqlite3 "$DB" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
 sudo -iu "$PM2_USER" bash -lc \
@@ -811,6 +824,15 @@ sudo install -o "$APP_USER" -g "$APP_GROUP" -m 600 '<backup-candidato>' "$DB"
 sudo -iu "$PM2_USER" bash -lc \
   "cd '$APP' && set -a && . ./.env && set +a && pm2 restart guardias --update-env"
 ```
+
+### 11.6 El rollback falla
+
+No arrancar Node ni reintentar movimientos destructivos. Mantener el servicio
+detenido, conservar DB/WAL/SHM fallidos y los backups originales, y registrar el
+error. Verificar otro backup y restaurarlo primero a una ruta nueva; solo
+instalarlo como `$DB` cuando pase `quick_check`, `foreign_key_check` y los
+recuentos esenciales. Si no existe una copia verificada, mantener mantenimiento
+y escalar la recuperación: nunca reparar manualmente la única copia disponible.
 
 ## 12. Cierre de ventana
 

@@ -1,6 +1,6 @@
 const { DB_PATH, initializeDatabase } = require('../db');
 
-initializeDatabase()
+initializeDatabase({ skipWeeklyReset: true })
   .then(() => {
     console.log(`Database initialized at ${DB_PATH}`);
   })

@@ -119,14 +119,16 @@ async function withImmediateTransaction(db, callback, options = {}) {
   return runPromise;
 }
 
-async function initializeDatabase() {
+async function initializeDatabase(options = {}) {
   const db = await getDatabase();
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
   await db.exec(schema);
   await applyMigrations(db);
   await ensureAlumnosFueraAulaConstraints(db);
   await seedDefaultCredentials(db);
-  await ensureWeeklyResetIfNeeded(db);
+  if (!options.skipWeeklyReset) {
+    await ensureWeeklyResetIfNeeded(db);
+  }
   return db;
 }
 
