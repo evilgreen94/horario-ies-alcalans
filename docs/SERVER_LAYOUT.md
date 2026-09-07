@@ -7,7 +7,8 @@
 
 | Elemento | Estado observado |
 |---|---|
-| SO/arquitectura | Ubuntu Linux x86_64 |
+| SO/arquitectura | Ubuntu Linux x86_64; kernel 6.8 observado |
+| glibc | Versión instalada no inventariada; objetivo de compatibilidad del release: Ubuntu 22.04+ / glibc 2.35 o superior |
 | Usuario runtime | `rafa` (`HOME=/home/rafa`) |
 | Aplicación | `/srv/guardias/horario-ies-alcalans` |
 | SQLite | `$APP/BD/guardias.sqlite`, legacy, sin `schema_migrations` |

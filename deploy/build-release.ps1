@@ -1,6 +1,7 @@
 param(
   [string]$OutputDirectory = '',
-  [string]$ContainerImage = 'node:22-bookworm-slim'
+  [string]$ContainerImage = 'node:22-bookworm-slim',
+  [string]$MaximumGlibc = '2.35'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -76,9 +77,21 @@ npm ls --omit=dev
 printf %s "$NATIVE_CHECK_B64" | base64 -d > .release-native-check.cjs
 node .release-native-check.cjs
 rm .release-native-check.cjs
+sqlite_native=node_modules/sqlite3/build/Release/node_sqlite3.node
+sqlite_glibc="$(grep -ao 'GLIBC_[0-9.]*' "$sqlite_native" | sed 's/^GLIBC_//' | sort -Vu | tail -1)"
+test -n "$sqlite_glibc"
+highest_glibc="$(printf '%s\n' "$sqlite_glibc" "$MAXIMUM_GLIBC" | sort -V | tail -1)"
+if [ "$highest_glibc" != "$MAXIMUM_GLIBC" ]; then
+  echo "sqlite3 requires GLIBC_$sqlite_glibc; maximum allowed is GLIBC_$MAXIMUM_GLIBC" >&2
+  exit 1
+fi
+node_version="$(node --version)"
+npm_version="$(npm --version)"
+printf 'sqlite3-glibc-required=GLIBC_%s\n' "$sqlite_glibc"
 chmod +x ops/*.sh deploy/linux/*.sh
-printf 'commit=%s\nbranch=%s\nbuilt_at=%s\nbuild_image=%s\narchitecture=linux-x64\n' \
-  "$RELEASE_COMMIT" "$RELEASE_BRANCH" "$BUILD_TIMESTAMP" "$BUILD_IMAGE" > .deployed-release
+printf 'commit=%s\nbranch=%s\nbuilt_at=%s\nbuild_image=%s\narchitecture=linux-x64\nnode=%s\nnpm=%s\nsqlite3_glibc_required=GLIBC_%s\nglibc_compatibility_max=GLIBC_%s\n' \
+  "$RELEASE_COMMIT" "$RELEASE_BRANCH" "$BUILD_TIMESTAMP" "$BUILD_IMAGE" \
+  "$node_version" "$npm_version" "$sqlite_glibc" "$MAXIMUM_GLIBC" > .deployed-release
 tar --sort=name --mtime="@$SOURCE_EPOCH" --owner=0 --group=0 --numeric-owner -cf - . | gzip -n > "/output/$ARTIFACT_NAME"
 cd /output
 sha256sum "$ARTIFACT_NAME" > "$ARTIFACT_NAME.sha256"
@@ -93,6 +106,7 @@ sha256sum "$ARTIFACT_NAME" > "$ARTIFACT_NAME.sha256"
     -e "RELEASE_BRANCH=$branch" `
     -e "BUILD_TIMESTAMP=$buildTimestamp" `
     -e "BUILD_IMAGE=$ContainerImage" `
+    -e "MAXIMUM_GLIBC=$MaximumGlibc" `
     -e "SOURCE_EPOCH=$sourceEpoch" `
     -e "NATIVE_CHECK_B64=$nativeCheck" `
     $ContainerImage bash -lc $buildScript
@@ -104,6 +118,7 @@ sha256sum "$ARTIFACT_NAME" > "$ARTIFACT_NAME.sha256"
 Write-Output "RELEASE_COMMIT=$commit"
 Write-Output "RELEASE_BRANCH=$branch"
 Write-Output "BUILD_IMAGE=$ContainerImage"
+Write-Output "MAXIMUM_GLIBC=$MaximumGlibc"
 Write-Output "STAGING_PATH=$stageDirectory"
 Write-Output "ARTIFACT_PATH=$artifact"
 Write-Output "CHECKSUM_PATH=$checksum"
