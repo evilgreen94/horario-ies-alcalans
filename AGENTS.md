@@ -2,6 +2,12 @@
 
 These rules apply to every change; explicit user instructions take precedence.
 
+Start with `docs/START_HERE.md`. If documentation disagrees, current code and
+migrations win, followed by this file for agent safety, then the authority order
+defined in `docs/START_HERE.md`. Treat production paths, users, PM2 state, Nginx
+configuration, network addresses, and connectivity as unverified until inspected
+on the school server with explicit authorization.
+
 ## Workflow
 
 - Inspect the branch, `git status --short`, and existing diff first. Preserve

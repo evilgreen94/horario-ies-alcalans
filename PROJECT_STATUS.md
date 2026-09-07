@@ -1,127 +1,82 @@
-# Estado real del proyecto Guardias 2026/27
+# Estado de Guardias 2026/27
 
-Fecha de auditoría: 6 de septiembre de 2026.
+> **Documento contextual y de planificación.** Actualizado el 7 de septiembre de
+> 2026. Para operar, empezar por [docs/START_HERE.md](docs/START_HERE.md).
 
-## Resumen ejecutivo
+## Resumen
 
-El modelo de datos, la autenticación individual y el horario canónico están
-implementados y cubiertos por pruebas automatizadas. El sistema aún no está listo
-para producción: falta asegurar que Node escuche solo en loopback, ensayar las
-migraciones y la restauración sobre una copia representativa de producción, y
-aprobar e importar el dataset 2026/27.
+La arquitectura, persistencia SQLite, identidad individual, horario canónico,
+importadores provisionales y obligaciones de recreo están implementados. La base
+de código auditada es `59de86bd42cf8a733777f1516435f7f567e15a77` en
+`rescue/preproduction-2026-09`; su suite pasa 77/77.
 
-Commit candidato auditado: `b854507af7e1d6bafacc5bac4f66b6b2d0bb31fb` en
-`rescue/preproduction-2026-09`. La suite registrada para ese commit pasa 65/65.
+La fase de código está cerrada. Esto **no equivale a producción lista**: aún se
+deben verificar físicamente la infraestructura del servidor, los backups y el
+smoke interactivo, además de ejecutar el runbook con aprobación expresa.
 
-Los ficheros externos de censo y PDF no forman parte del repositorio. La base
-SQLite operativa y producción no se inspeccionaron ni modificaron durante esta
-auditoría.
+Producción y la SQLite operativa no se inspeccionaron ni modificaron durante esta
+sesión. No hay constancia en el repositorio de un dataset 2026/27 activo en
+producción.
 
-## Leyenda
+## Estado técnico
 
-- **READY**: implementado y con evidencia automatizada suficiente para su función.
-- **IMPLEMENTED / NEEDS MANUAL VALIDATION**: existe y está probado parcialmente,
-  pero requiere comprobación real en el servidor o navegador.
-- **PROVISIONAL**: utilizable con revisión y límites explícitos; no es la fuente o
-  flujo definitivo.
-- **PENDING**: necesario pero aún no resuelto o no verificado.
-- **OBSOLETE**: retirado como fuente operativa; solo puede quedar historial Git o
-  compatibilidad de contrato.
+| Área | Estado comprobado en repositorio |
+|---|---|
+| Node/Express | Bind fijo a `127.0.0.1`; puerto por `PORT`, 3000 por defecto. |
+| SQLite | WAL, FK, timeout, transacciones, migraciones 001/002 y backup consistente. |
+| Migraciones | Ensayadas sobre base heredada representativa; `db:init` no ejecuta mantenimiento semanal. |
+| Autenticación | Sesiones legacy e individuales, roles servidor, scrypt, cambio de clave propia y auditoría. |
+| Identidad docente | Usuario persistente; perfil/asignación/identidad externa por curso; `source_code` no es PK. |
+| Horario canónico | Periodos dinámicos, breaks explícitos y datasets versionados `draft/validated/active/archived`. |
+| Compatibilidad | SQLite canónica → adaptador → `PROFESORADO_SOURCE` → `guardias.html`; sin fallback 2025/26. |
+| `/app/` | Vista personal autenticada con estados clase/guardia/reunión/otra/libre/recreo/patio/fuera. |
+| Patio | Obligaciones PDF integradas sin inventar puesto y fusionadas con configuración explícita. |
+| Infraestructura real | **POR VERIFICAR EN EL CENTRO:** PM2, Nginx, usuarios, rutas, firewall, timers y espacio. |
+| Validación visual | Pendiente de smoke manual antes de producción; navegador integrado no disponible. |
 
-## Inventario por subsistema
+## Dataset PDF provisional aprobado operativamente
 
-| Subsistema | Estado | Evidencia y límites actuales |
-|---|---|---|
-| Arquitectura LAN → Nginx → Node → SQLite | IMPLEMENTED / NEEDS MANUAL VALIDATION | Express y SQLite están en el repositorio. La configuración Nginx real no está versionada ni se inspeccionó. |
-| Nginx | PENDING | Debe verificarse `nginx -T`, el proxy a `127.0.0.1:3000`, cabeceras `Host`/`X-Forwarded-*` y acceso LAN por `:80`. |
-| Node/Express | IMPLEMENTED / NEEDS MANUAL VALIDATION | API y estáticos se sirven desde `server/app.js`. `app.listen(PORT)` no fija host y puede escuchar en todas las interfaces. |
-| PM2 | IMPLEMENTED / NEEDS MANUAL VALIDATION | El README describe PM2, pero no hay `ecosystem.config.js`. Deben verificarse cwd, entorno, usuario, logs y arranque persistente. Existe además una unidad systemd; no deben operar ambos gestores a la vez. |
-| SQLite operativo | READY | WAL, `busy_timeout`, claves foráneas y transacciones serializadas. Toda persistencia backend vigente reside en SQLite. |
-| Autenticación legacy | READY | `admin` y `superadmin` conservan login por rol y cookie firmada de 12 horas. Contraseñas scrypt y comparación temporalmente segura. |
-| Autenticación individual | READY | Login por usuario activo y roles obtenidos en servidor. Se ignoran roles/IDs enviados por cliente. Cambio de contraseña limitado al propio usuario. |
-| Cookies/sesiones | READY | HMAC-SHA256, `HttpOnly`, `SameSite=Lax`, expiración y `Secure` cuando la petición se considera HTTPS. El secreto de sesión es obligatorio. |
-| Roles y autorización | READY | `teacher`, `admin` y `superadmin`; escrituras administrativas protegidas. Activación y backups completos requieren `superadmin`. |
-| Auditoría | READY | Eventos individuales y cambio de contraseña; redacción recursiva de claves, hashes, salts, cookies, sesiones y tokens. |
-| Perfiles docentes | READY | Registros internos por curso, nombre no único e identidades externas separadas. `source_code` se guarda como identidad externa, no como PK. |
-| Identidades externas | READY | Clave externa acotada por curso, sistema y formato; integridad entre perfil, curso, roster y sesiones mediante restricciones/triggers. |
-| Asignaciones docentes | READY | Titular/sustituto, intervalos, referencia al titular y restricciones contra solapamientos ambiguos. |
-| Resolución de identidad activa | READY | Determinista por fecha; prioriza sustituto, respeta expiración, curso, usuario y perfil activos. |
-| Flujo operativo de sustituciones | PROVISIONAL | El resolver individual usa `teacher_assignments`; `guardias.html` mantiene además el mapa operativo `teacher_substitutions` en `app_state`. No existe una operación única que actualice ambos. |
-| Cursos académicos | READY | Estados `preparation`, `active`, `archived`; una única anualidad activa. Usuarios persisten entre cursos y perfiles/asignaciones son anuales. |
-| Dataset horario canónico | READY | Periodos dinámicos, breaks explícitos, sesiones `class`, `guardia`, `meeting`, `other`, versiones y huella reproducible. |
-| Estados y activación del dataset | READY | `draft`, `validated`, `active`, `archived`; importación no activa y activación superadmin explícita/transaccional. No hay fallback silencioso. |
-| Adaptador PDF 2026/27 | PROVISIONAL | Extrae el PDF concreto por coordenadas y plantilla horaria 2026/27. Estructuralmente válido; quedan 335 actividades `other` para revisión humana. |
-| Importador XML anual | PROVISIONAL | Importa por `source_code`, admite nombres duplicados y rechaza contradicciones. El parser y la plantilla son específicos del formato provisional 2026/27. |
-| Importación de perfiles en producción | PENDING | La librería existe, pero no hay un comando de producción dedicado. Los scripts suministrados bloquean deliberadamente la base operativa. |
-| Activación en producción | IMPLEMENTED / NEEDS MANUAL VALIDATION | Existe API `POST /api/schedule/datasets/:id/activate`; no hay interfaz de activación. El CLI incluido solo admite bases dev/test/tmp. |
-| `guardias.html` | IMPLEMENTED / NEEDS MANUAL VALIDATION | Conserva el contrato funcional y consume el adaptador canónico. Falta el smoke visual manual completo con datos 2026/27. |
-| Adaptador canónico → legacy | READY | Genera `{nombre, horario, guardias}` y periodos desde SQLite; conserva `sourceCode`. Sin dataset activo muestra error visible. |
-| `/app/` | IMPLEMENTED / NEEDS MANUAL VALIDATION | Login individual, identidad, estado actual, detalle y lista diaria, logout. La lista permite ver el siguiente tramo, pero no hay tarjeta separada de “siguiente actividad”. |
-| Backups SQLite | READY | `.backup` consistente, descarga superadmin y verificación `quick_check`; pruebas cubren copia/restauración completa. |
-| Timers de backup | IMPLEMENTED / NEEDS MANUAL VALIDATION | Unidades diaria/semanal/mensual y retención. Deben verificarse instalación, ejecución, permisos, espacio y restaurabilidad en Ubuntu. |
-| Backup/restore JSON | PROVISIONAL | Snapshot operativo heredado. No incluye cuentas ni modelo horario completo y no debe usarse como rollback de despliegue. |
-| Reset de curso | IMPLEMENTED / NEEDS MANUAL VALIDATION | Crea y verifica archivo SQLite, limpia varias colecciones y archiva curso/dataset activos. Debe revisarse manualmente el tratamiento deseado de `alumnos_fuera_aula` y `grupos_estado`. |
-| Migración 001 | READY | Aditiva; crea usuarios, roles, perfiles, asignaciones y auditoría sin retirar autenticación heredada. |
-| Migración 002 | IMPLEMENTED / NEEDS MANUAL VALIDATION | Añade anualidad, identidades y horario canónico. La ejecución está controlada por `schema_migrations`; falta ensayo sobre copia representativa de producción. |
-| Tests | READY | 65/65: auth, permisos, sustituciones, migraciones, SQLite, importación, activación, backup/restore, HTTP y robustez frontend. |
-| Prueba visual integrada | PENDING | El navegador integrado no estaba disponible. El riesgo se aceptó para los commits, no para el despliegue. |
-| Persistencia JSON/JS 2025/26 | OBSOLETE | Fuentes de profesorado/horario retiradas. Solo queda el contrato `PROFESORADO_SOURCE`, servido dinámicamente desde SQLite. |
-| Configuración de patio JS | IMPLEMENTED / NEEDS MANUAL VALIDATION | `js/data/patio_guardias.js` sigue siendo configuración frontend, no persistencia backend. |
+Fuente externa no versionada. Resultado reproducible del adaptador 2026/27:
 
-## Auditoría del PDF provisional 2026/27
-
-Informe regenerado en modo solo lectura con los ficheros externos disponibles:
-
-| Métrica | Resultado |
+| Métrica | Total |
 |---|---:|
-| Docentes en censo | 88 |
-| Páginas docentes detectadas | 88 |
-| Docentes enlazados por `source_code` | 88 |
-| Docentes ausentes del PDF | 0 |
-| Sesiones totales | 2.059 |
-| `class` | 1.235 |
-| `guardia` | 157 |
-| `meeting` | 332 |
-| `other` | 335 |
-| Etiquetas distintas dentro de `other` | 33 |
-| Periodos | 9 |
-| Breaks explícitos | 2 |
-| Sesiones en P7 | 156 |
+| Docentes enlazados por `source_code` | 88/88 |
+| Sesiones lectivas/operativas | 2.059 |
+| Clases | 1.290 |
+| Guardias en periodo lectivo | 157 |
+| Reuniones | 332 |
+| Otras actividades en periodo lectivo | 280 |
+| `GUÀRDIES PATI` | 57 |
+| `BIBLIOTECA PATI` | 5 |
+| Total canónico, incluyendo recreos con obligación | 2.121 |
+| Periodos / breaks explícitos | 9 / 2 |
+| Duplicados docente/día/periodo | 0 |
 | Anomalías estructurales | 0 |
-| Duplicados docente/día/periodo | 0; la validación canónica los rechaza |
 
-Las mayores etiquetas `other` son `COMPLEMENTARIAS AUTORIZADAS` (159),
-`JEFE-DIRECIÓN DE DEPART. DIDÁCTIC` (44), `FUNCIONES DIRECTIVAS (L)` (31),
-`LECTIVAS AUTORIZADAS` (9) y `MANTENIMIENTO DE EQUIPOS` (9). Que una celda sea
-`other` no la convierte en libre: ocupa el tramo en `/app/`, pero no se trata como
-clase cubrible en la lógica de guardias. Jefatura debe confirmar que esa semántica
-es correcta para las 33 etiquetas antes de activar el PDF.
+Toda sesión u obligación significa ocupado. Las cinco `BIBLIOTECA PATI` siguen
+sin puesto físico automático; la existencia del puesto `0.1` no determina su
+significado. Las 57 `GUÀRDIES PATI` tampoco reciben puestos inventados.
 
-## Riesgos conocidos
+## Decisiones y verificaciones pendientes reales
 
-1. **Exposición directa de Node:** el código no asegura todavía el bind a
-   `127.0.0.1`; Nginx no debe ser solo una convención.
-2. **Despliegue sin dataset activo:** al retirarse el fallback 2025/26,
-   `guardias.html` mostrará indisponibilidad hasta activar un dataset canónico.
-3. **Importación operativa:** los CLI actuales protegen la base real; hace falta
-   ensayar y aprobar el procedimiento de copia de trabajo/instalación descrito en
-   `DEPLOYMENT_RUNBOOK.md` o proporcionar un comando dedicado.
-4. **Semántica PDF:** 335 actividades requieren aprobación, aunque no hay errores
-   estructurales.
-5. **Doble flujo de sustituciones:** la sustitución visible en `guardias.html` y la
-   identidad que abre `/app/` se gestionan en estructuras distintas.
-6. **Provisionamiento:** no hay UI ni comando de producción para altas iniciales;
-   `create-local-teacher.js` está deliberadamente limitado a pruebas.
-7. **Infraestructura no observada:** no se ha confirmado el PM2, Nginx, firewall,
-   espacio, timers ni `.env` reales.
-8. **Rollback de activación:** la API archiva el dataset anterior y no reactiva uno
-   archivado; el rollback soportado es restaurar el backup SQLite previo.
+1. Jefatura debe definir puestos/rotaciones físicos de patio y el significado
+   operativo de `BIBLIOTECA PATI`.
+2. Verificar en el servidor: ruta, propietario, usuario PM2, proceso único,
+   Nginx, listener, `.env`, timers, backups restaurables y espacio.
+3. Ejecutar smoke visual manual de `guardias.html` y `/app/` con el dataset
+   aprobado antes de abrir el servicio.
+4. Aprobar el procedimiento de importación/instalación/activación en producción.
+5. Definir el alta gradual de cuentas y el procedimiento doble de sustituciones
+   mientras `teacher_assignments` y `teacher_substitutions` sigan separados.
+6. Confirmar el XML definitivo de Peñalara cuando llegue; debe alimentar el mismo
+   modelo canónico.
 
-## Qué no existe todavía
+## No implementado
 
-- PWA, Service Worker o Web Push.
-- Interfaz administrativa de usuarios/asignaciones.
-- Interfaz de listado/activación de datasets.
-- Configuración Nginx o PM2 versionada para el entorno real.
-- Importador definitivo del XML real de Peñalara.
-- Smoke visual manual de producción/preproducción con el dataset 2026/27.
+- PWA, trabajo offline o Web Push.
+- Gestión administrativa completa de usuarios/asignaciones.
+- Importador del XML real definitivo aún no recibido.
+- Acceso remoto desde Internet.
+- Configuración Nginx o PM2 real verificada/versionada.
+
+La priorización actual está en [ROADMAP_2026-27.md](ROADMAP_2026-27.md).

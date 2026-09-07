@@ -4,6 +4,9 @@ Este documento prepara el despliegue; **no autoriza ejecutarlo**. No usar en
 producción hasta cerrar todos los P0 de `ROADMAP_2026-27.md` y obtener aprobación
 expresa para la ventana.
 
+Para diagnóstico cotidiano usar `docs/OPERATIONS.md`; este es el único documento
+autorizado para cambiar release, migrar, instalar una DB o hacer rollback.
+
 Arquitectura objetivo:
 
 ```text
@@ -18,7 +21,7 @@ documentado en el proyecto. No usar `git pull` en producción.
 
 Abortar antes de modificar producción si ocurre cualquiera de estas condiciones:
 
-- el release aún usa `app.listen(PORT)` sin fijar loopback;
+- el release no fija Node en `127.0.0.1` o el listener real muestra otra interfaz;
 - el árbol fuente no está limpio o el commit no es el aprobado;
 - no hay backup SQLite verificado y artefacto de rollback de la aplicación;
 - `quick_check` no devuelve `ok` o `foreign_key_check` devuelve filas;
@@ -28,9 +31,9 @@ Abortar antes de modificar producción si ocurre cualquiera de estas condiciones
 - el dataset no tiene acta de validación y aprobación de Jefatura;
 - el smoke manual local no está firmado por Rafa.
 
-El commit `b854507af7e1d6bafacc5bac4f66b6b2d0bb31fb` es la base auditada, pero **no
-es desplegable mientras no se corrija el bind de Node**. El release real será el
-commit posterior que cierre ese P0.
+El commit `59de86bd42cf8a733777f1516435f7f567e15a77` es la última base de código
+auditada antes de esta documentación. El release real debe ser el SHA completo
+posterior expresamente aprobado para la ventana; nunca copiar este valor a ciegas.
 
 ## 1. Variables de la ventana
 
@@ -479,10 +482,13 @@ sqlite3 "$CHECK_DB" \
   "SELECT validation_report_json FROM schedule_datasets WHERE id=$DATASET_ID;"
 ```
 
-Para el PDF actualmente auditado se esperan exactamente: 88 docentes, 2.059
-sesiones, 1.235 `class`, 157 `guardia`, 332 `meeting`, 335 `other`, 9 periodos,
-2 breaks, 156 sesiones P7, cero duplicados y cero anomalías. Para XML definitivo,
-registrar y aprobar sus propios totales; no forzar los números del PDF.
+Para el PDF actualmente auditado se esperan exactamente: 88 docentes, 2.121
+sesiones canónicas: 1.290 `class`, 214 `guardia` totales (157 en periodos
+lectivos y 57 `GUÀRDIES PATI`), 332 `meeting` y 285 `other` totales (280 en
+periodos lectivos y cinco `BIBLIOTECA PATI`); 9 periodos, 2 breaks, 156 sesiones
+P7, cero duplicados y cero anomalías. Ninguna obligación de recreo recibe puesto
+físico automáticamente. Para XML definitivo, registrar y aprobar sus propios
+totales; no forzar los números del PDF.
 
 Revisar varias identidades, no solo RMLL:
 
@@ -710,6 +716,8 @@ variables de contraseña del proceso.
 - [ ] Guardia aparece como guardia y no como clase/libre.
 - [ ] Hueco lectivo sin sesión aparece libre.
 - [ ] Los dos breaks aparecen como recreo aunque no tengan sesión.
+- [ ] `GUÀRDIES PATI` aparece como obligación ocupada y no recibe puesto inventado.
+- [ ] `BIBLIOTECA PATI` aparece ocupada y sin puesto físico automático.
 - [ ] P7 aparece como lectiva cuando existe.
 - [ ] La lista completa funciona como resumen diario y mantiene el orden.
 - [ ] Recarga conserva sesión y datos; logout la invalida.
@@ -730,6 +738,7 @@ como “actuales”.
 - [ ] Alta, edición, asignación y retirada de una ausencia de prueba.
 - [ ] Flujo Jefatura: faltas futuras, tareas, historial y PDF si están en alcance del día.
 - [ ] Sustitución visible se guarda y recarga.
+- [ ] Patio muestra obligaciones importadas, puestos configurados y overrides sin sobrescribirse.
 - [ ] Admin puede escribir; profesor individual recibe 403.
 - [ ] Superadmin abre salud y descarga backup SQLite.
 - [ ] Consola sin errores inesperados y red sin 4xx/5xx no explicados.
