@@ -43,7 +43,8 @@ Get-ChildItem $out
 ```
 
 El script usa `node:22-bookworm-slim` en Docker Linux/amd64, extrae una allowlist
-del commit, ejecuta `npm ci --omit=dev`, carga el módulo nativo `sqlite3` y crea:
+del commit, compila las dependencias nativas dentro de esa imagen mediante
+`npm ci --omit=dev`, carga el módulo `sqlite3` resultante y crea:
 
 ```text
 guardias-release-<sha-corto>-linux-x64.tar.gz

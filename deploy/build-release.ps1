@@ -68,7 +68,10 @@ set -euo pipefail
 stage="/output/$STAGE_NAME"
 tar -xf /input/source.tar -C "$stage"
 cd "$stage"
-npm ci --omit=dev --no-audit --no-fund
+apt-get update
+apt-get install -y --no-install-recommends python3 make g++
+rm -rf /var/lib/apt/lists/*
+npm_config_build_from_source=true npm ci --omit=dev --no-audit --no-fund
 npm ls --omit=dev
 printf %s "$NATIVE_CHECK_B64" | base64 -d > .release-native-check.cjs
 node .release-native-check.cjs
