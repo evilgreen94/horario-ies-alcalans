@@ -36,6 +36,7 @@ if ((Test-Path $stageDirectory) -or (Test-Path $artifact) -or (Test-Path $checks
 }
 
 $sourceTar = Join-Path $OutputDirectory "source-$shortCommit.tar"
+$buildScriptPath = Join-Path $OutputDirectory "build-$shortCommit.sh"
 $paths = @(
   '.env.example',
   'package.json',
@@ -96,9 +97,16 @@ tar --sort=name --mtime="@$SOURCE_EPOCH" --owner=0 --group=0 --numeric-owner -cf
 cd /output
 sha256sum "$ARTIFACT_NAME" > "$ARTIFACT_NAME.sha256"
 '@
+  [IO.File]::WriteAllText(
+    $buildScriptPath,
+    $buildScript.Replace("`r`n", "`n"),
+    [Text.UTF8Encoding]::new($false)
+  )
+  $buildMount = "type=bind,source=$buildScriptPath,target=/input/build.sh,readonly"
 
   & docker run --rm --platform linux/amd64 `
     --mount $sourceMount `
+    --mount $buildMount `
     --mount $outputMount `
     -e "STAGE_NAME=$stageName" `
     -e "ARTIFACT_NAME=$artifactName" `
@@ -109,10 +117,11 @@ sha256sum "$ARTIFACT_NAME" > "$ARTIFACT_NAME.sha256"
     -e "MAXIMUM_GLIBC=$MaximumGlibc" `
     -e "SOURCE_EPOCH=$sourceEpoch" `
     -e "NATIVE_CHECK_B64=$nativeCheck" `
-    $ContainerImage bash -lc $buildScript
+    $ContainerImage bash /input/build.sh
   if ($LASTEXITCODE -ne 0) { throw 'La construcción Linux falló.' }
 } finally {
   if (Test-Path -LiteralPath $sourceTar) { Remove-Item -LiteralPath $sourceTar -Force }
+  if (Test-Path -LiteralPath $buildScriptPath) { Remove-Item -LiteralPath $buildScriptPath -Force }
 }
 
 Write-Output "RELEASE_COMMIT=$commit"
