@@ -1,6 +1,9 @@
 const BASE_URL = process.env.GUARDIAS_BASE_URL || 'http://127.0.0.1:3000';
 const ADMIN_PASSWORD = process.env.GUARDIAS_SMOKE_ADMIN_PASSWORD || '';
 const SUPERADMIN_PASSWORD = process.env.GUARDIAS_SMOKE_SUPERADMIN_PASSWORD || '';
+const TEACHER_USERNAME = process.env.GUARDIAS_SMOKE_TEACHER_USERNAME || '';
+const TEACHER_PASSWORD = process.env.GUARDIAS_SMOKE_TEACHER_PASSWORD || '';
+const EXPECT_DATASET = process.env.GUARDIAS_SMOKE_EXPECT_DATASET || '';
 
 function getFetch() {
   if (typeof fetch === 'function') return fetch;
@@ -102,6 +105,36 @@ async function testProtectedWithoutAuth() {
   return 'public reads allowed; protected routes reject anonymous access';
 }
 
+async function testPages() {
+  const checks = [
+    ['/', '<!DOCTYPE html'],
+    ['/guardias.html', '<!DOCTYPE html'],
+    ['/app/', '<!DOCTYPE html']
+  ];
+  for (const [pathname, marker] of checks) {
+    const { response, body } = await request(pathname);
+    assert(response.status === 200, `GET ${pathname} expected 200, got ${response.status}`);
+    assert(String(body).toLowerCase().includes(marker.toLowerCase()), `GET ${pathname} did not return the expected HTML`);
+  }
+  return 'homepage, guardias.html and /app/ ok';
+}
+
+async function testScheduleExpectation() {
+  if (!EXPECT_DATASET) return 'schedule expectation skipped';
+  const { response, body } = await request('/api/schedule/active');
+  if (EXPECT_DATASET === 'none') {
+    assert(response.status === 503, `schedule without active dataset expected 503, got ${response.status}`);
+    assert(String(body?.error || '').includes('No hay un dataset horario activo'), 'missing explicit no-dataset error');
+    return 'no active dataset is explicit (no legacy fallback)';
+  }
+  if (EXPECT_DATASET === 'active') {
+    assert(response.status === 200, `active schedule expected 200, got ${response.status}`);
+    assert(body && Array.isArray(body.periods) && Array.isArray(body.teachers), 'active schedule payload is incomplete');
+    return 'active canonical dataset ok';
+  }
+  throw new Error('GUARDIAS_SMOKE_EXPECT_DATASET must be empty, none or active');
+}
+
 async function testAnonymousAlumnosFueraAulaWriteProtection() {
   const payload = {
     profesor: 'SMOKE_ANON_WRITE',
@@ -173,6 +206,9 @@ async function testAdminFlow() {
 
   const jar = await login('admin', ADMIN_PASSWORD);
 
+  const session = await request('/api/auth/session', {}, jar);
+  assert(session.response.status === 200 && session.body?.role === 'admin', 'legacy admin session contract changed');
+
   const guardias = await request('/api/guardias', {}, jar);
   assert(guardias.response.status === 200, `GET /api/guardias expected 200, got ${guardias.response.status}`);
   assert(Array.isArray(guardias.body), 'GET /api/guardias expected array');
@@ -221,14 +257,50 @@ async function testSuperadminFlow() {
   return 'superadmin flow ok';
 }
 
+async function testIndividualTeacherFlow() {
+  if (!TEACHER_USERNAME && !TEACHER_PASSWORD) return 'individual teacher flow skipped';
+  assert(TEACHER_USERNAME && TEACHER_PASSWORD, 'both teacher smoke credentials are required');
+
+  const jar = createCookieJar();
+  const loginResult = await request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: TEACHER_USERNAME, password: TEACHER_PASSWORD, role: 'superadmin' })
+  }, jar);
+  assert(loginResult.response.status === 200, `individual login expected 200, got ${loginResult.response.status}`);
+  assert(loginResult.body?.role === 'teacher' && loginResult.body?.isAdmin === false, 'client role field escalated teacher');
+
+  const session = await request('/api/auth/session', {}, jar);
+  assert(session.body?.authenticated === true && session.body?.role === 'teacher', 'individual session identity is invalid');
+
+  const schedule = await request('/api/schedule/me?date=2026-09-07', {}, jar);
+  assert(schedule.response.status === 200, `teacher schedule expected 200, got ${schedule.response.status}`);
+
+  const deniedExport = await request('/api/export/database.sqlite', {}, jar);
+  assert(deniedExport.response.status === 403, `teacher export escalation expected 403, got ${deniedExport.response.status}`);
+  const deniedActivation = await request('/api/schedule/datasets/1/activate', {
+    method: 'POST',
+    body: JSON.stringify({ role: 'superadmin', userId: 1 })
+  }, jar);
+  assert(deniedActivation.response.status === 403, `teacher activation escalation expected 403, got ${deniedActivation.response.status}`);
+
+  const logout = await request('/api/auth/logout', { method: 'POST' }, jar);
+  assert(logout.response.status === 200 && logout.body?.ok === true, 'individual logout failed');
+  const afterLogout = await request('/api/auth/session', {}, jar);
+  assert(afterLogout.body?.authenticated === false, 'session remained active after logout');
+  return 'individual teacher session, schedule, denial and logout ok';
+}
+
 async function main() {
   const results = [];
   results.push(await testHealth());
+  results.push(await testPages());
+  results.push(await testScheduleExpectation());
   results.push(await testProtectedWithoutAuth());
   results.push(await testAnonymousAlumnosFueraAulaWriteProtection());
   results.push(await testAnonymousWriteProtection());
   results.push(await testAdminFlow());
   results.push(await testSuperadminFlow());
+  results.push(await testIndividualTeacherFlow());
 
   console.log('Smoke test passed');
   results.forEach(result => console.log(`- ${result}`));

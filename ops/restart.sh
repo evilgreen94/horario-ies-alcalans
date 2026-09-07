@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${APP_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-DB_PATH="${GUARDIAS_DB_PATH:-$APP_ROOT/BD/guardias.sqlite}"
+DB_PATH="${GUARDIAS_DB_PATH:-/var/lib/guardias/guardias.sqlite}"
 PM2_PROCESS="${PM2_PROCESS:-guardias}"
 PM2_USER="${PM2_USER:-}"
 NODE_PORT="${PORT:-3000}"

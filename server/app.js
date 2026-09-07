@@ -69,7 +69,8 @@ function isBlockedStaticRequest(req) {
   const firstSegment = lowerPath.split('/').filter(Boolean)[0] || '';
   if (!firstSegment) return false;
   if (firstSegment.startsWith('.')) return true;
-  if (['server', 'deploy', 'bd', 'json_profes', 'node_modules'].includes(firstSegment)) return true;
+  if (lowerPath.endsWith('.md')) return true;
+  if (['server', 'deploy', 'docs', 'ops', 'bd', 'json_profes', 'node_modules'].includes(firstSegment)) return true;
   return [
     '/package.json',
     '/package-lock.json',

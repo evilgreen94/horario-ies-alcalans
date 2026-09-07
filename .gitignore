@@ -10,3 +10,6 @@ server/data/
 *.sqlite-shm
 *.sqlite-wal
 server-local*.log
+/guardias-release-*/
+/guardias-release-*-linux-x64.tar.gz
+/guardias-release-*-linux-x64.tar.gz.sha256

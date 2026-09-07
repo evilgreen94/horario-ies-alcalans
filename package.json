@@ -4,6 +4,10 @@
   "private": true,
   "description": "Backend and frontend for guardias IES Alcalans",
   "main": "server/app.js",
+  "engines": {
+    "node": ">=22.9 <23",
+    "npm": ">=10 <12"
+  },
   "scripts": {
     "dev": "node server/app.js",
     "start": "node server/app.js",

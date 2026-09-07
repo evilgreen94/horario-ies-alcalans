@@ -88,6 +88,11 @@ async function testHttpLifecycle() {
     });
     await seedActiveSchedule(environment.dbPath);
 
+    for (const blockedPath of ['/server/app.js', '/deploy/linux/guardias.nginx.conf', '/docs/START_HERE.md', '/ops/status.sh', '/AGENTS.md']) {
+      const blocked = await request(server.baseUrl, blockedPath);
+      assert.strictEqual(blocked.response.status, 404, `${blockedPath} must not be exposed by the static server`);
+    }
+
     const anonymous = await request(server.baseUrl, '/api/guardias', {
       method: 'POST',
       body: { dia: 0, hora: 1, ausente: SYNTHETIC }

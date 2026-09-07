@@ -4,7 +4,7 @@ umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${APP_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-DB_PATH="${GUARDIAS_DB_PATH:-$APP_ROOT/BD/guardias.sqlite}"
+DB_PATH="${GUARDIAS_DB_PATH:-/var/lib/guardias/guardias.sqlite}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/guardias}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 TARGET_DIR="${BACKUP_DIR:-$BACKUP_ROOT/manual}"

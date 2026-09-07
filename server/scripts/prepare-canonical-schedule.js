@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const { open } = require('sqlite');
 const sqlite3 = require('sqlite3');
+const { resolveDatabaseTarget } = require('./database-target');
+
+const OPERATIONAL_IMPORT_CONFIRMATION = 'IMPORT_VALIDATED_DATASET_ONLY';
 
 function readArguments(argv) {
   const result = {};
@@ -26,19 +29,6 @@ function requireExternalFile(value, label) {
   return resolved;
 }
 
-function validateDevelopmentDatabase(value) {
-  if (!value) throw new Error('Falta --db; nunca se selecciona la base operativa por defecto.');
-  const resolved = path.resolve(value);
-  const operational = path.resolve(__dirname, '..', '..', 'BD', 'guardias.sqlite');
-  if (resolved.toLowerCase() === operational.toLowerCase()) {
-    throw new Error('La base operativa del repositorio está bloqueada para este importador.');
-  }
-  if (!/\.(?:dev|test|tmp)\.sqlite$/i.test(resolved)) {
-    throw new Error('La base debe terminar en .dev.sqlite, .test.sqlite o .tmp.sqlite.');
-  }
-  return resolved;
-}
-
 async function main() {
   const args = readArguments(process.argv.slice(2));
   const censusPath = requireExternalFile(args.census, 'census');
@@ -55,7 +45,10 @@ async function main() {
     return;
   }
 
-  const databasePath = validateDevelopmentDatabase(args.db);
+  const databasePath = resolveDatabaseTarget(args.db, {
+    confirmation: args['allow-operational-db'],
+    requiredConfirmation: OPERATIONAL_IMPORT_CONFIRMATION
+  });
   fs.mkdirSync(path.dirname(databasePath), { recursive: true });
   const db = await open({ filename: databasePath, driver: sqlite3.Database });
   try {
@@ -79,7 +72,11 @@ async function main() {
   }
 }
 
-main().catch(error => {
-  console.error(error.message || error);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch(error => {
+    console.error(error.message || error);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { OPERATIONAL_IMPORT_CONFIRMATION, main, readArguments };
