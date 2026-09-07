@@ -17,6 +17,9 @@ $shortCommit = (& git rev-parse --short=12 HEAD).Trim()
 $branch = (& git branch --show-current).Trim()
 $sourceEpoch = (& git show -s --format=%ct HEAD).Trim()
 $buildTimestamp = [DateTimeOffset]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
+$nativeCheck = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(
+  "require('sqlite3');require('sqlite');require('express');console.log('native-runtime-dependencies=ok')"
+))
 
 if (-not $OutputDirectory) {
   $OutputDirectory = Join-Path $env:TEMP ("guardias-release-output-" + [guid]::NewGuid().ToString('N'))
@@ -67,7 +70,8 @@ tar -xf /input/source.tar -C "$stage"
 cd "$stage"
 npm ci --omit=dev --no-audit --no-fund
 npm ls --omit=dev
-node -e "require('sqlite3');require('sqlite');require('express');console.log('native-runtime-dependencies=ok')"
+printf %s "$NATIVE_CHECK_B64" | base64 -d > /tmp/guardias-native-check.js
+node /tmp/guardias-native-check.js
 chmod +x ops/*.sh deploy/linux/*.sh
 printf 'commit=%s\nbranch=%s\nbuilt_at=%s\nbuild_image=%s\narchitecture=linux-x64\n' \
   "$RELEASE_COMMIT" "$RELEASE_BRANCH" "$BUILD_TIMESTAMP" "$BUILD_IMAGE" > .deployed-release
@@ -86,6 +90,7 @@ sha256sum "$ARTIFACT_NAME" > "$ARTIFACT_NAME.sha256"
     -e "BUILD_TIMESTAMP=$buildTimestamp" `
     -e "BUILD_IMAGE=$ContainerImage" `
     -e "SOURCE_EPOCH=$sourceEpoch" `
+    -e "NATIVE_CHECK_B64=$nativeCheck" `
     $ContainerImage bash -lc $buildScript
   if ($LASTEXITCODE -ne 0) { throw 'La construcción Linux falló.' }
 } finally {
