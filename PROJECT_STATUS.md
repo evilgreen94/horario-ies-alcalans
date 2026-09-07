@@ -6,17 +6,16 @@
 ## Resumen
 
 La arquitectura, persistencia SQLite, identidad individual, horario canónico,
-importadores provisionales y obligaciones de recreo están implementados. La base
-de código auditada es `59de86bd42cf8a733777f1516435f7f567e15a77` en
-`rescue/preproduction-2026-09`; su suite pasa 77/77.
+importadores provisionales y obligaciones de recreo están implementados en
+`rescue/preproduction-2026-09`. La suite actual pasa 78/78; el caso adicional
+protege el opt-in explícito de los comandos operativos de dataset.
 
-La fase de código está cerrada. Esto **no equivale a producción lista**: aún se
-deben verificar físicamente la infraestructura del servidor, los backups y el
-smoke interactivo, además de ejecutar el runbook con aprobación expresa.
+La fase de código está cerrada salvo defectos de despliegue. El procedimiento
+seleccionado es un **redeploy limpio controlado** mediante artefacto Linux
+offline; no se actualizará incrementalmente el checkout contaminado.
 
-Producción y la SQLite operativa no se inspeccionaron ni modificaron durante esta
-sesión. No hay constancia en el repositorio de un dataset 2026/27 activo en
-producción.
+Producción se inspeccionó en modo lectura el 7-09-2026 y no se modificó. La
+SQLite operativa legacy permanece intacta y no hay dataset 2026/27 activo.
 
 ## Estado técnico
 
@@ -31,7 +30,9 @@ producción.
 | Compatibilidad | SQLite canónica → adaptador → `PROFESORADO_SOURCE` → `guardias.html`; sin fallback 2025/26. |
 | `/app/` | Vista personal autenticada con estados clase/guardia/reunión/otra/libre/recreo/patio/fuera. |
 | Patio | Obligaciones PDF integradas sin inventar puesto y fusionadas con configuración explícita. |
-| Infraestructura real | **POR VERIFICAR EN EL CENTRO:** PM2, Nginx, usuarios, rutas, firewall, timers y espacio. |
+| Producción auditada | `rafa`, PM2 `guardias`, `pm2-rafa.service`, Nginx `:80 → localhost:3000`, app/DB legacy bajo `/srv/guardias/horario-ies-alcalans`. |
+| Riesgo producción | Node expuesto en `*:3000`, checkout no reproducible, WAL activo y sin backup periódico Guardias verificado. |
+| Destino | Releases por SHA + `current`; DB `/var/lib/guardias`; entorno `/etc/guardias`; backups `/var/backups/guardias`. |
 | Validación visual | Pendiente de smoke manual antes de producción; navegador integrado no disponible. |
 
 ## Dataset PDF provisional aprobado operativamente
@@ -59,10 +60,10 @@ significado. Las 57 `GUÀRDIES PATI` tampoco reciben puestos inventados.
 
 ## Decisiones y verificaciones pendientes reales
 
-1. Jefatura debe definir puestos/rotaciones físicos de patio y el significado
-   operativo de `BIBLIOTECA PATI`.
-2. Verificar en el servidor: ruta, propietario, usuario PM2, proceso único,
-   Nginx, listener, `.env`, timers, backups restaurables y espacio.
+1. Jefatura debe definir puestos/rotaciones físicos de patio, `PATIS INCLUSIUS`,
+   `BIBLIOTECA PATI` y el efecto de ausencias/sustituciones en patio.
+2. Ejecutar en la ventana el preflight, backup fuera del servidor, migración,
+   cambio PM2/Nginx y timers del runbook.
 3. Ejecutar smoke visual manual de `guardias.html` y `/app/` con el dataset
    aprobado antes de abrir el servicio.
 4. Aprobar el procedimiento de importación/instalación/activación en producción.
@@ -77,6 +78,5 @@ significado. Las 57 `GUÀRDIES PATI` tampoco reciben puestos inventados.
 - Gestión administrativa completa de usuarios/asignaciones.
 - Importador del XML real definitivo aún no recibido.
 - Acceso remoto desde Internet.
-- Configuración Nginx o PM2 real verificada/versionada.
 
 La priorización actual está en [ROADMAP_2026-27.md](ROADMAP_2026-27.md).

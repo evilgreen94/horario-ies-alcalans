@@ -1,8 +1,8 @@
 # Cómo funciona Guardias
 
-> **AUTORITATIVO / ACTUAL.** Radiografía funcional y técnica. Describe el código
-> vigente; las rutas reales del servidor siguen marcadas como pendientes de
-> verificación.
+> **AUTORITATIVO / ACTUAL.** Radiografía funcional y técnica. El inventario de
+> producción del 7-09-2026 está recogido en `SERVER_LAYOUT.md`; la disposición
+> nueva solo será real después del redeploy autorizado.
 
 ## 1. El problema que resuelve
 
@@ -243,8 +243,9 @@ significado. Una futura configuración explícita puede enlazarla.
 Decisiones pendientes:
 
 - reglas físicas de puestos y rotación 2026/27;
+- significado de `PATIS INCLUSIUS`;
 - significado/puesto de `BIBLIOTECA PATI`;
-- excepciones y bloqueos que Jefatura quiera aplicar.
+- ausencias/sustituciones y excepciones de patio que Jefatura quiera aplicar.
 
 ## 10. Sustituciones
 
@@ -336,10 +337,11 @@ cambio de contraseña y logout. No es todavía PWA, offline ni Web Push.
 LAN → Nginx :80 → 127.0.0.1:3000 → Express → SQLite
 ```
 
-Node escucha únicamente en loopback para que autenticación, límites y cabeceras
-de red pasen por Nginx. PM2 es el gestor previsto: arranca, supervisa, reinicia y
-conserva logs del proceso `guardias`. Existe una unidad
-`deploy/linux/guardias.service`, pero no debe estar activa a la vez que PM2.
+El release nuevo escucha únicamente en loopback. PM2 ejecutará el wrapper
+`deploy/linux/start-guardias.sh` desde `/srv/guardias/current`; este carga el
+entorno `0600` de `/etc/guardias/guardias.env` y usa la SQLite externa de
+`/var/lib/guardias`. Existe una unidad alternativa
+`deploy/linux/guardias.service`, pero no debe activarse junto con PM2.
 
 El servidor puede carecer de Internet/GitHub. Un release debe prepararse como
 artefacto externo siguiendo el runbook, no mediante un `git pull` supuesto.
@@ -347,7 +349,7 @@ artefacto externo siguiendo el runbook, no mediante un `git pull` supuesto.
 Al arrancar normalmente:
 
 1. se exige `GUARDIAS_SESSION_SECRET`;
-2. se abre la SQLite configurada, o la ruta resuelta por defecto;
+2. se abre la SQLite indicada por `GUARDIAS_DB_PATH`;
 3. se aplican esquema y migraciones pendientes;
 4. se validan restricciones complementarias;
 5. se crean credenciales legacy solo si faltan y existen variables iniciales;
@@ -418,9 +420,10 @@ Los comandos concretos están en [INCIDENTS.md](INCIDENTS.md).
 
 ## 18. Pendientes actuales
 
-- Verificar infraestructura real desde la LAN del centro.
+- Ejecutar el redeploy limpio controlado y verificar Node/Nginx/PM2/backups.
 - Smoke visual manual previo al despliegue.
-- Configurar puestos/rotaciones y decidir `BIBLIOTECA PATI`.
+- Configurar puestos/rotaciones y decidir `PATIS INCLUSIUS`,
+  `BIBLIOTECA PATI` y ausencias/sustituciones de patio.
 - Definir altas graduales y doble flujo temporal de sustituciones.
 - Recibir y validar el XML definitivo.
 

@@ -11,9 +11,8 @@ Incluye la interfaz central `guardias.html` y la vista personal móvil `/app/`.
 LAN del centro → Nginx :80 → Node/Express 127.0.0.1:3000 → SQLite
 ```
 
-No se debe asumir acceso remoto desde Internet ni conectividad del servidor con
-GitHub. Las rutas, usuarios y servicios reales del servidor deben verificarse en
-el propio centro antes de operar.
+El servidor no depende de Internet/GitHub para desplegar. El inventario legacy
+está documentado y el objetivo es un redeploy limpio por artefacto Linux.
 
 ## Documentación
 
@@ -31,7 +30,7 @@ el propio centro antes de operar.
 
 ## Desarrollo local
 
-Requisitos: Node.js compatible con el `package-lock.json` y una SQLite de prueba.
+Requisitos: Node.js `>=22.9 <23`, npm 10/11 y una SQLite de prueba.
 No usar `BD/guardias.sqlite` para desarrollo.
 
 ```powershell
@@ -49,8 +48,10 @@ git diff --check
 Scripts relevantes:
 
 - `npm run db:init`: esquema y migraciones; **no** ejecuta mantenimiento semanal.
-- `npm run schedule:prepare`: informe/importación a DB `.dev/.test/.tmp.sqlite`.
-- `npm run schedule:activate`: activación limitada a DB local aislada.
+- `npm run schedule:prepare`: informe/importación local; una ruta operativa exige
+  la confirmación textual exacta documentada en el runbook.
+- `npm run schedule:activate`: activación explícita; la DB local real del repo
+  permanece bloqueada incluso con confirmación.
 - `npm run course:reset`: operación destructiva; consultar primero el runbook.
 
 ## Persistencia y fuentes

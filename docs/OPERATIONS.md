@@ -6,16 +6,15 @@
 Los ejemplos usan las rutas esperadas de los archivos versionados:
 
 ```bash
-export APP=/srv/guardias/horario-ies-alcalans
-export GUARDIAS_DB_PATH=$APP/BD/guardias.sqlite
+export APP=/srv/guardias/current
+export GUARDIAS_DB_PATH=/var/lib/guardias/guardias.sqlite
 export BACKUP_ROOT=/var/backups/guardias
 export PM2_PROCESS=guardias
 ```
 
-Antes de actuar, confirmar esas rutas y el usuario real de PM2 en
-[SERVER_LAYOUT.md](SERVER_LAYOUT.md). Los scripts no cargan `.env` ni muestran
-secretos. Si PM2 pertenece a otro usuario, ejecutar como él o definir
-`PM2_USER=<usuario-verificado>`.
+El inventario confirmó `PM2_USER=rafa`. Los scripts no cargan el entorno secreto
+ni muestran sus valores. Durante el redeploy, confirmar que `current` y la DB
+resuelven exactamente a las rutas aprobadas.
 
 ## SAFE / READ-ONLY
 

@@ -16,7 +16,7 @@ No hay acceso remoto desde fuera de la red escolar y no debe suponerse.
 En el servidor:
 
 ```bash
-cd /srv/guardias/horario-ies-alcalans
+cd /srv/guardias/current
 bash ./ops/status.sh
 ```
 
@@ -47,7 +47,7 @@ falla, no reinicies el servidor entero: conserva la salida y escala.
 Ruta esperada:
 
 ```text
-/srv/guardias/horario-ies-alcalans/BD/guardias.sqlite
+/var/lib/guardias/guardias.sqlite
 ```
 
 Confírmala antes con `ops/status.sh`. Los archivos `-wal` y `-shm` junto a
@@ -75,11 +75,12 @@ Un fichero a medio crear o no verificado no es backup válido.
 ## 8. ¿Qué versión está instalada?
 
 ```bash
-cat /srv/guardias/horario-ies-alcalans/.deployed-release 2>/dev/null
-git -C /srv/guardias/horario-ies-alcalans rev-parse HEAD 2>/dev/null
+cat /srv/guardias/current/.deployed-release 2>/dev/null
+readlink -f /srv/guardias/current
 ```
 
-Envía ambas salidas; pueden diferir si se desplegó un artefacto sin `.git`.
+El marker identifica el commit y el symlink identifica el directorio instalado;
+el release no contiene `.git`.
 
 ## 9. ¿Qué no debo borrar?
 

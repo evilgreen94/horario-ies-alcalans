@@ -18,20 +18,22 @@ Node/Express 127.0.0.1:3000
       SQLite
 ```
 
-- Aplicación/release esperado: `/srv/guardias/horario-ies-alcalans`.
-- SQLite esperada: `/srv/guardias/horario-ies-alcalans/BD/guardias.sqlite`.
-- Backups esperados: `/var/backups/guardias`.
-- Proceso previsto: PM2, nombre `guardias`.
+- Release objetivo: `/srv/guardias/current` → `releases/<sha>`.
+- SQLite objetivo: `/var/lib/guardias/guardias.sqlite`.
+- Backups: `/var/backups/guardias`.
+- Proceso: PM2 de `rafa`, nombre `guardias`.
 - Nginx recibe las conexiones LAN y es el único frontal de red.
 - PM2 mantiene Node en ejecución y permite consultar logs/reiniciarlo.
 
-Esos valores están versionados en scripts de despliegue, pero **deben verificarse
-en el servidor**. La infraestructura real no fue inspeccionada en esta sesión.
+El inventario de lectura del 7-09-2026 confirmó el estado legacy bajo
+`/srv/guardias/horario-ies-alcalans`, PM2 y Nginx. Ese checkout está contaminado
+y Node escucha en todas las interfaces: el próximo cambio será el redeploy limpio
+del runbook, no un upgrade incremental.
 
 El primer comando ante un fallo es:
 
 ```bash
-cd /srv/guardias/horario-ies-alcalans
+cd /srv/guardias/current
 bash ./ops/status.sh
 ```
 
@@ -75,5 +77,5 @@ conectado a su LAN.
 5. `docs/OPERATIONS.md` y `docs/INCIDENTS.md` para mantenimiento.
 6. `PROJECT_STATUS.md` y `ROADMAP_2026-27.md` para estado y planificación.
 
-Una ruta de servidor marcada «POR VERIFICAR» nunca se convierte en hecho por
-aparecer en un ejemplo.
+Durante la ventana, cualquier dato que difiera del inventario obliga a detenerse
+y actualizar el runbook antes de seguir.
