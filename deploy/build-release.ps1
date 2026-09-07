@@ -70,8 +70,9 @@ tar -xf /input/source.tar -C "$stage"
 cd "$stage"
 npm ci --omit=dev --no-audit --no-fund
 npm ls --omit=dev
-printf %s "$NATIVE_CHECK_B64" | base64 -d > /tmp/guardias-native-check.js
-node /tmp/guardias-native-check.js
+printf %s "$NATIVE_CHECK_B64" | base64 -d > .release-native-check.cjs
+node .release-native-check.cjs
+rm .release-native-check.cjs
 chmod +x ops/*.sh deploy/linux/*.sh
 printf 'commit=%s\nbranch=%s\nbuilt_at=%s\nbuild_image=%s\narchitecture=linux-x64\n' \
   "$RELEASE_COMMIT" "$RELEASE_BRANCH" "$BUILD_TIMESTAMP" "$BUILD_IMAGE" > .deployed-release
