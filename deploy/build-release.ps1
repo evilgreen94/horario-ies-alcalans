@@ -75,24 +75,34 @@ apt-get install -y --no-install-recommends python3 make g++
 rm -rf /var/lib/apt/lists/*
 npm_config_build_from_source=true npm ci --omit=dev --no-audit --no-fund
 npm ls --omit=dev
+mkdir -p runtime
+cp -L "$(command -v node)" runtime/node
+chmod 0755 runtime/node
 printf %s "$NATIVE_CHECK_B64" | base64 -d > .release-native-check.cjs
-node .release-native-check.cjs
+runtime/node .release-native-check.cjs
 rm .release-native-check.cjs
 sqlite_native=node_modules/sqlite3/build/Release/node_sqlite3.node
 sqlite_glibc="$(grep -ao 'GLIBC_[0-9.]*' "$sqlite_native" | sed 's/^GLIBC_//' | sort -Vu | tail -1)"
+node_glibc="$(grep -ao 'GLIBC_[0-9.]*' runtime/node | sed 's/^GLIBC_//' | sort -Vu | tail -1)"
 test -n "$sqlite_glibc"
-highest_glibc="$(printf '%s\n' "$sqlite_glibc" "$MAXIMUM_GLIBC" | sort -V | tail -1)"
-if [ "$highest_glibc" != "$MAXIMUM_GLIBC" ]; then
-  echo "sqlite3 requires GLIBC_$sqlite_glibc; maximum allowed is GLIBC_$MAXIMUM_GLIBC" >&2
-  exit 1
-fi
-node_version="$(node --version)"
+test -n "$node_glibc"
+for requirement in "sqlite3:$sqlite_glibc" "node:$node_glibc"; do
+  component="${requirement%%:*}"
+  required="${requirement#*:}"
+  highest_glibc="$(printf '%s\n' "$required" "$MAXIMUM_GLIBC" | sort -V | tail -1)"
+  if [ "$highest_glibc" != "$MAXIMUM_GLIBC" ]; then
+    echo "$component requires GLIBC_$required; maximum allowed is GLIBC_$MAXIMUM_GLIBC" >&2
+    exit 1
+  fi
+done
+node_version="$(runtime/node --version)"
 npm_version="$(npm --version)"
 printf 'sqlite3-glibc-required=GLIBC_%s\n' "$sqlite_glibc"
+printf 'node-glibc-required=GLIBC_%s\n' "$node_glibc"
 chmod +x ops/*.sh deploy/linux/*.sh
-printf 'commit=%s\nbranch=%s\nbuilt_at=%s\nbuild_image=%s\narchitecture=linux-x64\nnode=%s\nnpm=%s\nsqlite3_glibc_required=GLIBC_%s\nglibc_compatibility_max=GLIBC_%s\n' \
+printf 'commit=%s\nbranch=%s\nbuilt_at=%s\nbuild_image=%s\narchitecture=linux-x64\nnode=%s\nnpm=%s\nnode_glibc_required=GLIBC_%s\nsqlite3_glibc_required=GLIBC_%s\nglibc_compatibility_max=GLIBC_%s\n' \
   "$RELEASE_COMMIT" "$RELEASE_BRANCH" "$BUILD_TIMESTAMP" "$BUILD_IMAGE" \
-  "$node_version" "$npm_version" "$sqlite_glibc" "$MAXIMUM_GLIBC" > .deployed-release
+  "$node_version" "$npm_version" "$node_glibc" "$sqlite_glibc" "$MAXIMUM_GLIBC" > .deployed-release
 tar --sort=name --mtime="@$SOURCE_EPOCH" --owner=0 --group=0 --numeric-owner -cf - . | gzip -n > "/output/$ARTIFACT_NAME"
 cd /output
 sha256sum "$ARTIFACT_NAME" > "$ARTIFACT_NAME.sha256"

@@ -9,7 +9,7 @@ Group=rafa
 WorkingDirectory=/srv/guardias/current
 EnvironmentFile=/etc/guardias/guardias.env
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node server/app.js
+ExecStart=/srv/guardias/current/deploy/linux/start-guardias.sh
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=60
