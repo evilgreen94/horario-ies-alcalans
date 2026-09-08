@@ -126,6 +126,8 @@ module.exports = [{
       assert.match(webRuntime, /canSuperAdmin=roles\.includes\('superadmin'\)/);
       assert.match(webRuntime, /storage\.loginIndividual\(username,password\)/);
       assert.doesNotMatch(webRuntime, /storage\.loginRole\('admin'/);
+      assert.match(webRuntime, /url\.searchParams\.delete\('panel'\)/);
+      assert.match(webRuntime, /if\(isSuperAdmin\)\{\s*window\.location\.href=getMainRouteUrl\(\);\s*return;/);
 
       const teacher = await loginAccount(server, 'teacher.only');
       const own = await request(server.baseUrl, '/api/schedule/me?date=2026-09-07&source_code=JGP2&teacherProfileId=999&userId=999', {}, teacher.jar);

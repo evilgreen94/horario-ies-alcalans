@@ -4330,6 +4330,7 @@ function buildPrintScheduleSnapshot(targetDay=day,targetWeekOffset=weekOffset){
 function getMainRouteUrl(){
   if(window.location.protocol==='file:') return 'guardias.html';
   const url=new URL(window.location.href);
+  url.searchParams.delete('panel');
   url.searchParams.delete('view');
   url.searchParams.delete('day');
   url.searchParams.delete('weekOffset');
@@ -6861,11 +6862,16 @@ async function toggleAdmin(){
 }
 async function toggleSuperAdmin(){
   if(!SUPERADMIN_ENABLED||!canSuperAdmin) return;
-  isSuperAdmin=!isSuperAdmin;
-  if(isSuperAdmin){isAdmin=false;closeTeacherPanel();}
+  if(isSuperAdmin){
+    window.location.href=getMainRouteUrl();
+    return;
+  }
+  isSuperAdmin=true;
+  isAdmin=false;
+  closeTeacherPanel();
   renderTable();
   refreshAccessUi();
-  showToast(isSuperAdmin?'Administración técnica activada.':'Administración técnica desactivada.','info');
+  showToast('Administración técnica activada.','info');
 }
 function renderTeacherAccessPreview(){
   const teacherLoginInput=document.getElementById('teacherLoginName');
