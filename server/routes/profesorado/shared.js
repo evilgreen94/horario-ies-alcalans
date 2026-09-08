@@ -18,9 +18,15 @@ function forbidden(message) {
 
 function normalizeAnnualImportRequest(body, ensureRequiredString) {
   const input = body && typeof body === 'object' ? body : {};
-  const xmlText = ensureRequiredString(input.xmlText, 'xmlText');
-  const fileName = String(input.fileName || 'horario-anual.xml').trim() || 'horario-anual.xml';
-  return { xmlText, fileName };
+  const academicYear = ensureRequiredString(input.academicYear || input.academic_year, 'academicYear');
+  const xmlBase64 = ensureRequiredString(input.xmlBase64, 'xmlBase64');
+  if (!/^[A-Za-z0-9+/=\r\n]+$/.test(xmlBase64)) throw badRequest('xmlBase64 inválido.');
+  const xmlBytes = Buffer.from(xmlBase64, 'base64');
+  if (!xmlBytes.length) throw badRequest('El XML está vacío.');
+  if (xmlBytes.length > 4 * 1024 * 1024) throw badRequest('El XML supera el límite de 4 MiB.');
+  const requestedName = String(input.fileName || 'horario-anual.xml').trim();
+  const fileName = requestedName.split(/[\\/]/).pop().slice(0, 255) || 'horario-anual.xml';
+  return { academicYear, xmlBytes, fileName };
 }
 
 function getExpectedOrigin(req) {

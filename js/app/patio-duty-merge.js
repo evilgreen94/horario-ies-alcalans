@@ -42,10 +42,11 @@
         teacherName,
         kind:clean(rawDuty?.kind).toLowerCase()||'other',
         label:clean(rawDuty?.label),
-        positionId:clean(rawDuty?.positionId).toLowerCase()
+        positionId:clean(rawDuty?.positionId).toLowerCase(),
+        fixedPost:clean(rawDuty?.fixedPost)
       };
 
-      if(!duty.positionId){
+      if(!duty.positionId&&!duty.fixedPost){
         const existingAssignment=rotation.find(item=>item.teacherSourceCodes.includes(sourceCode));
         if(existingAssignment) duty.positionId=existingAssignment.positionId;
       }

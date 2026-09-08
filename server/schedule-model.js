@@ -4,7 +4,15 @@ const { withImmediateTransaction } = require('./db');
 const ACADEMIC_YEAR_STATUSES = new Set(['preparation', 'active', 'archived']);
 const DATASET_STATUSES = new Set(['draft', 'validated', 'active', 'archived']);
 const PERIOD_TYPES = new Set(['teaching', 'break']);
-const SESSION_TYPES = new Set(['class', 'guardia', 'meeting', 'other']);
+const SESSION_TYPES = new Set([
+  'class',
+  'guardia',
+  'meeting',
+  'other',
+  'guardia_patio',
+  'biblioteca_patio',
+  'patio_inclusivo'
+]);
 const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 
 function cleanText(value) {
@@ -120,7 +128,7 @@ async function importTeacherProfiles(db, payload, options = {}) {
     let updated = 0;
 
     for (const teacher of census.teachers) {
-      const existing = await db.get(
+      let existing = await db.get(
         `SELECT profile.id
          FROM teacher_external_identities identity
          JOIN teacher_profiles profile ON profile.id = identity.teacher_profile_id
@@ -130,12 +138,34 @@ async function importTeacherProfiles(db, payload, options = {}) {
            AND identity.external_key = ? COLLATE NOCASE`,
         [academicYear.id, census.sourceSystem, census.sourceFormat, teacher.sourceCode]
       );
+      if (!existing) {
+        const compatible = await db.all(
+          `SELECT profile.id
+           FROM teacher_external_identities identity
+           JOIN teacher_profiles profile ON profile.id = identity.teacher_profile_id
+           WHERE identity.academic_year_id = ?
+             AND identity.source_system = ?
+             AND identity.external_key = ? COLLATE NOCASE`,
+          [academicYear.id, census.sourceSystem, teacher.sourceCode]
+        );
+        const profileIds = [...new Set(compatible.map(row => row.id))];
+        if (profileIds.length > 1) {
+          throw new Error(`Ambiguous external teacher identity "${teacher.sourceCode}".`);
+        }
+        existing = profileIds.length ? { id: profileIds[0] } : null;
+      }
       if (existing) {
         await db.run(
           `UPDATE teacher_profiles
            SET display_name = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`,
           [teacher.displayName, teacher.active ? 1 : 0, existing.id]
+        );
+        await db.run(
+          `INSERT OR IGNORE INTO teacher_external_identities
+            (teacher_profile_id, academic_year_id, source_system, source_format, external_key)
+           VALUES (?, ?, ?, ?, ?)`,
+          [existing.id, academicYear.id, census.sourceSystem, census.sourceFormat, teacher.sourceCode]
         );
         updated += 1;
         continue;
@@ -244,7 +274,14 @@ function validateCanonicalSchedule(payload) {
     schemaVersion: Number(payload.schema_version || 1),
     academicYear,
     label: requiredText(payload.label, 'label'),
-    source: { system: sourceSystem, format: sourceFormat, provisional: !!payload.source?.provisional },
+    source: {
+      system: sourceSystem,
+      format: sourceFormat,
+      provisional: !!payload.source?.provisional,
+      filename: cleanText(payload.source?.filename),
+      sha256: cleanText(payload.source?.sha256),
+      encoding: cleanText(payload.source?.encoding)
+    },
     teacherSourceCodes,
     periods,
     sessions
@@ -259,6 +296,7 @@ function validateCanonicalSchedule(payload) {
       sessions: sessions.length,
       teachersCovered: teacherSourceCodes.length,
       countsByType,
+      source: normalized.source,
       anomalies: Array.isArray(payload.anomalies) ? payload.anomalies.map(cleanText).filter(Boolean) : []
     }
   };
@@ -274,10 +312,18 @@ async function resolveProfileMap(db, academicYearId, sourceSystem) {
        AND profile.is_active = 1`,
     [academicYearId, sourceSystem]
   );
-  return new Map(rows.map(row => [String(row.external_key).toUpperCase(), {
-    profileId: row.profile_id,
-    identityId: row.identity_id
-  }]));
+  const result = new Map();
+  for (const row of rows) {
+    const key = String(row.external_key).toUpperCase();
+    const existing = result.get(key);
+    if (existing && existing.profileId !== row.profile_id) {
+      throw new Error(`Ambiguous external teacher identity "${key}".`);
+    }
+    if (!existing || row.identity_id < existing.identityId) {
+      result.set(key, { profileId: row.profile_id, identityId: row.identity_id });
+    }
+  }
+  return result;
 }
 
 async function importScheduleDataset(db, payload) {
@@ -513,7 +559,9 @@ function buildLegacySchedulePayload(canonical) {
         franja: `${period.startsAt}-${period.endsAt}`,
         slot: period.position,
         texto: text,
-        aula: session.room || ''
+        aula: session.room || '',
+        sessionType: session.type,
+        automaticCoverageRequired: session.type === 'class'
       };
     });
     teacher.sessions.filter(session => periodsByKey.get(session.periodKey)?.type === 'break').forEach(session => {
@@ -528,10 +576,17 @@ function buildLegacySchedulePayload(canonical) {
         slot: period.position,
         startsAt: period.startsAt,
         endsAt: period.endsAt,
-        kind: normalizedLabel === 'BIBLIOTECA PATI' ? 'library' : session.type === 'guardia' ? 'patio' : 'other',
+        kind: session.type === 'biblioteca_patio' || normalizedLabel === 'BIBLIOTECA PATI'
+          ? 'library'
+          : session.type === 'guardia_patio' || session.type === 'guardia'
+            ? 'patio'
+            : 'other',
         label: session.label || session.type,
         sourceRef: session.sourceRef,
-        positionId: null
+        positionId: null,
+        fixedPost: session.type === 'biblioteca_patio' ? 'Biblioteca' : null,
+        rotatable: session.type === 'guardia_patio',
+        automaticCoverageRequired: false
       });
     });
     return {

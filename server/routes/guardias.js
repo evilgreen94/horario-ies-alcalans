@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { getDatabase, withImmediateTransaction } = require('../db');
 const { ensureArray, ensureObject, ensureOptionalId, ensureRequiredString, normalizeBoolean, normalizeInteger, normalizeText, normalizeString, sanitizeAusencia } = require('./validation');
 const { requireRole } = require('../session');
-const { esHoraValida, getResolvedTeacherSession, getSesionesCubriblesProfesor } = require('../teacher-schedule');
+const { esHoraValida, getCanonicalTeacherSessionAtSlot, getResolvedTeacherSession, getSesionesCubriblesProfesor } = require('../teacher-schedule');
 const { getInactiveGroupSet, isGroupInactive, logInactiveGroupSkip } = require('../group-state');
 const {
   buildMonthlyGuardiaLoadResponse,
@@ -124,6 +124,14 @@ async function ensureNoDuplicateAbsence(db, row, excludeId = null) {
   return targetKeys;
 }
 
+async function ensureCoverageAssignmentAllowed(db, row) {
+  if (!String(row?.guardia || '').trim()) return;
+  const session = await getCanonicalTeacherSessionAtSlot(db, row.ausente, row.dia, row.hora);
+  if (session && ['guardia_patio', 'biblioteca_patio', 'patio_inclusivo'].includes(session.tipo)) {
+    throw conflict('Esta obligación puede registrar ausencia, pero no admite cobertura automática.');
+  }
+}
+
 router.get('/', async (_req, res, next) => {
   try {
     const db = await getDatabase();
@@ -207,9 +215,9 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
       });
       return;
     }
-    console.warn('[ausencias] payload inválido recibido', req.body);
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
     const db = await getDatabase();
+    await ensureCoverageAssignmentAllowed(db, { dia, hora, ausente, guardia });
     if (await shouldSkipAbsenceRowByInactiveGroup(db, { dia, hora, ausente })) {
       throw conflict('La sesión pertenece a un grupo inactivo y no genera guardia.');
     }
@@ -232,7 +240,6 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
     logGuardiasSave('save-single:success', { id: row?.id, dia, hora, ausente });
     res.status(201).json({ ...row, ausente_key, guardia_key });
   } catch (error) {
-    console.error('[guardias] save-single:error', error);
     next(error);
   }
 });
@@ -245,6 +252,7 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
     const rows = [];
     for (const row of candidateRows) {
       if (await shouldSkipAbsenceRowByInactiveGroup(db, row, inactiveGroups)) continue;
+      await ensureCoverageAssignmentAllowed(db, row);
       rows.push(row);
     }
     const duplicateKeys = new Set();
@@ -298,7 +306,6 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
     });
     res.json(await filterVisibleAbsenceRows(db, persisted));
   } catch (error) {
-    console.error('[guardias] replace:error', error);
     next(error);
   }
 });
@@ -308,6 +315,7 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
     const { id } = req.params;
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
     const db = await getDatabase();
+    await ensureCoverageAssignmentAllowed(db, { dia, hora, ausente, guardia });
     if (await shouldSkipAbsenceRowByInactiveGroup(db, { dia, hora, ausente })) {
       throw conflict('La sesión pertenece a un grupo inactivo y no genera guardia.');
     }
@@ -334,7 +342,6 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
     logGuardiasSave('save-update:success', { id, dia, hora, ausente });
     res.json({ ...row, ausente_key, guardia_key });
   } catch (error) {
-    console.error('[guardias] save-update:error', error);
     next(error);
   }
 });
@@ -354,7 +361,6 @@ router.delete('/:id', requireRole('admin'), async (req, res, next) => {
     logGuardiasSave('delete:success', { id: req.params.id });
     res.status(204).end();
   } catch (error) {
-    console.error('[guardias] delete:error', error);
     next(error);
   }
 });

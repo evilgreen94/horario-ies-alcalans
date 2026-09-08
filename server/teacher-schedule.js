@@ -1,5 +1,6 @@
 const { getInactiveGroupSet, isGroupInactive, logInactiveGroupSkip } = require('./group-state');
 const { loadCanonicalDataset } = require('./schedule-model');
+const { absenceRequiresAutomaticCoverage } = require('./session-semantics');
 
 function esHoraValida(hora) {
   return Number.isInteger(Number(hora)) && Number(hora) >= 0;
@@ -30,13 +31,24 @@ function canonicalSessionToLegacy(session) {
     materia: cleanText(session.subject) || (session.type === 'guardia' ? 'Guardia' : cleanText(session.label)),
     grupo: cleanText(session.group),
     detalle: detail || session.type,
-    aula: cleanText(session.room)
+    aula: cleanText(session.room),
+    automaticCoverageRequired: absenceRequiresAutomaticCoverage(session)
   };
 }
 
 function isSessionCubrible(session, _hora) {
   if (!session) return false;
   return session.tipo === 'guardia' || session.tipo === 'clase';
+}
+
+async function getCanonicalTeacherSessionAtSlot(db, profesor, dia, hora) {
+  const canonical = await loadCanonicalDataset(db);
+  const teacher = findTeacher(canonical, profesor);
+  if (!teacher || !teacher.active) return null;
+  const period = canonical.periods.find(row => Number(row.position) === Number(hora));
+  if (!period) return null;
+  const session = teacher.sessions.find(row => Number(row.weekday) === Number(dia) && row.periodKey === period.key);
+  return session ? canonicalSessionToLegacy(session) : null;
 }
 
 async function getSessionOverridesMap(db, profesor, dia) {
@@ -100,6 +112,7 @@ async function getSesionesCubriblesProfesor(db, profesor, dia) {
 
 module.exports = {
   esHoraValida,
+  getCanonicalTeacherSessionAtSlot,
   getResolvedTeacherSession,
   getResolvedTeacherSessionsByDay,
   getSesionesCubriblesProfesor,

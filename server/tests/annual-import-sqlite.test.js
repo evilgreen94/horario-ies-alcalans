@@ -46,7 +46,7 @@ async function testAnnualXmlPersistsOnlyInSqlite() {
     const anonymous = await request(server.baseUrl, '/api/profesorado/annual-import/xml', {
       method: 'POST',
       headers: { origin: server.baseUrl },
-      body: { fileName: 'horario.xml', xmlText }
+      body: { fileName: 'horario.xml', academicYear: '2026/27', xmlBase64: Buffer.from(xmlText).toString('base64') }
     });
     assert.equal(anonymous.response.status, 401);
 
@@ -55,7 +55,7 @@ async function testAnnualXmlPersistsOnlyInSqlite() {
     const preview = await request(server.baseUrl, '/api/profesorado/annual-import/xml/preview', {
       method: 'POST',
       headers: { origin: server.baseUrl },
-      body: { fileName: 'horario.xml', xmlText }
+      body: { fileName: 'horario.xml', academicYear: '2026/27', xmlBase64: Buffer.from(xmlText).toString('base64') }
     }, admin.jar);
     assert.equal(preview.response.status, 200);
     assert.equal(preview.body.academicYear, '2026/27');
@@ -65,7 +65,7 @@ async function testAnnualXmlPersistsOnlyInSqlite() {
     const imported = await request(server.baseUrl, '/api/profesorado/annual-import/xml', {
       method: 'POST',
       headers: { origin: server.baseUrl },
-      body: { fileName: 'horario.xml', xmlText }
+      body: { fileName: 'horario.xml', academicYear: '2026/27', xmlBase64: Buffer.from(xmlText).toString('base64') }
     }, admin.jar);
     assert.equal(imported.response.status, 200);
     assert.equal(imported.body.datasetStatus, 'validated');

@@ -1,5 +1,6 @@
 const zlib = require('zlib');
 const { validateTeacherCensus } = require('./schedule-model');
+const { sourceActivityType } = require('./schedule-source-types');
 
 const WINDOWS_1252 = new TextDecoder('windows-1252');
 const DAY_COLUMNS = [
@@ -116,12 +117,12 @@ function classifyBreakCell(lines) {
   const filtered = lines.filter(line => normalizeToken(line.text) !== 'RECREO');
   if (!filtered.length) return null;
   const label = filtered.map(line => line.text).join(' | ');
-  const normalized = normalizeToken(label);
-  if (/^GUARD(?:IA|IES) PATI$/.test(normalized)) {
-    return { type: 'guardia', subject: '', group: '', room: '', label };
+  const type = sourceActivityType(label);
+  if (type === 'guardia_patio') {
+    return { type, subject: '', group: '', room: '', label };
   }
-  if (normalized === 'BIBLIOTECA PATI') {
-    return { type: 'other', subject: '', group: '', room: '', label };
+  if (type === 'biblioteca_patio') {
+    return { type, subject: '', group: '', room: 'Biblioteca', label };
   }
   return { type: 'other', subject: '', group: '', room: '', label, unclassified: true };
 }
@@ -270,16 +271,16 @@ function extractCanonicalScheduleFromPdf(buffer, censusPayload, options = {}) {
       countsByType,
       breakDuties: {
         total: breakDuties.length,
-        patio: breakDuties.filter(row => row.type === 'guardia').length,
-        library: breakDuties.filter(row => normalizeToken(row.label) === 'BIBLIOTECA PATI').length
+        patio: breakDuties.filter(row => row.type === 'guardia_patio').length,
+        library: breakDuties.filter(row => row.type === 'biblioteca_patio').length
       },
       operationalCounts: {
         class: teachingSessions.filter(row => row.type === 'class').length,
         guardia: teachingSessions.filter(row => row.type === 'guardia').length,
         meeting: teachingSessions.filter(row => row.type === 'meeting').length,
         other: teachingSessions.filter(row => row.type === 'other').length,
-        patioDuty: breakDuties.filter(row => row.type === 'guardia').length,
-        libraryBreakDuty: breakDuties.filter(row => normalizeToken(row.label) === 'BIBLIOTECA PATI').length
+        patioDuty: breakDuties.filter(row => row.type === 'guardia_patio').length,
+        libraryBreakDuty: breakDuties.filter(row => row.type === 'biblioteca_patio').length
       },
       manualReview: {
         otherSessions: countsByType.other,

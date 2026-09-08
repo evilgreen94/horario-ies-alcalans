@@ -1,7 +1,8 @@
 const express = require('express');
 const { getDatabase, withImmediateTransaction } = require('../db');
 const { buildCanonicalSchedule, parseAnnualXml } = require('../annual-source');
-const { importScheduleDataset, validateCanonicalSchedule } = require('../schedule-model');
+const { importScheduleDataset, importTeacherProfiles, validateCanonicalSchedule } = require('../schedule-model');
+const { parseGhcXml } = require('../ghc-xml-import');
 const {
   ensureArray,
   ensureRequiredString,
@@ -76,12 +77,15 @@ registerAnnualImportRoutes(router, {
   buildCanonicalSchedule,
   getDatabase,
   importScheduleDataset,
+  importTeacherProfiles,
+  parseGhcXml,
   parseAnnualXml,
   validateCanonicalSchedule,
   normalizeAnnualImportRequest,
   ensureRequiredString,
   requireRole,
-  requireSameOriginWrite
+  requireSameOriginWrite,
+  withImmediateTransaction
 });
 
 module.exports = router;

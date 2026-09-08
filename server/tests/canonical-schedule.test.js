@@ -170,8 +170,8 @@ module.exports = [
         const dutySchedule = schedule();
         dutySchedule.teacher_source_codes = ['RMLL', 'ABCD'];
         dutySchedule.sessions.push(
-          { teacher_source_code: 'RMLL', weekday: 1, period_key: 'BREAK-A', type: 'guardia', label: 'GUÀRDIES PATI', source_ref: 'page:1' },
-          { teacher_source_code: 'ABCD', weekday: 2, period_key: 'BREAK-A', type: 'other', label: 'BIBLIOTECA PATI', source_ref: 'page:2' }
+          { teacher_source_code: 'RMLL', weekday: 1, period_key: 'BREAK-A', type: 'guardia_patio', label: 'GUÀRDIES PATI', source_ref: 'page:1' },
+          { teacher_source_code: 'ABCD', weekday: 2, period_key: 'BREAK-A', type: 'biblioteca_patio', label: 'BIBLIOTECA PATI', source_ref: 'page:2' }
         );
         const imported = await importScheduleDataset(db, dutySchedule);
         assert.equal(imported.status, 'validated');
@@ -184,10 +184,10 @@ module.exports = [
         const active = await loadCanonicalDataset(db);
         const legacy = buildLegacySchedulePayload(active);
         assert.deepEqual(
-          legacy.breakDuties.map(row => ({ sourceCode: row.sourceCode, weekday: row.weekday, slot: row.slot, kind: row.kind, label: row.label, sourceRef: row.sourceRef, positionId: row.positionId })),
+          legacy.breakDuties.map(row => ({ sourceCode: row.sourceCode, weekday: row.weekday, slot: row.slot, kind: row.kind, label: row.label, sourceRef: row.sourceRef, positionId: row.positionId, fixedPost: row.fixedPost })),
           [
-            { sourceCode: 'ABCD', weekday: 2, slot: 20, kind: 'library', label: 'BIBLIOTECA PATI', sourceRef: 'page:2', positionId: null },
-            { sourceCode: 'RMLL', weekday: 1, slot: 20, kind: 'patio', label: 'GUÀRDIES PATI', sourceRef: 'page:1', positionId: null }
+            { sourceCode: 'ABCD', weekday: 2, slot: 20, kind: 'library', label: 'BIBLIOTECA PATI', sourceRef: 'page:2', positionId: null, fixedPost: 'Biblioteca' },
+            { sourceCode: 'RMLL', weekday: 1, slot: 20, kind: 'patio', label: 'GUÀRDIES PATI', sourceRef: 'page:1', positionId: null, fixedPost: null }
           ]
         );
         assert.equal(legacy.teachers.find(teacher => teacher.sourceCode === 'RMLL').horario.some(row => row.slot === 20), false);

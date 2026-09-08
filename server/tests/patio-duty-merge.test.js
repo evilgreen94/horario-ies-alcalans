@@ -68,7 +68,7 @@ module.exports = [
     }
   },
   {
-    name: 'library break duty remains unallocated despite an existing library post definition',
+    name: 'library break duty keeps its fixed post without entering patio rotation',
     fn() {
       const base = configuredSlot();
       const library = duty({
@@ -76,7 +76,8 @@ module.exports = [
         teacherName: 'DOCENTE BIBLIOTECA',
         kind: 'library',
         label: 'BIBLIOTECA PATI',
-        positionId: ''
+        positionId: '',
+        fixedPost: 'Biblioteca'
       });
       const result = mergePatioSlot(base, [library], positionsById);
 
@@ -86,11 +87,12 @@ module.exports = [
       assert.equal(result.duties[0].sourceCode, 'LIB1');
       assert.equal(result.duties[0].label, 'BIBLIOTECA PATI');
       assert.equal(result.duties[0].positionId, '');
+      assert.equal(result.duties[0].fixedPost, 'Biblioteca');
       assert.deepEqual(result.rotation.slice(0, 2), base.rotation);
     }
   },
   {
-    name: 'an explicit future patio assignment can map a library break duty to a post',
+    name: 'patio rotation cannot override the fixed Biblioteca post',
     fn() {
       const base = configuredSlot();
       base.positions.push(positionsById['0.1']);
@@ -104,10 +106,12 @@ module.exports = [
         sourceCode: 'LIB1',
         teacherName: 'DOCENTE BIBLIOTECA',
         kind: 'library',
-        label: 'BIBLIOTECA PATI'
+        label: 'BIBLIOTECA PATI',
+        fixedPost: 'Biblioteca'
       })], positionsById);
 
-      assert.equal(result.duties[0].positionId, '0.1');
+      assert.equal(result.duties[0].positionId, '');
+      assert.equal(result.duties[0].fixedPost, 'Biblioteca');
       assert.equal(result.rotation.filter(row => row.positionId === '0.1').length, 1);
     }
   },
@@ -123,7 +127,8 @@ module.exports = [
         teacherName: `DOCENTE BIBLIOTECA ${index + 1}`,
         kind: 'library',
         label: 'BIBLIOTECA PATI',
-        positionId: ''
+        positionId: '',
+        fixedPost: 'Biblioteca'
       }));
       const once = mergePatioSlot({ positions: [], rotation: [], duties: [] }, [...patioDuties, ...libraryDuties], positionsById);
       const twice = mergePatioSlot(once, [...patioDuties, ...libraryDuties], positionsById);
@@ -132,6 +137,7 @@ module.exports = [
       assert.equal(once.duties.filter(row => row.kind === 'library').length, 5);
       assert.equal(once.duties.filter(row => row.kind === 'patio' && !row.positionId).length, 57);
       assert.equal(once.duties.filter(row => row.kind === 'library' && !row.positionId).length, 5);
+      assert.ok(once.duties.filter(row => row.kind === 'library').every(row => row.fixedPost === 'Biblioteca'));
       assert.ok(once.duties.every(row => row.sourceCode));
       assert.equal(twice.duties.length, 62);
       assert.ok(!twice.rotation.some(row => row.positionId === '0.1'));

@@ -61,11 +61,11 @@ module.exports = [
     fn() {
       assert.deepEqual(
         classifyBreakCell([{ text: 'GUÀRDIES PATI' }, { text: 'Recreo' }]),
-        { type: 'guardia', subject: '', group: '', room: '', label: 'GUÀRDIES PATI' }
+        { type: 'guardia_patio', subject: '', group: '', room: '', label: 'GUÀRDIES PATI' }
       );
       assert.deepEqual(
         classifyBreakCell([{ text: 'BIBLIOTECA PATI' }]),
-        { type: 'other', subject: '', group: '', room: '', label: 'BIBLIOTECA PATI' }
+        { type: 'biblioteca_patio', subject: '', group: '', room: 'Biblioteca', label: 'BIBLIOTECA PATI' }
       );
       assert.equal(classifyBreakCell([{ text: 'Recreo' }]), null);
     }

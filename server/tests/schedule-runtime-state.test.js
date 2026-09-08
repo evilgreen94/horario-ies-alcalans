@@ -51,9 +51,9 @@ async function testEverySessionTypeRemainsOccupied() {
           { teacher_source_code: 'STATE', weekday: 0, period_key: 'P1', type: 'class', subject: 'Class' },
           { teacher_source_code: 'STATE', weekday: 0, period_key: 'P2', type: 'guardia', label: 'Guardia' },
           { teacher_source_code: 'STATE', weekday: 0, period_key: 'P3', type: 'meeting', label: 'Meeting' },
-          { teacher_source_code: 'STATE', weekday: 0, period_key: 'B1', type: 'guardia', label: 'GUÀRDIES PATI' },
+          { teacher_source_code: 'STATE', weekday: 0, period_key: 'B1', type: 'guardia_patio', label: 'GUÀRDIES PATI' },
           { teacher_source_code: 'STATE', weekday: 0, period_key: 'P4', type: 'other', label: 'Other obligation' },
-          { teacher_source_code: 'STATE', weekday: 1, period_key: 'B1', type: 'other', label: 'BIBLIOTECA PATI' }
+          { teacher_source_code: 'STATE', weekday: 1, period_key: 'B1', type: 'biblioteca_patio', room: 'Biblioteca', label: 'BIBLIOTECA PATI' }
         ]
       });
       await activateScheduleDataset(db, imported.datasetId);
@@ -97,7 +97,7 @@ async function testEverySessionTypeRemainsOccupied() {
     assert.equal(result.response.status, 200);
     assert.deepEqual(
       Object.fromEntries(result.body.periods.map(period => [period.key, period.state])),
-      { P1: 'class', P2: 'guardia', P3: 'meeting', B1: 'patio-duty', P4: 'other', P5: 'free', B2: 'break' }
+      { P1: 'class', P2: 'guardia', P3: 'meeting', B1: 'guardia_patio', P4: 'other', P5: 'free', B2: 'break' }
     );
     for (const key of ['P1', 'P2', 'P3', 'P4']) {
       assert.notEqual(result.body.periods.find(period => period.key === key).state, 'free');
@@ -105,7 +105,7 @@ async function testEverySessionTypeRemainsOccupied() {
     assert.equal(result.body.periods.find(period => period.key === 'B1').session.label, 'GUÀRDIES PATI');
     const library = await request(server.baseUrl, '/api/schedule/me?date=2026-09-08', {}, login.jar);
     assert.equal(library.response.status, 200);
-    assert.equal(library.body.periods.find(period => period.key === 'B1').state, 'library-break-duty');
+    assert.equal(library.body.periods.find(period => period.key === 'B1').state, 'biblioteca_patio');
     assert.equal(library.body.periods.find(period => period.key === 'B1').session.label, 'BIBLIOTECA PATI');
     const ordinaryBreak = await request(server.baseUrl, '/api/schedule/me?date=2026-09-09', {}, login.jar);
     assert.equal(ordinaryBreak.response.status, 200);
