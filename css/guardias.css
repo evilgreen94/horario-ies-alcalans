@@ -985,6 +985,12 @@ header {
 }
 .logo { margin: 0; }
 .logo-link { display: flex; align-items: center; color: var(--text); text-decoration: none; }
+.identity-lockup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .85rem;
+}
 .logo-title {
   font-family: var(--font-h);
   font-size: clamp(2rem, 3vw, 2.8rem);
@@ -993,6 +999,61 @@ header {
   line-height: 1;
 }
 .logo-title-accent { color: var(--accent); }
+.argos-brand {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  gap: .08rem;
+  color: var(--text);
+  line-height: 1;
+}
+.argos-eye {
+  position: relative;
+  display: block;
+  width: 42px;
+  height: 24px;
+  overflow: hidden;
+  background: var(--text);
+  clip-path: polygon(0 50%, 18% 14%, 50% 0, 82% 14%, 100% 50%, 82% 86%, 50% 100%, 18% 86%);
+}
+.argos-eye::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  inset: 7px 3px;
+  background: var(--surface);
+  clip-path: polygon(0 50%, 22% 0, 78% 0, 100% 50%, 78% 100%, 22% 100%);
+}
+.argos-eye__pupil {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translate(-50%, -50%);
+  animation: argos-pupil-watch 9s ease-in-out infinite;
+}
+.argos-wordmark {
+  font-family: var(--font-h);
+  font-size: .5rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+  white-space: nowrap;
+}
+@keyframes argos-pupil-watch {
+  0%, 20%, 38%, 62%, 82%, 100% { transform: translate(-50%, -50%); }
+  29% { transform: translate(calc(-50% + 2px), calc(-50% + .5px)); }
+  72% { transform: translate(calc(-50% - 2px), calc(-50% - 1px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .argos-eye__pupil {
+    animation: none;
+    transform: translate(-50%, -50%);
+  }
+}
 .pulse-badge { display: flex; align-items: center; gap: 6px; background: rgba(31,157,99,0.08); border: 1px solid rgba(31,157,99,0.14); color: var(--green); font-size: .72rem; font-weight: 600; padding: 4px 11px; border-radius: 20px; letter-spacing: .4px; text-transform: uppercase; }
 .pulse-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: blink 1.6s infinite; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
@@ -3774,6 +3835,9 @@ tbody td:nth-child(7) {
   .header-center {
     gap: .45rem;
   }
+  .identity-lockup { gap: .65rem; }
+  .argos-eye { width: 38px; height: 22px; }
+  .argos-wordmark { font-size: .46rem; letter-spacing: .1em; }
   .admin-pasillo-item { grid-template-columns: 1fr; }
   .header-actions {
     display: grid;
@@ -3933,11 +3997,9 @@ tbody td:nth-child(7) {
     padding: .75rem 1rem;
   }
   body:not(.tv-mode):not(.superadmin-active):not(.superadmin-route) .header-status,
-  body:not(.tv-mode):not(.superadmin-active):not(.superadmin-route) .tv-header-top,
   body:not(.tv-mode):not(.superadmin-active):not(.superadmin-route) .tv-announcement,
   body:not(.tv-mode):not(.superadmin-active):not(.superadmin-route) .tv-header-meta,
   body:not(.tv-mode):not(.superadmin-active):not(.superadmin-route) .clock,
-  body:not(.tv-mode):not(.superadmin-active):not(.superadmin-route) .header-center,
   body:not(.tv-mode):not(.superadmin-active):not(.superadmin-route) .day-strip .week-strip,
   body:not(.tv-mode):not(.superadmin-active):not(.superadmin-route) .day-strip,
   body:not(.tv-mode):not(.superadmin-active):not(.superadmin-route) #dayPills,

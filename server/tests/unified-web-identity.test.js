@@ -120,7 +120,15 @@ module.exports = [{
       assert.doesNotMatch(htmlText, /onclick="changeTeacherUser\(\)"/);
       assert.match(htmlText, /name="username"/);
       assert.match(htmlText, /name="password"/);
+      assert.match(htmlText, /class="argos-brand"[^>]*role="img"[^>]*aria-label="A\.R\.G\.O\.S, identidad del sistema"/);
+      assert.match(htmlText, /class="argos-eye__pupil"/);
+      assert.match(htmlText, />A\.R\.G\.O\.S</);
       assert.equal((await request(server.baseUrl, '/app/')).response.status, 200);
+      const webStyles = (await request(server.baseUrl, '/css/guardias.css')).body.toString('utf8');
+      assert.match(webStyles, /\.argos-eye\s*\{/);
+      assert.match(webStyles, /background:\s*var\(--accent\)/);
+      assert.match(webStyles, /@keyframes argos-pupil-watch/);
+      assert.match(webStyles, /@media \(prefers-reduced-motion: reduce\)/);
       const webRuntime = (await request(server.baseUrl, '/js/app/guardias.js')).body.toString('utf8');
       assert.match(webRuntime, /canAdmin=roles\.includes\('admin'\)/);
       assert.match(webRuntime, /canSuperAdmin=roles\.includes\('superadmin'\)/);
