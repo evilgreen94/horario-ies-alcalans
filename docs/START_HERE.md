@@ -1,11 +1,11 @@
-# Empezar aquí
+# Empezar aquí: ARGOS
 
 > **AUTORITATIVO / ACTUAL.** Entrada canónica para una persona mantenedora o un
 > asistente de programación. Revisado el 7 de septiembre de 2026.
 
 ## Qué es y dónde encaja
 
-Guardias es el servicio interno del IES Alcalans para horarios docentes,
+ARGOS es el producto interno del IES Alcalans; Guardias es el módulo actual para horarios docentes,
 ausencias, coberturas, tareas, guardias ordinarias, patio y consulta personal.
 
 ```text

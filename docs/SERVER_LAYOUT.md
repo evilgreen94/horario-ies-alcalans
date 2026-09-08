@@ -96,7 +96,8 @@ El procedimiento exacto, incluida la reversión, está en
 - `BD/` y `.env.local.*` están ignorados y no son fixtures.
 - `.codex-main-worktree/` es otro worktree Git; no es runtime y no se borra con
   operaciones recursivas.
-- `js/data/patio_guardias.js` sí es runtime: configuración fechada de patio.
+- `js/data/patio_guardias.js` es un contenedor runtime vacío; la rotación aprobada
+  se cargará por periodo y `source_code`, sin datos históricos embebidos.
 - `json_profes` solo permanece como nombre defensivo en el bloqueo HTTP; no es
   dependencia runtime.
 - `deploy/linux/guardias.service` es alternativa documentada, no el gestor

@@ -1,9 +1,10 @@
-# Guardias IES Alcalans
+# ARGOS · Guardias IES Alcalans
 
 > **Documento actual / índice del repositorio.** La entrada operativa y técnica
 > canónica es [docs/START_HERE.md](docs/START_HERE.md).
 
-Guardias es la aplicación interna del IES Alcalans para organizar ausencias,
+ARGOS (Aplicación de Registro y Gestión de Organización y Sustituciones) es el
+producto interno del IES Alcalans. Guardias es su módulo actual para organizar ausencias,
 coberturas, tareas del profesorado, guardias ordinarias y obligaciones de patio.
 Incluye la interfaz central `guardias.html` y la vista personal móvil `/app/`.
 
@@ -23,6 +24,8 @@ está documentado y el objetivo es un redeploy limpio por artefacto Linux.
 - [Disposición del servidor](docs/SERVER_LAYOUT.md): rutas verificadas, esperadas
   y pendientes de confirmar.
 - [Entrega a otro compañero](docs/HANDOVER.md): guía corta para una urgencia.
+- [Smoke manual](docs/MANUAL_SMOKE_CHECKLIST.md), [auditoría de seguridad](docs/SECURITY_AUDIT_CHECKLIST.md)
+  y [carga](docs/LOAD_TEST_PLAN.md): validaciones posteriores al RC.
 - [Runbook de despliegue](DEPLOYMENT_RUNBOOK.md): único procedimiento autorizado
   para despliegue y rollback.
 - [Estado](PROJECT_STATUS.md) y [hoja de ruta](ROADMAP_2026-27.md): contexto y
@@ -50,8 +53,12 @@ Scripts relevantes:
 - `npm run db:init`: esquema y migraciones; **no** ejecuta mantenimiento semanal.
 - `npm run schedule:prepare`: informe/importación local; una ruta operativa exige
   la confirmación textual exacta documentada en el runbook.
+- `npm run schedule:prepare-ghc`: audita/importa el XML oficial como `validated`.
+- `npm run schedule:reconcile`: compara XML y PDF externos sin persistirlos.
 - `npm run schedule:activate`: activación explícita; la DB local real del repo
   permanece bloqueada incluso con confirmación.
+- `npm run security:reset-superadmin`: recuperación break-glass solo con acceso OS,
+  ruta SQLite absoluta y confirmación exacta; la clave temporal se muestra una vez.
 - `npm run course:reset`: operación destructiva; consultar primero el runbook.
 
 ## Persistencia y fuentes
@@ -60,9 +67,9 @@ Toda la persistencia backend está en SQLite. `localStorage` solo actúa como es
 de interfaz donde el código lo contempla. Los horarios anuales JSON/JS de cursos
 anteriores no son fuente runtime ni fallback.
 
-Los PDF, XML y censos personales son fuentes externas temporales: nunca deben
-copiarse al repositorio. Importar un dataset lo deja `validated`; activarlo es una
-operación posterior, explícita y transaccional.
+El XML oficial GHC es la fuente estructurada primaria 2026/27. El PDF es contraste
+independiente. Ambos y el censo permanecen fuera del repositorio; la importación
+deja el dataset `validated` y la activación es posterior, explícita y transaccional.
 
 ## Producción
 

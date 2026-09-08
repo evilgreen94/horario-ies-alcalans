@@ -1,4 +1,4 @@
-# Cómo funciona Guardias
+# Cómo funciona ARGOS / Guardias
 
 > **AUTORITATIVO / ACTUAL.** Radiografía funcional y técnica. El inventario de
 > producción del 7-09-2026 está recogido en `SERVER_LAYOUT.md`; la disposición
@@ -6,7 +6,7 @@
 
 ## 1. El problema que resuelve
 
-En un día lectivo Jefatura necesita saber quién falta, qué clases requieren
+ARGOS es el producto; Guardias es el módulo operativo actual. En un día lectivo Jefatura necesita saber quién falta, qué clases requieren
 cobertura, qué docentes tienen guardia, dónde se imparte la sesión y si el
 profesor ausente dejó tarea. Guardias mantiene ese estado común, ayuda a repartir
 coberturas, muestra la información en pantallas/impresos y permite a cada docente
@@ -42,10 +42,22 @@ SQLite completa cuando la ruta exige `superadmin`.
 
 ### Superadmin
 
-Incluye permisos de admin y operaciones técnicas sensibles: información de
-salud, descarga SQLite completa, restore del snapshot JSON parcial y activación
-explícita del dataset. La restauración SQLite completa se hace solo con el
-runbook; superadmin no es una vía para saltarse backup o validación.
+Administra cuentas, roles, resets temporales, sesiones y auditoría. Nunca puede
+ver una contraseña actual. Conserva las operaciones técnicas ya autorizadas
+(salud, backup/restore y activación explícita), pero el rol por sí solo no ofrece
+un editor de sesiones canónicas ni permite saltarse backup o validación.
+
+El reset genera aleatoriamente una contraseña temporal, persiste solo scrypt,
+incrementa `session_version` y exige cambio propio. La clave se entrega una vez y
+no entra en auditoría/logs. Desactivar, revocar o cambiar roles sensibles también
+invalida cookies previas. Con acceso OS autorizado, el único break-glass es:
+
+```bash
+node server/scripts/reset-superadmin.js --db /ruta/absoluta/guardias.sqlite \
+  --username USUARIO --confirm RESET_SUPERADMIN_ACCESS
+```
+
+No es un endpoint HTTP y debe ejecutarse solo tras backup y autorización.
 
 ### Sustituto
 
@@ -107,7 +119,7 @@ confundirse con el destructivo reset de curso.
 ## 5. Entrada del horario
 
 ```text
-PDF provisional o XML
+XML oficial GHC (primario) o PDF (contraste)
           │
       adaptador de entrada
           │ valida source_code, celdas y periodos
@@ -131,9 +143,9 @@ transacción: archiva la versión activa anterior, activa la elegida y actualiza
 curso. Si no hay dataset activo, el backend devuelve un error visible; no usa
 datos 2025/26.
 
-El PDF 2026/27 usa una plantilla específica de coordenadas y periodos. El futuro
-XML debe producir exactamente el mismo contrato canónico, sin cambiar runtime ni
-frontends.
+El XML GHC oficial usa relaciones e IDs explícitos, `source_code` y su marco de
+periodos. El PDF 2026/27 conserva una plantilla específica de coordenadas para
+contraste. Ambos producen el mismo contrato canónico sin cambiar runtime ni frontends.
 
 ## 6. Modelo canónico de horario
 
@@ -146,8 +158,8 @@ Un dataset contiene:
 - informe de validación y marcas de validación/activación.
 
 Los periodos pueden ser `teaching` o `break`. Los breaks son explícitos, no
-huecos inferidos. Las sesiones son `class`, `guardia`, `meeting` u `other`.
-La combinación periodo+sesión permite expresar obligaciones durante un recreo.
+huecos inferidos. Las sesiones son `class`, `guardia`, `meeting`, `other`,
+`guardia_patio`, `biblioteca_patio` o `patio_inclusivo`.
 
 El modelo no supone permanentemente nueve posiciones, siete horas lectivas,
 claves P1–P7, breaks en 4/8 ni los relojes 2026/27. Esos datos pertenecen al
@@ -176,9 +188,9 @@ Estados:
 | Teaching + otra actividad | `other`, ocupado |
 | Teaching vacío | `free` |
 | Break vacío | `break` |
-| Break + `GUÀRDIES PATI` | `patio-duty`, ocupado |
-| Break + `BIBLIOTECA PATI` | `library-break-duty`, ocupado |
-| Break + otra obligación | `break-duty`, ocupado |
+| Break + `GUÀRDIES PATI` | `guardia_patio`, ocupado |
+| Break + `BIBLIOTECA PATI` | `biblioteca_patio`, ocupado |
+| Teaching + `PATIS INCLUSIUS` | `patio_inclusivo`, ocupado |
 | Ningún periodo actual | `outside` |
 
 Invariante central:
@@ -221,9 +233,8 @@ dataset.
 
 Capas:
 
-1. `js/data/patio_guardias.js`: configuración fechada de puestos, asignaciones y
-   rotaciones legacy. El periodo incluido actualmente es mayo-junio de 2026 y no
-   se aplica fuera de rango.
+1. `js/data/patio_guardias.js`: contenedor vacío para una futura configuración
+   aprobada por periodo, `source_code` y puesto; el release no inventa rotaciones.
 2. Dataset canónico: evidencia semanal importada por `source_code`,
    día y B1/B2.
 3. Fusión: conserva configuración explícita; enlaza solo mediante código externo
@@ -233,19 +244,11 @@ Capas:
 5. `app_state.patio_teacher_blocks`: indisponibilidad manual de un docente en
    ese puesto/tramo.
 
-`GUÀRDIES PATI` significa obligación ocupada. Las 57 celdas PDF no reciben un
-puesto inventado: permanecen «sin puesto» hasta que la configuración lo resuelva.
-
-`BIBLIOTECA PATI` es otra obligación ocupada y mantiene su etiqueta. **No se
-asigna automáticamente al puesto físico 0.1**; Jefatura aún debe definir su
-significado. Una futura configuración explícita puede enlazarla.
-
-Decisiones pendientes:
-
-- reglas físicas de puestos y rotación 2026/27;
-- significado de `PATIS INCLUSIUS`;
-- significado/puesto de `BIBLIOTECA PATI`;
-- ausencias/sustituciones y excepciones de patio que Jefatura quiera aplicar.
+`GUÀRDIES PATI` está ocupada, entra en la futura rotación y no tiene puesto
+inventado. `BIBLIOTECA PATI` está ocupada en el puesto fijo Biblioteca y no rota.
+`PATIS INCLUSIUS` es un bloque especial ocupado, no una guardia ni un puesto.
+La ausencia en cualquiera de los tres puede mostrarse, pero nunca crea cobertura,
+sustituto o vacante automática. Solo falta la tabla física de rotación de Jefatura.
 
 ## 10. Sustituciones
 
@@ -326,7 +329,9 @@ cambio de contraseña y logout. No es todavía PWA, offline ni Web Push.
 - `teacher-identity.js`: asignación docente activa por fecha.
 - `schedule-model.js` y `teacher-schedule.js`: validación, persistencia,
   activación y lectura del horario.
-- `annual-source.js` / `pdf-schedule-import.js`: adaptadores XML/PDF.
+- `ghc-xml-import.js`, `annual-source.js` y `pdf-schedule-import.js`: adaptadores GHC/XML/PDF.
+- `schedule-source-types.js` y `session-semantics.js`: mapeo y semántica central.
+- `routes/users.js`: administración segura de cuentas Superadmin.
 - rutas `guardias`, `profesorado`, `grupos`, `biblioteca`: operación.
 - rutas `schedule`: dataset activo, compatibilidad, vista personal y activación.
 - rutas `export` y `sqlite-backup.js`: snapshots, SQLite y restore.
@@ -361,7 +366,7 @@ aplica migraciones, pero no limpia la operación semanal.
 
 ## 15. Migraciones, backup y rollback
 
-`schema_migrations` registra cada SQL aplicado. Las migraciones 001/002 son
+`schema_migrations` registra cada SQL aplicado. Las migraciones 001/002/003 son
 aditivas e idempotentes bajo ese control y han sido ensayadas sobre una base
 heredada representativa. En producción siempre se requiere backup inmediato,
 integridad antes/después y ventana sin escritores.
@@ -422,10 +427,9 @@ Los comandos concretos están en [INCIDENTS.md](INCIDENTS.md).
 
 - Ejecutar el redeploy limpio controlado y verificar Node/Nginx/PM2/backups.
 - Smoke visual manual previo al despliegue.
-- Configurar puestos/rotaciones y decidir `PATIS INCLUSIUS`,
-  `BIBLIOTECA PATI` y ausencias/sustituciones de patio.
+- Configurar la primera rotación física de `GUÀRDIES PATI` suministrada por Jefatura.
 - Definir altas graduales y doble flujo temporal de sustituciones.
-- Recibir y validar el XML definitivo.
+- Ejecutar smoke visual, auditoría adversarial y certificación de carga del RC.
 
 ## 19. Modelo mental en una página
 
@@ -439,7 +443,7 @@ PERSONAS
                                                → external identity/source_code
 
 HORARIO
-  PDF/XML → adaptador → dataset validated → revisión → activación explícita
+  XML oficial/PDF → adaptador → dataset validated → revisión → activación explícita
                                                      │
                                                      ▼
                                                SQLite active
@@ -451,7 +455,7 @@ REGLA DIARIA
   sesión/obligación = ocupado
   teaching vacío = libre
   break vacío = recreo
-  break con patio/biblioteca = ocupado
+  guardia patio/biblioteca/Patis Inclusius = ocupado y sin cobertura automática
 
 OPERACIÓN
   ausencia + sesión cubrible → fila de guardia → asignación + tarea/comentario

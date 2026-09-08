@@ -1,11 +1,11 @@
-# Guardias: guía de emergencia para otro compañero
+# ARGOS / Guardias: guía de emergencia para otro compañero
 
 > **OPERATIVO / ACTUAL.** Para Joaquín u otra persona con conocimientos básicos
 > de Linux, físicamente en el centro o conectada a su LAN.
 
 ## 1. ¿Qué es?
 
-Guardias es la aplicación interna del IES Alcalans para horarios, ausencias,
+ARGOS es el producto interno y Guardias su módulo actual para horarios, ausencias,
 coberturas, tareas y patio. La red entra por Nginx; el proceso Node se llama
 `guardias` en PM2 y usa una base SQLite.
 

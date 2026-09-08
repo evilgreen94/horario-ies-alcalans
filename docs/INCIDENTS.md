@@ -135,10 +135,10 @@ sqlite3 -readonly -header -column "$GUARDIAS_DB_PATH" "
   ORDER BY p.period_key,s.label;"
 ```
 
-Para el PDF actual deben aparecer 57 `GUÀRDIES PATI` y cinco
-`BIBLIOTECA PATI`. Que estén «sin puesto» puede ser correcto: no asignar
-`BIBLIOTECA PATI` a 0.1 ni inventar sectores. Revisar overrides manuales desde
-la interfaz admin, no editando el JSON de `app_state` a mano.
+Para el XML oficial deben aparecer 57 `guardia_patio`, cinco
+`biblioteca_patio` y seis `patio_inclusivo`. Solo `guardia_patio` espera la futura
+rotación; `biblioteca_patio` tiene Biblioteca fija y `patio_inclusivo` no es una
+guardia. Ninguno genera cobertura automática por ausencia.
 
 ## Falla la integridad SQLite
 

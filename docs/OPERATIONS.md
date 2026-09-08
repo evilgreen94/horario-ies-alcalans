@@ -190,6 +190,8 @@ backup verificado y aprobación humana:
 - cambiar Nginx, PM2, firewall, usuarios o permisos;
 - limpiar releases, tarballs, logs o backups;
 - reactivar un dataset archivado.
+- ejecutar la recuperación `security:reset-superadmin` (acceso OS, backup,
+  usuario explícito y confirmación exacta; la clave temporal se muestra una vez).
 
 Nunca probar una operación peligrosa directamente en producción. Primero usar una
 copia SQLite aislada con sufijo `.test.sqlite` o `.tmp.sqlite`.

@@ -1,4 +1,4 @@
-# Despliegue limpio y reversible — Guardias 2026/27
+# Despliegue limpio y reversible — ARGOS / Guardias 2026/27
 
 Este documento prepara una ventana autorizada; no la autoriza. El despliegue es
 por artefacto offline, no usa `git pull`, GitHub, `npm install` ni `npm ci` en el
@@ -22,7 +22,7 @@ antiguos contienen estado local y material sensible: se ha elegido un
 Abortar la ventana si:
 
 - el SHA o checksum del artefacto no son los aprobados;
-- el servidor no tiene Node `>=22.9 <23`, `sqlite3`, PM2 y Nginx operativos;
+- el runtime Node incluido no es `>=22.9 <23`, o faltan `sqlite3`, PM2/Nginx;
 - no hay espacio para dos releases y tres copias de la DB;
 - no se obtiene un backup SQLite verificable y una copia fuera del servidor;
 - `quick_check` no es `ok` o `foreign_key_check` devuelve filas;
@@ -45,7 +45,8 @@ Get-ChildItem $out
 El script usa `node:22-bookworm-slim` en Docker Linux/amd64, extrae una allowlist
 del commit, compila las dependencias nativas dentro de esa imagen mediante
 `npm ci --omit=dev`, carga el módulo `sqlite3` resultante y rechaza el artefacto
-si requiere una versión superior a `GLIBC_2.35`. Después crea:
+si `sqlite3` o el Node portable requieren una versión superior a `GLIBC_2.35`.
+El tar incluye `runtime/node`; producción no descarga ni instala Node/npm. Después crea:
 
 ```text
 guardias-release-<sha-corto>-linux-x64.tar.gz
@@ -57,9 +58,9 @@ El tar incluye runtime, frontend, imágenes, `ops/`, tooling Linux,
 Excluye Git, BD, secretos, PDF/censo/XML, `json_profes`, datasets retirados,
 tests, utilidades locales de credenciales y `node_modules` Windows.
 
-Transferir exactamente: tarball, checksum y —por canal privado separado— PDF y
-censo aprobados. No transferir el checkout, `.env`, SQLite local ni temporales de
-Docker/WSL.
+Transferir exactamente: tarball, checksum y —por canal privado separado— el XML
+oficial aprobado. PDF/censo solo son evidencia diagnóstica y no son necesarios
+para operar. No transferir checkout, `.env`, SQLite local ni temporales.
 
 ## 2. Variables de la ventana
 
@@ -223,9 +224,9 @@ Ejecutar dos veces. `db:init` usa `skipWeeklyReset`; no ejecuta mantenimiento:
 
 ```bash
 sudo -iu "$APP_USER" bash -lc \
-  "set -a; . '$ENV_FILE'; set +a; cd '$CURRENT'; node server/scripts/init-db.js"
+  "set -a; . '$ENV_FILE'; set +a; cd '$CURRENT'; ./runtime/node server/scripts/init-db.js"
 sudo -iu "$APP_USER" bash -lc \
-  "set -a; . '$ENV_FILE'; set +a; cd '$CURRENT'; node server/scripts/init-db.js"
+  "set -a; . '$ENV_FILE'; set +a; cd '$CURRENT'; ./runtime/node server/scripts/init-db.js"
 
 sudo -u "$APP_USER" sqlite3 -readonly "$DB" \
   'PRAGMA quick_check; PRAGMA foreign_key_check;'
@@ -233,8 +234,9 @@ sudo -u "$APP_USER" sqlite3 -readonly -header -column "$DB" \
   'SELECT name,applied_at FROM schema_migrations ORDER BY name;'
 ```
 
-Deben figurar solo `001_individual_teacher_auth.sql` y
-`002_academic_schedule_model.sql`. Repetir los recuentos y compararlos: las
+Deben figurar `001_individual_teacher_auth.sql`,
+`002_academic_schedule_model.sql` y `003_final_session_security_and_schedule_types.sql`.
+Repetir los recuentos y compararlos: las
 tablas legacy no cambian. Si falla, no arrancar; volver al par PM2/DB legacy con
 aprobación.
 
@@ -306,28 +308,24 @@ Sin dataset activo, `/api/schedule/active` devuelve `503`; `guardias.html` no
 muestra 2025/26. Verificar login/logout legacy, permisos y endpoints de
 guardias/ausencias sin escribir contraseñas en comandos.
 
-## 10. Importar, validar y activar el PDF
+## 10. Importar, validar y activar el XML oficial
 
 ```bash
 export IMPORT_DIR="/var/tmp/guardias-import-$RELEASE"
 install -d -m 700 "$IMPORT_DIR"
-# Transferir por canal privado y verificar SHA-256:
-# censo-profesores-2026-27.json
-# censo-profesores-2026-27.pdf
+# Transferir por canal privado y verificar SHA-256: Horario.xml
 
 sudo -iu "$PM2_USER" pm2 stop guardias
 export PRE_IMPORT_BACKUP="$DEPLOY_BACKUPS/guardias-before-import-$STAMP.sqlite"
 sudo -u "$APP_USER" sqlite3 "$DB" ".backup '$PRE_IMPORT_BACKUP'"
 
 sudo -iu "$APP_USER" bash -lc \
-  "cd '$CURRENT' && node server/scripts/prepare-canonical-schedule.js \
-   --census '$IMPORT_DIR/censo-profesores-2026-27.json' \
-   --pdf '$IMPORT_DIR/censo-profesores-2026-27.pdf'"
+  "cd '$CURRENT' && ./runtime/node server/scripts/prepare-ghc-schedule.js \
+   --input '$IMPORT_DIR/Horario.xml' --academic-year 2026/27"
 sudo -iu "$APP_USER" bash -lc \
-  "cd '$CURRENT' && node server/scripts/prepare-canonical-schedule.js \
-   --census '$IMPORT_DIR/censo-profesores-2026-27.json' \
-   --pdf '$IMPORT_DIR/censo-profesores-2026-27.pdf' --db '$DB' --import \
-   --allow-operational-db IMPORT_VALIDATED_DATASET_ONLY"
+  "cd '$CURRENT' && ./runtime/node server/scripts/prepare-ghc-schedule.js \
+   --input '$IMPORT_DIR/Horario.xml' --academic-year 2026/27 --db '$DB' --import \
+   --allow-operational-db IMPORT_VALIDATED_GHC_DATASET_ONLY"
 ```
 
 La salida debe indicar `activated: false`, `validated` y:
@@ -335,13 +333,14 @@ La salida debe indicar `activated: false`, `validated` y:
 | Métrica | Total |
 |---|---:|
 | docentes | 88/88 |
-| total canónico | 2.121 |
-| clase | 1.290 |
-| guardia lectiva | 157 |
-| reunión | 332 |
-| other lectivo | 280 |
+| total canónico | 2.143 |
+| clase | 1.206 |
+| guardia lectiva | 155 |
+| reunión | 220 |
+| other/complementaria | 494 |
 | `GUÀRDIES PATI` | 57 |
 | `BIBLIOTECA PATI` | 5 |
+| `PATIS INCLUSIUS` | 6 |
 | duplicados / anomalías | 0 / 0 |
 
 Las obligaciones de recreo están ocupadas y sin puesto inventado. Revisar
@@ -361,7 +360,7 @@ sudo -u "$APP_USER" sqlite3 -readonly "$PRE_ACTIVATION_BACKUP" \
   'PRAGMA quick_check; PRAGMA foreign_key_check;'
 
 sudo -iu "$APP_USER" bash -lc \
-  "cd '$CURRENT' && node server/scripts/activate-canonical-schedule.js \
+  "cd '$CURRENT' && ./runtime/node server/scripts/activate-canonical-schedule.js \
    --db '$DB' --dataset-id '$DATASET_ID' \
    --allow-operational-db ACTIVATE_APPROVED_DATASET"
 ```
@@ -405,24 +404,21 @@ Rafa comprueba desde servidor y otro equipo LAN:
   recreo, patio, biblioteca y fuera de horario;
 - ausencia, asignación/retirada de guardia y sustitución controlada;
 - ningún dato 2025/26 aparece como fallback;
-- `BIBLIOTECA PATI` está ocupada y sin puesto automático;
+- `BIBLIOTECA PATI` está ocupada en Biblioteca fija y no rota;
+- `PATIS INCLUSIUS` está ocupado y no es guardia;
+- ninguno de los tres conceptos especiales genera cobertura automática;
 - consola/red del navegador sin errores inesperados.
 
 No usar `create-local-teacher.js` en producción. Si aún no existen cuentas
 individuales aprobadas, esa parte del piloto espera autorización separada; no se
 crean 88 credenciales.
 
-## 13. Sustitución futura por XML
+## 13. Política anual de fuentes
 
-El adaptador exige `academic_year` y `source_code`, rechaza match solo por nombre
-y deja cada importación `validated`. Procedimiento:
-
-```text
-PDF activo → importar XML como dataset validated independiente → comparar
-→ revisión de Jefatura → backup preactivación → activación XML explícita
-```
-
-No cambia `guardias.html`, `/app/` ni el modelo canónico.
+El XML oficial es primario. Exige curso explícito y `source_code`, rechaza match
+solo por nombre y queda `validated`. El PDF permanece fuera del servidor como
+contraste independiente. Cualquier XML posterior se importa como nueva versión,
+se reconcilia, se aprueba y solo después se activa con backup preactivación.
 
 ## 14. Rollback por dominios
 
@@ -453,6 +449,6 @@ legacy, DB/WAL/SHM congelados, backup detenido y backup preactivación.
 - borrar solo cookies/fuentes temporales tras verificar rutas exactas;
 - registrar SHA, checksum, PRAGMA, backups, smoke y decisiones humanas.
 
-No bloquean el release técnico: puestos físicos de patio, rotación, significado
-de `PATIS INCLUSIUS`, regla final de `BIBLIOTECA PATI` y comportamiento de patio
-ante ausencias/sustituciones.
+No bloquean el release técnico: la tabla física de rotación de `GUÀRDIES PATI`,
+pulido UI/PWA/branding y el rename futuro del repositorio. Las semánticas de
+Biblioteca, Patis Inclusius y ausencia especial ya son finales.
