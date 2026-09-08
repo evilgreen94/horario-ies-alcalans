@@ -1,4 +1,5 @@
 const BASE_URL = process.env.GUARDIAS_BASE_URL || 'http://127.0.0.1:3000';
+const ADMIN_USERNAME = process.env.GUARDIAS_SMOKE_ADMIN_USERNAME || '';
 const ADMIN_PASSWORD = process.env.GUARDIAS_SMOKE_ADMIN_PASSWORD || '';
 const SUPERADMIN_PASSWORD = process.env.GUARDIAS_SMOKE_SUPERADMIN_PASSWORD || '';
 const TEACHER_USERNAME = process.env.GUARDIAS_SMOKE_TEACHER_USERNAME || '';
@@ -152,7 +153,7 @@ async function testAnonymousAlumnosFueraAulaWriteProtection() {
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    assert(response.status === 403, `${pathname} without origin expected 403, got ${response.status}`);
+    assert(response.status === 401, `${pathname} without a session expected 401, got ${response.status}`);
   }
 
   return 'anonymous alumnos-fuera-aula writes blocked without origin';
@@ -199,15 +200,27 @@ async function login(role, password) {
   return jar;
 }
 
-async function testAdminFlow() {
-  if (!ADMIN_PASSWORD) {
-    return 'admin flow skipped (GUARDIAS_SMOKE_ADMIN_PASSWORD not set)';
-  }
+async function loginIndividual(username, password) {
+  const jar = createCookieJar();
+  const { response, body } = await request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password })
+  }, jar);
+  assert(response.status === 200, `individual login (${username}) expected 200, got ${response.status}`);
+  assert(body?.ok === true && body?.userId, `individual login (${username}) expected an account session`);
+  return jar;
+}
 
-  const jar = await login('admin', ADMIN_PASSWORD);
+async function testAdminFlow() {
+  if (!ADMIN_USERNAME && !ADMIN_PASSWORD) {
+    return 'admin flow skipped (individual admin smoke credentials not set)';
+  }
+  assert(ADMIN_USERNAME && ADMIN_PASSWORD, 'both individual admin smoke credentials are required');
+
+  const jar = await loginIndividual(ADMIN_USERNAME, ADMIN_PASSWORD);
 
   const session = await request('/api/auth/session', {}, jar);
-  assert(session.response.status === 200 && session.body?.role === 'admin', 'legacy admin session contract changed');
+  assert(session.response.status === 200 && session.body?.roles?.includes('admin'), 'individual admin role is missing');
 
   const guardias = await request('/api/guardias', {}, jar);
   assert(guardias.response.status === 200, `GET /api/guardias expected 200, got ${guardias.response.status}`);
