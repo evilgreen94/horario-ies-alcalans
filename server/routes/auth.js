@@ -198,7 +198,7 @@ router.post('/login', async (req, res, next) => {
     res.json({
       ok: true,
       role,
-      isAdmin: role === 'admin' || role === 'superadmin',
+      isAdmin: role === 'admin',
       isSuperAdmin: role === 'superadmin'
     });
   } catch (error) {

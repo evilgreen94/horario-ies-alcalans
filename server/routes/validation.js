@@ -202,7 +202,7 @@ function sanitizePatioTeacherBlock(row) {
   if (![4, 8].includes(hora)) {
     throw badRequest('hora debe ser una guardia de patio valida.');
   }
-  return {
+  const result = {
     weekKey: ensureRequiredString(input.weekKey, 'weekKey'),
     dia: normalizeInteger(input.dia, 'dia', 0, 4),
     hora,
@@ -210,6 +210,9 @@ function sanitizePatioTeacherBlock(row) {
     reason,
     note: normalizeString(input.note || input.nota)
   };
+  const sourceCode = normalizeString(input.sourceCode || input.source_code);
+  if (sourceCode) result.sourceCode = sourceCode;
+  return result;
 }
 
 function sanitizeTeacherFutureAbsence(row) {
@@ -221,7 +224,7 @@ function sanitizeTeacherFutureAbsence(row) {
   const hours = Array.isArray(input.hours)
     ? input.hours.map(value => normalizeInteger(value, 'hours', 0, 10000))
     : [];
-  return {
+  const result = {
     id: ensureRequiredString(input.id, 'id'),
     profesor: ensureRequiredString(input.profesor, 'profesor'),
     date: ensureRequiredString(input.date, 'date'),
@@ -233,6 +236,9 @@ function sanitizeTeacherFutureAbsence(row) {
     appliedAt: input.appliedAt ? ensureTimestamp(input.appliedAt, 'appliedAt') : '',
     createdAt: ensureTimestamp(input.createdAt, 'createdAt')
   };
+  const sourceCode = normalizeString(input.sourceCode || input.source_code);
+  if (sourceCode) result.sourceCode = sourceCode;
+  return result;
 }
 
 module.exports = {

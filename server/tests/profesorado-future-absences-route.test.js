@@ -12,7 +12,7 @@ function loadSession(secret) {
   return require('../session');
 }
 
-function createRouter({ db, session }) {
+function createRouter({ db, session, authenticatedAs = null }) {
   const router = express.Router();
   registerStateCollectionRoutes(router, {
     getDatabase: async () => db,
@@ -23,7 +23,12 @@ function createRouter({ db, session }) {
     sanitizeTeacherFutureAbsence: validation.sanitizeTeacherFutureAbsence,
     sanitizePatioGuardia: validation.sanitizePatioGuardia,
     sanitizePatioTeacherBlock: validation.sanitizePatioTeacherBlock,
+    appendAuditEvent: async () => {},
+    requireAuthenticated: authenticatedAs
+      ? (req, _res, next) => { req.sessionUser = authenticatedAs; next(); }
+      : session.requireAuthenticated,
     requireRole: session.requireRole,
+    resolveActiveTeacherContext: async () => null,
     requireSameOriginWrite,
     withImmediateTransaction: async (_db, callback) => callback()
   });
@@ -161,7 +166,11 @@ module.exports = [
     async fn() {
       const session = loadSession('future-absences-route-test-secret');
       const db = createDatabase();
-      const router = createRouter({ db, session });
+      const router = createRouter({
+        db,
+        session,
+        authenticatedAs: { userId: 7, roles: ['admin'] }
+      });
       const handlers = findRouteHandlers(router, '/future-absences', 'post');
       const cookie = session.serializeSessionCookie('admin', { secure: false, headers: {} }).split(';')[0];
       const entry = createFutureAbsence();

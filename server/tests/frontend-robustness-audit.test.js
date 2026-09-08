@@ -7,9 +7,10 @@ const vm = require('vm');
 const {
   cleanupTestEnvironment,
   createTestEnvironment,
-  login,
+  loginIndividual,
   request,
   seedActiveSchedule,
+  seedIndividualUser,
   startServer,
   stopServer
 } = require('./helpers/integration-harness');
@@ -136,8 +137,11 @@ async function testHttpEdgeCasesAndTwoClients() {
   try {
     server = await startServer({ dbPath: environment.dbPath });
     await seedActiveSchedule(environment.dbPath);
-    const clientA = await login(server.baseUrl, 'admin', 'Admin-integration-2026');
-    const clientB = await login(server.baseUrl, 'admin', 'Admin-integration-2026');
+    await seedIndividualUser(environment.dbPath, {
+      username: 'frontend.admin', password: 'Frontend-admin-2026!', roles: ['admin']
+    });
+    const clientA = await loginIndividual(server.baseUrl, 'frontend.admin', 'Frontend-admin-2026!');
+    const clientB = await loginIndividual(server.baseUrl, 'frontend.admin', 'Frontend-admin-2026!');
     assert.strictEqual(clientA.response.status, 200);
     assert.strictEqual(clientB.response.status, 200);
 

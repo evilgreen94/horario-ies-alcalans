@@ -68,7 +68,37 @@ async function resolveActiveTeacherProfile(db, userId, date = new Date()) {
   };
 }
 
+async function resolveActiveTeacherContext(db, userId, date = new Date()) {
+  const identity = await resolveActiveTeacherProfile(db, userId, date);
+  if (!identity) return null;
+  const external = await db.get(
+    `SELECT external.external_key, dataset.source_system, dataset.source_format
+     FROM schedule_datasets dataset
+     JOIN schedule_dataset_teachers roster ON roster.dataset_id = dataset.id
+     JOIN teacher_external_identities external
+       ON external.id = roster.teacher_external_identity_id
+      AND external.teacher_profile_id = roster.teacher_profile_id
+     WHERE dataset.status = 'active'
+       AND dataset.academic_year_id = ?
+       AND roster.teacher_profile_id = ?
+       AND external.source_system = dataset.source_system
+     ORDER BY dataset.id DESC, external.id ASC
+     LIMIT 1`,
+    [identity.teacherProfile.academicYearId, identity.teacherProfile.id]
+  );
+  if (!external) return { ...identity, externalIdentity: null };
+  return {
+    ...identity,
+    externalIdentity: {
+      sourceCode: external.external_key,
+      sourceSystem: external.source_system,
+      sourceFormat: external.source_format
+    }
+  };
+}
+
 module.exports = {
   normalizeDateKey,
+  resolveActiveTeacherContext,
   resolveActiveTeacherProfile
 };

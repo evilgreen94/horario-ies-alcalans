@@ -194,12 +194,32 @@ function registerAlumnosFueraAulaRoutes(router, deps) {
     getDatabase,
     sanitizeAlumnosFueraAula,
     ensureArray,
+    appendAuditEvent,
+    requireAuthenticated,
     requireRole,
+    resolveActiveTeacherContext,
     requireSameOriginWrite,
     badRequest,
     notFound,
     withImmediateTransaction = defaultWithImmediateTransaction
   } = deps;
+
+  async function applySessionTeacher(req, db) {
+    const roles = Array.isArray(req.sessionUser?.roles) ? req.sessionUser.roles : [];
+    if (roles.includes('teacher')) {
+      const context = await resolveActiveTeacherContext(db, req.sessionUser.userId, new Date());
+      if (!context) {
+        const error = new Error('No hay un perfil docente activo asignado para la fecha actual.');
+        error.status = 404;
+        throw error;
+      }
+      return { ...req.body, profesor: context.teacherProfile.displayName };
+    }
+    if (roles.includes('admin')) return req.body;
+    const error = new Error('Permisos insuficientes.');
+    error.status = 403;
+    throw error;
+  }
 
   router.get('/alumnos-fuera-aula', async (_req, res, next) => {
     try {
@@ -233,21 +253,37 @@ function registerAlumnosFueraAulaRoutes(router, deps) {
     }
   });
 
-  router.post('/alumnos-fuera-aula/salida', requireSameOriginWrite, async (req, res, next) => {
+  router.post('/alumnos-fuera-aula/salida', requireAuthenticated, requireSameOriginWrite, async (req, res, next) => {
     try {
-      const inputRow = sanitizeAlumnosFueraAula({ ...req.body, cantidad: 0 });
       const db = await getDatabase();
-      res.json(await applyAlumnosFueraAulaMovement(db, inputRow, 'salida', badRequest));
+      const inputRow = sanitizeAlumnosFueraAula({ ...await applySessionTeacher(req, db), cantidad: 0 });
+      const result = await applyAlumnosFueraAulaMovement(db, inputRow, 'salida', badRequest);
+      await appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: 'teacher.corridor_student_exit',
+        targetType: 'teacher_profile',
+        targetId: inputRow.profesor,
+        details: { dia: inputRow.dia, hora: inputRow.hora }
+      });
+      res.json(result);
     } catch (error) {
       next(error);
     }
   });
 
-  router.post('/alumnos-fuera-aula/retorno', requireSameOriginWrite, async (req, res, next) => {
+  router.post('/alumnos-fuera-aula/retorno', requireAuthenticated, requireSameOriginWrite, async (req, res, next) => {
     try {
-      const inputRow = sanitizeAlumnosFueraAula({ ...req.body, cantidad: 0 });
       const db = await getDatabase();
-      res.json(await applyAlumnosFueraAulaMovement(db, inputRow, 'retorno', badRequest));
+      const inputRow = sanitizeAlumnosFueraAula({ ...await applySessionTeacher(req, db), cantidad: 0 });
+      const result = await applyAlumnosFueraAulaMovement(db, inputRow, 'retorno', badRequest);
+      await appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: 'teacher.corridor_student_return',
+        targetType: 'teacher_profile',
+        targetId: inputRow.profesor,
+        details: { dia: inputRow.dia, hora: inputRow.hora }
+      });
+      res.json(result);
     } catch (error) {
       next(error);
     }
@@ -288,10 +324,10 @@ function registerAlumnosFueraAulaRoutes(router, deps) {
     }
   });
 
-  router.post('/alumnos-fuera-aula', requireSameOriginWrite, async (req, res, next) => {
+  router.post('/alumnos-fuera-aula', requireAuthenticated, requireSameOriginWrite, async (req, res, next) => {
     try {
-      const inputRow = sanitizeAlumnosFueraAula(req.body);
       const db = await getDatabase();
+      const inputRow = sanitizeAlumnosFueraAula(await applySessionTeacher(req, db));
       let existingRow = null;
       const row = await withImmediateTransaction(db, async () => {
         existingRow = await db.get(
@@ -325,6 +361,13 @@ function registerAlumnosFueraAulaRoutes(router, deps) {
           'SELECT * FROM alumnos_fuera_aula WHERE profesor = ? AND dia = ? AND hora = ?',
           [inputRow.profesor, inputRow.dia, inputRow.hora]
         );
+      });
+      await appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: 'teacher.corridor_state_set',
+        targetType: 'teacher_profile',
+        targetId: inputRow.profesor,
+        details: { dia: inputRow.dia, hora: inputRow.hora, cantidad: inputRow.cantidad }
       });
       res.status(existingRow ? 200 : 201).json({ ok: true, entry: serializeAlumnosFueraAulaRow(row) });
     } catch (error) {

@@ -11,6 +11,7 @@ const {
   openDatabase,
   request,
   seedActiveSchedule,
+  seedIndividualUser,
   startServer,
   stopServer
 } = require('./helpers/integration-harness');
@@ -87,6 +88,9 @@ async function testHttpLifecycle() {
       superadminPassword: SUPERADMIN_PASSWORD
     });
     await seedActiveSchedule(environment.dbPath);
+    await seedIndividualUser(environment.dbPath, {
+      username: 'lifecycle.admin', password: 'Lifecycle-admin-2026!', roles: ['admin']
+    });
 
     for (const blockedPath of ['/server/app.js', '/deploy/linux/guardias.nginx.conf', '/docs/START_HERE.md', '/ops/status.sh', '/AGENTS.md']) {
       const blocked = await request(server.baseUrl, blockedPath);
@@ -110,18 +114,24 @@ async function testHttpLifecycle() {
     const session = await request(server.baseUrl, '/api/auth/session', {}, goodLogin.jar);
     assert.strictEqual(session.body.authenticated, true);
     assert.strictEqual(session.body.role, 'admin');
+    const legacyAdminRejected = await request(server.baseUrl, '/api/guardias', {
+      method: 'POST', body: { dia: 0, hora: 1, ausente: SYNTHETIC }
+    }, goodLogin.jar);
+    assert.strictEqual(legacyAdminRejected.response.status, 403);
+    const individualAdmin = await loginIndividual(server.baseUrl, 'lifecycle.admin', 'Lifecycle-admin-2026!');
+    assert.strictEqual(individualAdmin.response.status, 200);
 
     const created = await request(server.baseUrl, '/api/guardias', {
       method: 'POST',
       body: { dia: 0, hora: 1, ausente: SYNTHETIC, guardia: '', aula: 'QA-01', faena: false, obs: 'fase-2c' }
-    }, goodLogin.jar);
+    }, individualAdmin.jar);
     assert.strictEqual(created.response.status, 201);
     const absenceId = created.body.id;
 
     const assigned = await request(server.baseUrl, `/api/guardias/${absenceId}`, {
       method: 'PUT',
       body: { dia: 0, hora: 1, ausente: SYNTHETIC, guardia: `${SYNTHETIC}_COVER`, aula: 'QA-01', faena: true, obs: 'fase-2c-assigned' }
-    }, goodLogin.jar);
+    }, individualAdmin.jar);
     assert.strictEqual(assigned.response.status, 200);
     assert.strictEqual(assigned.body.guardia, `${SYNTHETIC}_COVER`);
 
@@ -156,6 +166,8 @@ async function testHttpLifecycle() {
     assert.strictEqual(oldCredentials.response.status, 401);
     const persistedCredentials = await login(server.baseUrl, 'admin', CHANGED_ADMIN_PASSWORD);
     assert.strictEqual(persistedCredentials.response.status, 200);
+    const persistedIndividualAdmin = await loginIndividual(server.baseUrl, 'lifecycle.admin', 'Lifecycle-admin-2026!');
+    assert.strictEqual(persistedIndividualAdmin.response.status, 200);
     const persistedRows = await request(server.baseUrl, '/api/guardias');
     assert.ok(persistedRows.body.some(row => row.id === absenceId && row.guardia === `${SYNTHETIC}_COVER`));
 
@@ -174,17 +186,17 @@ async function testHttpLifecycle() {
     const second = await request(server.baseUrl, '/api/guardias', {
       method: 'POST',
       body: { dia: 0, hora: 2, ausente: `${SYNTHETIC}_SECOND`, guardia: '', aula: 'QA-02', faena: false, obs: 'concurrency' }
-    }, persistedCredentials.jar);
+    }, persistedIndividualAdmin.jar);
     assert.strictEqual(second.response.status, 201);
 
     const updateOne = request(server.baseUrl, `/api/guardias/${absenceId}`, {
       method: 'PUT',
       body: { dia: 0, hora: 1, ausente: SYNTHETIC, guardia: `${SYNTHETIC}_WRITE_A`, aula: 'QA-01', faena: true, obs: 'parallel-a' }
-    }, persistedCredentials.jar);
+    }, persistedIndividualAdmin.jar);
     const updateTwo = request(server.baseUrl, `/api/guardias/${second.body.id}`, {
       method: 'PUT',
       body: { dia: 0, hora: 2, ausente: `${SYNTHETIC}_SECOND`, guardia: `${SYNTHETIC}_WRITE_B`, aula: 'QA-02', faena: false, obs: 'parallel-b' }
-    }, persistedCredentials.jar);
+    }, persistedIndividualAdmin.jar);
     const concurrentReads = [
       request(server.baseUrl, '/api/guardias'),
       request(server.baseUrl, '/api/guardias')

@@ -1,3 +1,5 @@
+const crypto = require('node:crypto');
+
 const SUBSTITUTIONS_STATE_KEY = 'teacher_substitutions';
 const PRACTICAS_GUARDIAS_STATE_KEY = 'teacher_practicas_guardias';
 const PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY = 'teacher_practicas_guardias_tramos';
@@ -30,10 +32,45 @@ function registerStateCollectionRoutes(router, deps) {
     sanitizeTeacherFutureAbsence,
     sanitizePatioGuardia,
     sanitizePatioTeacherBlock,
+    appendAuditEvent,
+    requireAuthenticated,
     requireRole,
+    resolveActiveTeacherContext,
     requireSameOriginWrite,
     withImmediateTransaction
   } = deps;
+
+  async function buildOwnedFutureAbsence(req, db) {
+    const roles = Array.isArray(req.sessionUser?.roles) ? req.sessionUser.roles : [];
+    if (roles.includes('teacher')) {
+      const requested = sanitizeTeacherFutureAbsence(req.body);
+      const context = await resolveActiveTeacherContext(db, req.sessionUser.userId, requested.date);
+      if (!context) {
+        const error = new Error('No hay un perfil docente activo asignado para esa fecha.');
+        error.status = 404;
+        throw error;
+      }
+      if (!context.externalIdentity?.sourceCode) {
+        const error = new Error('El perfil docente no pertenece al dataset horario activo.');
+        error.status = 409;
+        throw error;
+      }
+      return sanitizeTeacherFutureAbsence({
+        ...req.body,
+        id: `future-${crypto.randomUUID()}`,
+        profesor: context.teacherProfile.displayName,
+        sourceCode: context.externalIdentity.sourceCode,
+        status: 'pending',
+        reviewedAt: '',
+        reviewerNote: '',
+        appliedAt: ''
+      });
+    }
+    if (roles.includes('admin')) return sanitizeTeacherFutureAbsence(req.body);
+    const error = new Error('Permisos insuficientes.');
+    error.status = 403;
+    throw error;
+  }
 
   router.get('/substitutions', async (_req, res, next) => {
     try {
@@ -135,6 +172,51 @@ function registerStateCollectionRoutes(router, deps) {
     }
   });
 
+  router.put('/patio-teacher-blocks/own', requireAuthenticated, requireSameOriginWrite, async (req, res, next) => {
+    try {
+      const roles = Array.isArray(req.sessionUser?.roles) ? req.sessionUser.roles : [];
+      if (!roles.includes('teacher')) {
+        const error = new Error('La operación requiere una identidad docente individual.');
+        error.status = 403;
+        throw error;
+      }
+      const db = await getDatabase();
+      const context = await resolveActiveTeacherContext(db, req.sessionUser.userId, new Date());
+      if (!context?.externalIdentity?.sourceCode) {
+        const error = new Error('No hay un perfil docente activo en el dataset operativo.');
+        error.status = context ? 409 : 404;
+        throw error;
+      }
+      const entry = sanitizePatioTeacherBlock({
+        ...req.body,
+        profesor: context.teacherProfile.displayName,
+        sourceCode: context.externalIdentity.sourceCode
+      });
+      const active = req.body?.active !== false;
+      await withImmediateTransaction(db, async () => {
+        const current = await getStateRows(db, PATIO_TEACHER_BLOCKS_STATE_KEY);
+        const sameEntry = row => (
+          row?.weekKey === entry.weekKey && Number(row?.dia) === entry.dia && Number(row?.hora) === entry.hora &&
+          (String(row?.sourceCode || '').toUpperCase() === entry.sourceCode.toUpperCase() ||
+            (!row?.sourceCode && row?.profesor === entry.profesor))
+        );
+        const nextRows = current.filter(row => !sameEntry(row));
+        if (active) nextRows.push(entry);
+        await replaceStateRows(db, PATIO_TEACHER_BLOCKS_STATE_KEY, nextRows);
+      });
+      await appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: active ? 'teacher.patio_unavailability.set' : 'teacher.patio_unavailability.cleared',
+        targetType: 'teacher_profile',
+        targetId: entry.sourceCode,
+        details: { weekKey: entry.weekKey, dia: entry.dia, hora: entry.hora }
+      });
+      res.json({ ok: true, active, entry });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get('/future-absences', async (_req, res, next) => {
     try {
       const db = await getDatabase();
@@ -144,14 +226,21 @@ function registerStateCollectionRoutes(router, deps) {
     }
   });
 
-  router.post('/future-absences', requireRole('admin'), requireSameOriginWrite, async (req, res, next) => {
+  router.post('/future-absences', requireAuthenticated, requireSameOriginWrite, async (req, res, next) => {
     try {
-      const entry = sanitizeTeacherFutureAbsence(req.body);
       const db = await getDatabase();
+      const entry = await buildOwnedFutureAbsence(req, db);
       await withImmediateTransaction(db, async () => {
         const current = await getStateRows(db, FUTURE_ABSENCES_STATE_KEY);
         const nextRows = [...current.filter(row => row?.id !== entry.id), entry];
         await replaceStateRows(db, FUTURE_ABSENCES_STATE_KEY, nextRows);
+      });
+      await appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: 'teacher.future_absence.created',
+        targetType: 'teacher_profile',
+        targetId: entry.sourceCode || entry.profesor,
+        details: { absenceId: entry.id, date: entry.date, hours: entry.hours }
       });
       res.json({ ok: true, entry });
     } catch (error) {
@@ -169,6 +258,13 @@ function registerStateCollectionRoutes(router, deps) {
         const nextRows = [...current.filter(row => row?.id !== id), entry];
         await replaceStateRows(db, FUTURE_ABSENCES_STATE_KEY, nextRows);
       });
+      await appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: 'admin.future_absence.updated',
+        targetType: 'teacher_profile',
+        targetId: entry.sourceCode || entry.profesor,
+        details: { absenceId: id, status: entry.status }
+      });
       res.json({ ok: true, entry });
     } catch (error) {
       next(error);
@@ -183,6 +279,12 @@ function registerStateCollectionRoutes(router, deps) {
         const current = await getStateRows(db, FUTURE_ABSENCES_STATE_KEY);
         const nextRows = current.filter(row => String(row?.id || '') !== id);
         await replaceStateRows(db, FUTURE_ABSENCES_STATE_KEY, nextRows);
+      });
+      await appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: 'admin.future_absence.deleted',
+        targetType: 'future_absence',
+        targetId: id
       });
       res.json({ ok: true });
     } catch (error) {

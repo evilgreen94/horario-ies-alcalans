@@ -1,8 +1,8 @@
 const assert = require('node:assert/strict');
 const { activateScheduleDataset, importScheduleDataset, importTeacherProfiles } = require('../schedule-model');
 const {
-  cleanupTestEnvironment, createTestEnvironment, login, openDatabase,
-  request, startServer, stopServer
+  cleanupTestEnvironment, createTestEnvironment, loginIndividual, openDatabase,
+  request, seedIndividualUser, startServer, stopServer
 } = require('./helpers/integration-harness');
 
 module.exports = [{
@@ -37,7 +37,10 @@ module.exports = [{
         await activateScheduleDataset(db, imported.datasetId);
       } finally { await db.close(); }
 
-      const admin = await login(server.baseUrl, 'admin', 'Admin-integration-2026');
+      await seedIndividualUser(environment.dbPath, {
+        username: 'coverage.admin', password: 'Coverage-admin-2026!', roles: ['admin']
+      });
+      const admin = await loginIndividual(server.baseUrl, 'coverage.admin', 'Coverage-admin-2026!');
       const origin = { origin: server.baseUrl };
       for (const hour of [2, 3, 4]) {
         const covered = await request(server.baseUrl, '/api/guardias', {

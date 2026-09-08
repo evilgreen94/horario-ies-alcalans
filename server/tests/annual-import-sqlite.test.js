@@ -5,9 +5,10 @@ const { importTeacherProfiles } = require('../schedule-model');
 const {
   cleanupTestEnvironment,
   createTestEnvironment,
-  login,
+  loginIndividual,
   openDatabase,
   request,
+  seedIndividualUser,
   startServer,
   stopServer
 } = require('./helpers/integration-harness');
@@ -17,6 +18,9 @@ async function testAnnualXmlPersistsOnlyInSqlite() {
   let server = null;
   try {
     server = await startServer({ dbPath: environment.dbPath });
+    await seedIndividualUser(environment.dbPath, {
+      username: 'annual.admin', password: 'Annual-admin-2026!', roles: ['admin']
+    });
     const db = await openDatabase(environment.dbPath);
     try {
       await importTeacherProfiles(db, {
@@ -50,7 +54,7 @@ async function testAnnualXmlPersistsOnlyInSqlite() {
     });
     assert.equal(anonymous.response.status, 401);
 
-    const admin = await login(server.baseUrl, 'admin', 'Admin-integration-2026');
+    const admin = await loginIndividual(server.baseUrl, 'annual.admin', 'Annual-admin-2026!');
     assert.equal(admin.response.status, 200);
     const preview = await request(server.baseUrl, '/api/profesorado/annual-import/xml/preview', {
       method: 'POST',

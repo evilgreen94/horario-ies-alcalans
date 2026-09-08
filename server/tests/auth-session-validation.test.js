@@ -102,7 +102,7 @@ module.exports = [
     }
   },
   {
-    name: 'requireRole accepts admin for admin routes and blocks superadmin-only access',
+    name: 'legacy shared admin session cannot authorize unified Jefatura routes',
     fn() {
       const session = loadSessionModule('worker-3-test-secret');
       const cookieHeader = session.serializeSessionCookie('admin', { secure: false, headers: {} });
@@ -111,21 +111,6 @@ module.exports = [
           cookie: cookieHeader.split(';')[0]
         }
       };
-
-      let nextCalls = 0;
-      const okRes = {
-        status() {
-          throw new Error('status should not be called for authorized admin access');
-        },
-        json() {
-          throw new Error('json should not be called for authorized admin access');
-        }
-      };
-      session.requireRole('admin')(req, okRes, () => {
-        nextCalls += 1;
-      });
-      assert.equal(nextCalls, 1);
-      assert.equal(req.sessionUser.role, 'admin');
 
       const forbiddenRes = {
         statusCode: null,
@@ -139,7 +124,7 @@ module.exports = [
           return this;
         }
       };
-      session.requireRole('superadmin')(req, forbiddenRes, () => {
+      session.requireRole('admin')(req, forbiddenRes, () => {
         throw new Error('next should not be called for forbidden access');
       });
       assert.equal(forbiddenRes.statusCode, 403);

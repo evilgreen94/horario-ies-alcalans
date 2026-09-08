@@ -6,6 +6,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { open } = require('sqlite');
 const sqlite3 = require('sqlite3');
+const { hashPassword } = require('../../auth');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
 const REAL_DB_PATH = path.resolve(PROJECT_ROOT, 'BD', 'guardias.sqlite');
@@ -170,6 +171,28 @@ async function seedActiveSchedule(dbPath) {
   }
 }
 
+async function seedIndividualUser(dbPath, { username, password, displayName = username, roles = [] }) {
+  const db = await openDatabase(dbPath);
+  try {
+    const credential = hashPassword(password);
+    const inserted = await db.run(
+      `INSERT INTO users (username, display_name, password_hash, password_salt, is_active, must_change_password)
+       VALUES (?, ?, ?, ?, 1, 0)`,
+      [username, displayName, credential.hash, credential.salt]
+    );
+    for (const role of roles) {
+      await db.run(
+        `INSERT INTO user_roles (user_id, role_id)
+         SELECT ?, id FROM roles WHERE key = ?`,
+        [inserted.lastID, role]
+      );
+    }
+    return inserted.lastID;
+  } finally {
+    await db.close();
+  }
+}
+
 async function createConsistentBackup(sourcePath, targetPath) {
   assertSafeTestDatabase(sourcePath);
   assert.ok(path.resolve(targetPath).startsWith(path.dirname(path.resolve(sourcePath)) + path.sep), 'Backup must remain in the isolated test directory');
@@ -203,6 +226,7 @@ module.exports = {
   openDatabase,
   request,
   seedActiveSchedule,
+  seedIndividualUser,
   startServer,
   stopServer
 };

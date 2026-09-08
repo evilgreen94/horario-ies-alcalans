@@ -16,7 +16,9 @@ const {
   sanitizeTeacherSubstitution,
   sanitizeTareaProfesorado
 } = require('./validation');
-const { requireRole } = require('../session');
+const { requireAuthenticated, requireRole } = require('../session');
+const { appendAuditEvent } = require('../audit');
+const { resolveActiveTeacherContext } = require('../teacher-identity');
 const {
   badRequest,
   notFound,
@@ -43,7 +45,10 @@ registerAlumnosFueraAulaRoutes(router, {
   getDatabase,
   sanitizeAlumnosFueraAula,
   ensureArray,
+  appendAuditEvent,
+  requireAuthenticated,
   requireRole,
+  resolveActiveTeacherContext,
   requireSameOriginWrite,
   badRequest,
   notFound,
@@ -68,7 +73,10 @@ registerStateCollectionRoutes(router, {
   sanitizeTeacherFutureAbsence,
   sanitizePatioGuardia,
   sanitizePatioTeacherBlock,
+  appendAuditEvent,
+  requireAuthenticated,
   requireRole,
+  resolveActiveTeacherContext,
   requireSameOriginWrite,
   withImmediateTransaction
 });

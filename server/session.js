@@ -123,13 +123,13 @@ function readSessionFromRequest(req) {
         roles,
         role,
         sessionVersion: Number(parsed.sessionVersion || 0),
-        isAdmin: roles.includes('admin') || roles.includes('superadmin'),
+        isAdmin: roles.includes('admin'),
         isSuperAdmin: roles.includes('superadmin')
       };
     }
     return {
       role: parsed.role,
-      isAdmin: parsed.role === 'admin' || parsed.role === 'superadmin',
+      isAdmin: parsed.role === 'admin',
       isSuperAdmin: parsed.role === 'superadmin'
     };
   } catch (_error) {
@@ -167,7 +167,7 @@ function validateSessionFromRequest(req, options = {}) {
       sessionVersion: Number(row.session_version),
       mustChangePassword: !!row.must_change_password,
       passwordChangeOnly: !!row.must_change_password && !options.allowPasswordChange,
-      isAdmin: roles.includes('admin') || roles.includes('superadmin'),
+      isAdmin: roles.includes('admin'),
       isSuperAdmin: roles.includes('superadmin')
     };
   })();
@@ -209,7 +209,7 @@ function requireRole(role) {
       if (!session) return res.status(401).json({ error: 'Sesion no valida.' });
       if (rejectForcedPasswordChange(session, res)) return undefined;
     const allowed = role === 'admin'
-      ? (session.userId ? session.roles.includes('admin') : session.isAdmin)
+      ? (session.userId ? session.roles.includes('admin') : false)
       : role === 'superadmin'
         ? session.isSuperAdmin
         : Array.isArray(session.roles) && session.roles.includes(role);
