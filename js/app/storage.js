@@ -250,6 +250,12 @@
         body: JSON.stringify(rows)
       });
     },
+    setOwnPatioTeacherBlock(row){
+      return request('/profesorado/patio-teacher-blocks/own', {
+        method: 'PUT',
+        body: JSON.stringify(row)
+      });
+    },
     fetchTeacherFutureAbsences(){
       return request('/profesorado/future-absences');
     },
@@ -282,6 +288,15 @@
     fetchAuthSession(){
       return request('/auth/session');
     },
+    fetchOwnSchedule(date=''){
+      return request(`/schedule/me${date ? `?date=${encodeURIComponent(date)}` : ''}`);
+    },
+    loginIndividual(username, password){
+      return request('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      });
+    },
     loginRole(role, password){
       return request('/auth/login', {
         method: 'POST',
@@ -301,6 +316,12 @@
     },
     fetchSuperAdminInfo(){
       return request('/export/info');
+    },
+    changeIndividualPassword(currentPassword, newPassword){
+      return request('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
     },
     fetchUsers(query=''){
       return request(`/users?q=${encodeURIComponent(query)}`);

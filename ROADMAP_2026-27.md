@@ -22,6 +22,8 @@
 
 ## Completado
 
+- Identidad web individual unificada y navegación por roles en `guardias.html`;
+  las operaciones docentes propias se resuelven desde la sesión.
 - Persistencia backend SQLite y retirada de datasets anuales legacy.
 - Modelo anual, perfiles/identidades externas/asignaciones y periodos dinámicos.
 - Importadores PDF y GHC XML al mismo contrato canónico.

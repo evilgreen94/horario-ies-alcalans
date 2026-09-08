@@ -39,10 +39,11 @@
     <div class="clock" id="clock"></div>
   </div>
   <div class="header-actions">
-    <button class="btn" id="btnTeacher" onclick="openTeacherPanel()">Profesorado</button>
-    <button class="btn" id="btnAdmin" onclick="toggleAdmin()">Jefatura de Estudios</button>
+    <button class="btn" id="btnTeacher" onclick="openTeacherPanel()">Acceso personal</button>
+    <button class="btn" id="btnAdmin" onclick="toggleAdmin()" style="display:none">Jefatura</button>
     <button class="btn" id="btnTv" onclick="openTvPanel()">Sala del profesorado</button>
     <button class="btn" id="btnSuperAdmin" onclick="toggleSuperAdmin()" style="display:none">Administración técnica</button>
+    <button class="btn" id="btnLogout" onclick="logoutCurrentRole()" style="display:none">Cerrar sesión</button>
   </div>
 </header>
 <main>
@@ -255,7 +256,6 @@
   <div class="teacher-bar" id="teacherBar">
     <span class="teacher-tag">Panel del profesorado</span>
     <button class="btn-teacher" onclick="openTeacherPanel()">Mis tareas</button>
-    <button class="btn-teacher" onclick="changeTeacherUser()">Cambiar docente</button>
     <span class="teacher-name" id="teacherBarName">Profesorado</span>
   </div>
   <div class="tbl-wrap">
@@ -377,7 +377,6 @@
         <div class="teacher-duty-alert" id="teacherDutyAlert" hidden></div>
         <div class="teacher-panel-actions">
           <button class="btn-teacher-panel" type="button" onclick="openTeacherFutureAbsenceModal()">Comunicar ausencia futura</button>
-          <button class="btn-teacher-panel" type="button" onclick="changeTeacherUser()">Cambiar docente</button>
         </div>
         <div class="teacher-mood-card" id="teacherMoodCard" hidden aria-hidden="true"></div>
       </div>
@@ -390,41 +389,38 @@
 <div class="overlay" id="teacherAccessOverlay" onclick="bgTeacherAccessClose(event)">
   <div class="modal teacher-access-modal">
     <div class="modal-hd teacher-access-head">
-      <span>Acceso profesorado</span>
+      <span>Acceso personal</span>
       <button class="modal-x" aria-label="Cerrar acceso del profesorado" onclick="closeTeacherAccess()">x</button>
     </div>
     <div class="teacher-access-shell">
-      <div class="teacher-access-intro">Busca tu nombre para abrir tu panel del d&iacute;a. Desde ah&iacute; podr&aacute;s revisar sesiones, indicar tarea y ajustar materia, grupo o aula si hace falta.</div>
+      <div class="teacher-access-intro">Accede con tu cuenta individual de ARGOS. Tu perfil docente se resolver&aacute; desde la sesi&oacute;n; no es posible seleccionar otra identidad.</div>
       <div class="teacher-access-search-panel">
         <div class="fg">
-          <label>Docente</label>
+          <label>Usuario</label>
           <div class="teacher-access-search">
             <input
               type="text"
               id="teacherLoginName"
-              name="profesor_busqueda"
-              placeholder="Busca tu nombre"
-              autocomplete="new-password"
-              autocapitalize="words"
+              name="username"
+              placeholder="Usuario ARGOS"
+              autocomplete="username"
+              autocapitalize="none"
               autocorrect="off"
               spellcheck="false"
               inputmode="text"
-              aria-autocomplete="list"
-              aria-controls="teacherAccessSuggestions"
-              data-form-type="other"
-              data-lpignore="true"
-              data-1p-ignore="true"
             >
-            <div class="teacher-access-suggestions" id="teacherAccessSuggestions" hidden></div>
           </div>
         </div>
-        <div class="teacher-access-recent" id="teacherAccessRecent" hidden></div>
-        <div class="teacher-access-preview" id="teacherAccessPreview">Selecciona tu nombre para entrar en tu panel.</div>
+        <div class="fg">
+          <label>Contrase&ntilde;a</label>
+          <input id="teacherLoginPassword" name="password" type="password" autocomplete="current-password" minlength="6">
+        </div>
+        <div class="teacher-access-preview" id="teacherAccessPreview">La identidad y los permisos se comprobar&aacute;n en el servidor.</div>
       </div>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" type="button" onclick="closeTeacherAccess()">Cancelar</button>
-      <button class="btn-save" type="button" onclick="loginTeacher()">Abrir panel del profesorado</button>
+      <button class="btn-save" type="button" onclick="loginTeacher()">Acceder</button>
     </div>
   </div>
 </div>
@@ -593,14 +589,14 @@
 <script>window.PROFESORADO_SOURCE=null;window.PROFESORADO_SOURCE_ERROR='No hay un dataset horario activo y validado.';</script>
 <script src="/api/schedule/legacy.js?v=20260904-canonical"></script>
 <script src="js/data/patio_guardias.js?v=20260508-printstatic"></script>
-<script src="js/app/storage.js?v=20260508-printstatic"></script>
+<script src="js/app/storage.js?v=20260908-unified-auth"></script>
 <script src="js/app/guardias-core.js?v=20260508-printstatic"></script>
 <script src="js/app/patio-duty-merge.js?v=20260906-break-duties"></script>
 <script src="js/app/guardias-ui.js?v=20260508-printstatic"></script>
-<script src="js/app/guardias-future-absences.js?v=20260508-printstatic"></script>
+<script src="js/app/guardias-future-absences.js?v=20260908-unified-auth"></script>
 <script src="js/app/guardias-aux-panels.js?v=20260508-printstatic"></script>
 <script src="js/app/guardias-teacher.js?v=20260508-printstatic"></script>
-<script src="js/app/guardias.js?v=20260511-poll-sync"></script>
+<script src="js/app/guardias.js?v=20260908-unified-auth"></script>
 </body>
 </html>
 

@@ -4,7 +4,8 @@
 
 ARGOS (Aplicación de Registro y Gestión de Organización y Sustituciones) es el
 producto; Guardias es el módulo actual. La rama de preparación es
-`rescue/preproduction-2026-09`. Producción y su SQLite no se han modificado.
+`feat/argos-1.0.1-unified-web-auth`, desde el ARGOS 1.0 congelado en
+`argos-v1.0-rc1`. Producción y su SQLite no se han modificado.
 
 ## Estado técnico
 
@@ -16,7 +17,7 @@ producto; Guardias es el módulo actual. La rama de preparación es
 | Identidad | Cuenta persistente; perfil, identidad externa y asignación por curso/fecha. |
 | Horario | Periodos dinámicos y datasets `draft/validated/active/archived`. |
 | Fuente 2026/27 | XML oficial GHC ISO-8859-1 primario; PDF solo contraste independiente. |
-| Autenticación | Legacy admin/superadmin compatible e identidad individual con revocación por versión. |
+| Autenticación | Identidad individual compartida por `guardias.html` y `/app/`; Jefatura exige rol `admin` explícito y Superadmin no lo implica. |
 | Superadmin | Gestión de cuentas, reset temporal, cambio forzado, auditoría y recuperación break-glass. |
 | Despliegue | Redeploy limpio por artefacto Linux offline; nunca upgrade del checkout contaminado. |
 

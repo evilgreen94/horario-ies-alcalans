@@ -370,6 +370,10 @@ const TEACHER_MOOD_OPTIONS = [
 let isAdmin=false,day=0,editId=null;
 let editAbsenceGroupIds=[];
 let isSuperAdmin=false;
+let currentAuthSession=null;
+let canAdmin=false;
+let canSuperAdmin=false;
+let authenticatedTeacherSourceCode='';
 let teacherName='';
 let teacherDay=0;
 let teacherAccessMatches=[];
@@ -400,7 +404,7 @@ let selectedAbsenceIds=new Set();
 const demo=[];
 const APP_URL_PARAMS=new URLSearchParams(window.location.search||'');
 const APP_PATHNAME=(window.location.pathname||'').toLowerCase();
-window.GUARDIAS_CLIENT_VERSION='20260511-poll-sync';
+window.GUARDIAS_CLIENT_VERSION='argos-1.0.1-unified-auth';
 const TV_MODE=APP_URL_PARAMS.get('view')==='tv'||APP_PATHNAME.endsWith('/tv');
 const PRINT_MODE=APP_URL_PARAMS.get('view')==='print'||APP_PATHNAME.endsWith('/print');
 const SUPERADMIN_ENABLED=APP_URL_PARAMS.get('panel')==='superadmin';
@@ -514,16 +518,11 @@ function clearTeacherIdentityConfirmation(){
 }
 async function ensureTeacherIdentityConfirmed(actionLabel){
   const profesor=getProfesor(teacherName);
-  if(!profesor) return false;
-  if(teacherIdentityConfirmedFor===teacherName) return true;
-  const nombre=getVisibleTeacherName(profesor.nombreCompleto||profesor.nombre||teacherName);
-  const confirmed=await askConfirm(
-    'Confirmar docente',
-    `Vas a trabajar como ${nombre}. Comprueba que es tu panel antes de ${actionLabel}.`,
-    'Confirmar docente'
-  );
-  if(confirmed) teacherIdentityConfirmedFor=teacherName;
-  return confirmed;
+  if(!currentAuthSession?.authenticated||!currentAuthSession.userId||!authenticatedTeacherSourceCode||!profesor){
+    showToast(`Necesitas una identidad docente autenticada para ${actionLabel}.`,'error');
+    return false;
+  }
+  return cleanText(profesor.sourceCode).toUpperCase()===authenticatedTeacherSourceCode;
 }
 function load(){
   try{
@@ -665,10 +664,11 @@ function normalizePatioTeacherBlockRow(row){
   const dia=Number(row?.dia);
   const hora=Number(row?.hora);
   const profesor=resolveTeacherCanonicalName(row?.profesor);
+  const sourceCode=cleanText(row?.sourceCode||row?.source_code).toUpperCase();
   const reason=cleanText(row?.reason||row?.motivo||'equipo-docente').toLowerCase()||'equipo-docente';
   const note=cleanText(row?.note||row?.nota);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(weekKey)||!Number.isInteger(dia)||dia<0||dia>4||!Number.isInteger(hora)||!PATIO_RENDER_HORAS.has(hora)||!getProfesor(profesor)) return null;
-  return {weekKey,dia,hora,profesor,reason,note};
+  return {weekKey,dia,hora,profesor,sourceCode,reason,note};
 }
 function makePatioTeacherBlockKey(weekKey,dia,hora,profesor){
   return `${cleanText(weekKey)}|${Number(dia)}|${Number(hora)}|${normalizeText(resolveTeacherCanonicalName(profesor)||profesor)}`;
@@ -1593,6 +1593,12 @@ function resolveTeacherCanonicalName(nombre){
 function getProfesor(nombre){
   const canonical=resolveTeacherCanonicalName(nombre);
   return canonical?PROFESORES_BASE[canonical]||null:null;
+}
+function getProfesorBySourceCode(sourceCode){
+  const normalized=cleanText(sourceCode).toUpperCase();
+  if(!normalized) return null;
+  const raw=RAW_PROFESORADO.find(teacher=>cleanText(teacher?.sourceCode).toUpperCase()===normalized);
+  return raw?getProfesor(formatTeacherName(raw.nombre)):null;
 }
 function getVisibleTeacherName(nombre){
   const canonical=resolveTeacherCanonicalName(nombre);
@@ -2783,7 +2789,7 @@ patioTeacherBlocks=loadPatioTeacherBlocks();
 refreshOrdenGuardias();
 teacherFutureAbsences=loadTeacherFutureAbsences();
 teacherMoodEntries=loadTeacherMoods();
-teacherName=getProfesorNombreSeleccionado(loadTeacherUser())||'';
+teacherName='';
 teacherDay=day;
 applyTeacherStatePatch({
   teacherRecents,
@@ -3028,6 +3034,7 @@ function serializePatioTeacherBlocks(){
     dia:row.dia,
     hora:row.hora,
     profesor:row.profesor,
+    sourceCode:row.sourceCode||'',
     reason:row.reason||'equipo-docente',
     note:row.note||''
   }));
@@ -3883,7 +3890,7 @@ async function syncTeacherState(){
     drainPendingBackendSync();
   }
 }
-async function syncPatioTeacherBlocksState(){
+async function syncPatioTeacherBlocksState(entry){
   if(!storage.hasBackend()) return {ok:true,localOnly:true};
   if(backendSyncInFlight){
     backendSyncPendingPatioTeacherBlocks=true;
@@ -3892,7 +3899,7 @@ async function syncPatioTeacherBlocksState(){
   backendSyncInFlight=true;
   renderSuperAdminMonitor();
   try{
-    await storage.replacePatioTeacherBlocks(serializePatioTeacherBlocks());
+    await storage.setOwnPatioTeacherBlock(entry);
     lastBackendSnapshot=makeBackendSnapshot();
     superAdminStatus.lastTeacherSyncAt=new Date().toISOString();
     clearSuperAdminError();
@@ -4126,6 +4133,7 @@ function normalizeTeacherFutureAbsence(row){
   return {
     id:cleanText(row?.id),
     profesor:resolveTeacherCanonicalName(row?.profesor)||cleanText(row?.profesor),
+    sourceCode:cleanText(row?.sourceCode||row?.source_code).toUpperCase(),
     date:cleanText(row?.date),
     note:cleanText(row?.note),
     hours:Array.isArray(row?.hours)?[...new Set(row.hours.map(Number).filter(esHoraValida).filter(hora=>!HORAS_PATIO.has(hora)))].sort((a,b)=>a-b):[],
@@ -5197,20 +5205,25 @@ function updateAdminControls(){
   if(btnInformeSemanal) btnInformeSemanal.style.display=isAdmin?'':'none';
 }
 function refreshAccessUi(){
+  const btnTeacher=document.getElementById('btnTeacher');
   const btnAdmin=document.getElementById('btnAdmin');
   const btnSuperAdmin=document.getElementById('btnSuperAdmin');
+  const btnLogout=document.getElementById('btnLogout');
   const adminBar=document.getElementById('adminBar');
   const superAdminBar=document.getElementById('superAdminBar');
   document.body.classList.toggle('superadmin-active',isSuperAdmin);
+  if(btnTeacher) btnTeacher.textContent=currentAuthSession?.authenticated?(teacherName?'Mi perfil':'Mi cuenta'):'Acceso personal';
   if(btnAdmin){
+    btnAdmin.style.display=canAdmin?'':'none';
     btnAdmin.classList.toggle('on',isAdmin);
-    btnAdmin.textContent=isAdmin?'Salir de Jefatura':'Jefatura de Estudios';
+    btnAdmin.textContent=isAdmin?(teacherName?'Mi perfil':'Salir de Jefatura'):'Jefatura';
   }
   if(btnSuperAdmin){
-    btnSuperAdmin.style.display=(SUPERADMIN_ENABLED||isSuperAdmin)?'':'none';
+    btnSuperAdmin.style.display=(SUPERADMIN_ENABLED&&canSuperAdmin)?'':'none';
     btnSuperAdmin.classList.toggle('on',isSuperAdmin);
     btnSuperAdmin.textContent=isSuperAdmin?'Salir de administración técnica':'Administración técnica';
   }
+  if(btnLogout) btnLogout.style.display=currentAuthSession?.authenticated?'':'none';
   if(adminBar) adminBar.classList.toggle('show',isAdmin);
   if(superAdminBar) superAdminBar.classList.toggle('show',isSuperAdmin);
   syncAppModeClasses();
@@ -5231,6 +5244,9 @@ function setSuperAdminHint(message,type){
 }
 async function loadAuthSession(){
   if(!storage.hasBackend()){
+    currentAuthSession=null;
+    canAdmin=false;
+    canSuperAdmin=false;
     isAdmin=false;
     isSuperAdmin=false;
     refreshAccessUi();
@@ -5238,47 +5254,45 @@ async function loadAuthSession(){
   }
   try{
     const session=await storage.fetchAuthSession();
-    if(session?.isSuperAdmin&&!SUPERADMIN_ENABLED){
-      try{
-        await storage.logoutRole();
-      }catch(error){
-        console.warn('Superadmin session cleanup failed',error);
-      }
-      isAdmin=false;
-      isSuperAdmin=false;
-      refreshAccessUi();
-      renderTable();
-      return;
-    }
-    isAdmin=session?.role==='admin';
-    isSuperAdmin=!!session?.isSuperAdmin;
+    currentAuthSession=session?.authenticated&&session?.userId?session:null;
+    const roles=Array.isArray(currentAuthSession?.roles)?currentAuthSession.roles:[];
+    canAdmin=roles.includes('admin');
+    canSuperAdmin=roles.includes('superadmin');
+    isAdmin=false;
+    isSuperAdmin=SUPERADMIN_ENABLED&&canSuperAdmin;
+    teacherName='';
+    authenticatedTeacherSourceCode='';
+    teacherIdentityConfirmedFor='';
+    if(roles.includes('teacher')) await loadAuthenticatedTeacherIdentity(true);
     refreshAccessUi();
     renderTable();
   }catch(error){
     console.warn('Session load failed',error);
+    currentAuthSession=null;
+    canAdmin=false;
+    canSuperAdmin=false;
     isAdmin=false;
     isSuperAdmin=false;
     refreshAccessUi();
     renderTable();
   }
 }
-async function loginRole(role,password){
-  if(!storage.hasBackend()){
-    showToast('Este acceso requiere backend activo.','error');
-    return false;
-  }
+async function loadAuthenticatedTeacherIdentity(silent=false){
+  teacherName='';
+  authenticatedTeacherSourceCode='';
+  teacherIdentityConfirmedFor='';
+  if(!currentAuthSession?.authenticated||!currentAuthSession.userId) return false;
   try{
-    const result=await storage.loginRole(role,password);
-    isAdmin=result?.role==='admin';
-    isSuperAdmin=!!result?.isSuperAdmin;
-    refreshAccessUi();
-    backendHydrated=false;
-    await hydrateFromBackend();
+    const result=await storage.fetchOwnSchedule();
+    const profesor=getProfesorBySourceCode(result?.teacher?.sourceCode);
+    if(!profesor) throw new Error('El perfil autenticado no aparece en el dataset horario activo.');
+    authenticatedTeacherSourceCode=cleanText(result.teacher.sourceCode).toUpperCase();
+    teacherName=profesor.nombre;
+    teacherIdentityConfirmedFor=teacherName;
+    syncTeacherIdentity();
     return true;
   }catch(error){
-    if(String(error?.message||'').includes('401')) return false;
-    console.warn('Role login failed',error);
-    showToast('No se pudo iniciar la sesi\u00f3n.','error');
+    if(!silent) showToast(error?.status===404?'Tu cuenta no tiene un perfil docente activo.':'No se pudo cargar tu perfil docente.','error');
     return false;
   }
 }
@@ -5290,27 +5304,33 @@ async function logoutCurrentRole(){
       console.warn('Logout failed',error);
     }
   }
+  closeTeacherPanel();
+  closeTeacherAccess();
+  currentAuthSession=null;
+  canAdmin=false;
+  canSuperAdmin=false;
   isAdmin=false;
   isSuperAdmin=false;
+  teacherName='';
+  authenticatedTeacherSourceCode='';
+  teacherIdentityConfirmedFor='';
+  document.getElementById('teacherBar')?.classList.remove('show');
   backendHydrated=false;
   refreshAccessUi();
+  renderTable();
+  showToast('Sesi\u00f3n cerrada.','info');
 }
 async function ensureSuperAdminRouteAccess(){
   if(!SUPERADMIN_ENABLED||superAdminRoutePrompted) return true;
   superAdminRoutePrompted=true;
-  if(isSuperAdmin||isAdmin){
-    await logoutCurrentRole();
+  if(canSuperAdmin){isSuperAdmin=true;refreshAccessUi();return true;}
+  if(!currentAuthSession?.authenticated){
+    openTeacherAccess();
+    showToast('Accede con una cuenta Superadmin.','info');
+  }else{
+    showToast('Esta cuenta no tiene permiso de Superadmin.','error');
   }
-  const password=await askPassword('Acceso de administración técnica','Introduce la contraseña de administración técnica.');
-  if(!password){
-    window.location.href=window.location.pathname;
-    return false;
-  }
-  const ok=await loginRole('superadmin',password);
-  if(ok) return true;
-  showToast('Contraseña incorrecta.','error');
-  window.location.href=window.location.pathname;
-  return false;
+  return true;
 }
 async function initializeApp(){
   await loadAuthSession();
@@ -6827,41 +6847,25 @@ function renderTable(){
   renderAdminWorkspace();
 }
 async function toggleAdmin(){
-  if(!isAdmin){
-    const pw=await askPassword('Acceso Jefatura','Introduce la contrase\u00f1a de Jefatura de Estudios.');
-    if(!pw) return;
-    if(!await loginRole('admin',pw)){
-      if(pw) showToast('Contrase\u00f1a incorrecta.','error');
-      return;
-    }
-    renderTable();
-    showToast('Modo Jefatura activado.','info');
+  if(!canAdmin){
+    showToast('Tu cuenta no tiene permiso de Jefatura.','error');
     return;
   }
-  await logoutCurrentRole();
+  const entering=!isAdmin;
+  isAdmin=entering;
+  if(entering) closeTeacherPanel();
   renderTable();
-  showToast('Modo Jefatura desactivado.','info');
+  refreshAccessUi();
+  if(!entering&&teacherName) await openTeacherPanel();
+  showToast(isAdmin?'Vista de Jefatura activada.':'Vista personal activada.','info');
 }
 async function toggleSuperAdmin(){
-  if(!SUPERADMIN_ENABLED) return;
-  if(!isSuperAdmin){
-    const pw=await askPassword('Acceso de administración técnica','Introduce la contrase\u00f1a de administración técnica.');
-    if(!pw) return;
-    if(!await loginRole('superadmin',pw)){
-      if(pw) showToast('Contrase\u00f1a incorrecta.','error');
-      return;
-    }
-    renderTable();
-    showToast('Administración técnica activada.','info');
-    return;
-  }
-  await logoutCurrentRole();
-  if(SUPERADMIN_ENABLED){
-    window.location.href=window.location.pathname;
-    return;
-  }
+  if(!SUPERADMIN_ENABLED||!canSuperAdmin) return;
+  isSuperAdmin=!isSuperAdmin;
+  if(isSuperAdmin){isAdmin=false;closeTeacherPanel();}
   renderTable();
-  showToast('Administración técnica desactivada.','info');
+  refreshAccessUi();
+  showToast(isSuperAdmin?'Administración técnica activada.':'Administración técnica desactivada.','info');
 }
 function renderTeacherAccessPreview(){
   const teacherLoginInput=document.getElementById('teacherLoginName');
@@ -6996,72 +7000,92 @@ function handleTeacherAccessKeydown(event){
 }
 function openTeacherAccess(resetSelection){
   const teacherLoginInput=document.getElementById('teacherLoginName');
+  const passwordInput=document.getElementById('teacherLoginPassword');
   const teacherAccessOverlay=document.getElementById('teacherAccessOverlay');
-  if(!teacherLoginInput||!teacherAccessOverlay){openTeacherPanelFallback();return;}
-  teacherLoginInput.value=resetSelection?'':getVisibleTeacherName(teacherName||'');
-  teacherAccessActiveIndex=-1;
-  renderTeacherAccessRecents();
-  renderTeacherAccessPreview();
+  if(currentAuthSession?.authenticated){
+    if(teacherName) return openTeacherPanel();
+    showToast('Tu cuenta no tiene un perfil docente activo.','info');
+    return false;
+  }
+  if(!teacherLoginInput||!passwordInput||!teacherAccessOverlay) return false;
+  if(resetSelection!==false) teacherLoginInput.value='';
+  passwordInput.value='';
+  const preview=document.getElementById('teacherAccessPreview');
+  if(preview) preview.textContent='La identidad y los permisos se comprobarán en el servidor.';
   teacherAccessOverlay.classList.add('open');
   teacherLoginInput.focus();
-  teacherLoginInput.select();
-  renderTeacherAccessSuggestions(true);
+  return true;
 }
 function closeTeacherAccess(){
   const teacherAccessOverlay=document.getElementById('teacherAccessOverlay');
   if(teacherAccessOverlay) teacherAccessOverlay.classList.remove('open');
-  closeTeacherAccessSuggestions();
 }
 function bgTeacherAccessClose(e){if(e.target.id==='teacherAccessOverlay')closeTeacherAccess();}
 function changeTeacherUser(){
-  closeTeacherPanel();
-  clearTeacherIdentityConfirmation();
-  openTeacherAccess(true);
+  showToast('La identidad docente procede de tu sesión ARGOS.','info');
 }
 async function loginTeacher(){
   const teacherLoginInput=document.getElementById('teacherLoginName');
-  if(!teacherLoginInput) return;
-  const nombre=getProfesorNombreSeleccionado(teacherLoginInput.value);
-  if(!nombre){showToast('Selecciona tu nombre de la lista.','error');teacherLoginInput.focus();renderTeacherAccessSuggestions(true);return;}
-  const profesor=getProfesor(nombre);
-  const confirmed=await askConfirm('Confirmar docente',`Vas a entrar como ${getVisibleTeacherName(profesor?.nombreCompleto||nombre)}. Revisa bien el nombre antes de continuar.`,'Entrar con este nombre');
-  if(!confirmed) return;
-  teacherName=nombre;
+  const passwordInput=document.getElementById('teacherLoginPassword');
+  if(!teacherLoginInput||!passwordInput||!storage.hasBackend()) return;
+  const username=cleanText(teacherLoginInput.value);
+  const password=passwordInput.value;
+  if(!username||!password){showToast('Introduce usuario y contraseña.','error');return;}
+  let result;
+  try{
+    result=await storage.loginIndividual(username,password);
+    passwordInput.value='';
+    if(result?.mustChangePassword){
+      const newPassword=await askPassword('Cambio de contraseña obligatorio','Introduce una nueva contraseña de al menos 12 caracteres.');
+      if(!newPassword) throw new Error('Debes cambiar la contraseña temporal antes de continuar.');
+      const repeated=await askPassword('Confirmar nueva contraseña','Repite la nueva contraseña.');
+      if(newPassword!==repeated) throw new Error('Las contraseñas nuevas no coinciden.');
+      await storage.changeIndividualPassword(password,newPassword);
+    }
+    const session=await storage.fetchAuthSession();
+    currentAuthSession=session?.authenticated&&session?.userId?session:null;
+    const roles=Array.isArray(currentAuthSession?.roles)?currentAuthSession.roles:[];
+    canAdmin=roles.includes('admin');
+    canSuperAdmin=roles.includes('superadmin');
+    isAdmin=false;
+    isSuperAdmin=SUPERADMIN_ENABLED&&canSuperAdmin;
+    await loadAuthenticatedTeacherIdentity(!roles.includes('teacher'));
+  }catch(error){
+    passwordInput.value='';
+    showToast(error?.status===401?'Credenciales incorrectas.':(error?.message||'No se pudo iniciar la sesión.'),'error');
+    return;
+  }
   teacherDay=day;
   teacherWeekOffset=weekOffset;
-  teacherIdentityConfirmedFor=nombre;
-  persistTeacherUser(nombre);
-  persistTeacherRecents([nombre,...teacherRecents.filter(item=>!sameNormalizedText(item,nombre))]);
-  teacherRecents=loadTeacherRecents();
   closeTeacherAccess();
-  closeTeacherPanel();
-  syncTeacherIdentity();
-  document.getElementById('teacherOverlay').classList.add('open');
-  document.getElementById('teacherBar').classList.add('show');
-  syncAppModeClasses();
-  renderTeacherPanel();
+  refreshAccessUi();
+  backendHydrated=false;
+  await hydrateFromBackend();
+  if(teacherName) openTeacherPanel();
+  else showToast('Sesión iniciada. Esta cuenta no tiene perfil docente.','info');
 }
 function openTeacherPanelFallback(){
-  teacherName=teacherName||ALL_PROFESORES[0]||'';
+  return openTeacherAccess();
+}
+async function openTeacherPanel(){
+  if(!currentAuthSession?.authenticated) return openTeacherAccess();
+  if(!getProfesor(teacherName)&&!await loadAuthenticatedTeacherIdentity(false)) return false;
+  isAdmin=false;
+  isSuperAdmin=false;
   teacherDay=day;
   teacherWeekOffset=weekOffset;
   syncTeacherIdentity();
   document.getElementById('teacherOverlay').classList.add('open');
   document.getElementById('teacherBar').classList.add('show');
+  refreshAccessUi();
   syncAppModeClasses();
   renderTeacherPanel();
+  return true;
 }
-function openTeacherPanel(){if(!getProfesor(teacherName)){openTeacherAccess();return;}teacherDay=day;teacherWeekOffset=weekOffset;syncTeacherIdentity();document.getElementById('teacherOverlay').classList.add('open');document.getElementById('teacherBar').classList.add('show');syncAppModeClasses();renderTeacherPanel();}
 function closeTeacherPanel(){document.getElementById('teacherOverlay').classList.remove('open');syncAppModeClasses();}
 function bgTeacherClose(event){if(event?.target?.id==='teacherOverlay') closeTeacherPanel();}
 function exitTeacherMode(){
   closeTeacherPanel();
-  closeTeacherAccess();
-  teacherName='';
-  clearTeacherIdentityConfirmation();
-  persistTeacherUser('');
-  document.getElementById('teacherBar').classList.remove('show');
-  syncTeacherIdentity();
   syncAppModeClasses();
 }
 function setTeacherDay(dia){teacherDay=dia;renderTeacherPanel();}
@@ -7197,6 +7221,7 @@ async function toggleTeacherPatioTeamMeeting(dia,hora){
         dia,
         hora,
         profesor:teacherName,
+        sourceCode:authenticatedTeacherSourceCode,
         reason:'equipo-docente',
         note:''
       }
@@ -7206,7 +7231,16 @@ async function toggleTeacherPatioTeamMeeting(dia,hora){
   renderTeacherPanel();
   renderGuardiaBoard();
   renderTable();
-  const syncResult=await syncPatioTeacherBlocksState();
+  const syncResult=await syncPatioTeacherBlocksState({
+    weekKey:getTeacherSelectedWeekKey(),
+    dia,
+    hora,
+    profesor:teacherName,
+    sourceCode:authenticatedTeacherSourceCode,
+    reason:'equipo-docente',
+    note:'',
+    active:!current
+  });
   showToast(
     current
       ? 'Bloqueo de patio retirado.'
@@ -8348,31 +8382,9 @@ if(futureAbsenceAdminTeacherFilterInput){
 }
 const teacherLoginInput=document.getElementById('teacherLoginName');
 if(teacherLoginInput){
-  teacherLoginInput.addEventListener('input',handleTeacherAccessInput);
-  teacherLoginInput.addEventListener('change',handleTeacherAccessInput);
-  teacherLoginInput.addEventListener('focus',()=>renderTeacherAccessSuggestions(true));
-  teacherLoginInput.addEventListener('click',()=>renderTeacherAccessSuggestions(true));
-  teacherLoginInput.addEventListener('keydown',handleTeacherAccessKeydown);
-  teacherLoginInput.addEventListener('blur',()=>window.setTimeout(closeTeacherAccessSuggestions,120));
+  teacherLoginInput.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();loginTeacher();}});
 }
-const teacherAccessSuggestions=document.getElementById('teacherAccessSuggestions');
-if(teacherAccessSuggestions){
-  teacherAccessSuggestions.addEventListener('pointerdown',event=>{
-    const button=event.target.closest('[data-teacher-name]');
-    if(!button) return;
-    event.preventDefault();
-    selectTeacherAccessSuggestion(button.dataset.teacherName||'');
-  });
-}
-const teacherAccessRecent=document.getElementById('teacherAccessRecent');
-if(teacherAccessRecent){
-  teacherAccessRecent.addEventListener('pointerdown',event=>{
-    const button=event.target.closest('[data-teacher-name]');
-    if(!button) return;
-    event.preventDefault();
-    selectTeacherAccessSuggestion(button.dataset.teacherName||'');
-  });
-}
+document.getElementById('teacherLoginPassword')?.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();loginTeacher();}});
 const restoreSnapshotInput=document.getElementById('restoreSnapshotInput');
 if(restoreSnapshotInput){
   restoreSnapshotInput.addEventListener('change',event=>{
@@ -8458,9 +8470,17 @@ document.addEventListener('visibilitychange',()=>{
   }
 });
 window.addEventListener('guardias-auth-invalid',()=>{
-  if(!isAdmin&&!isSuperAdmin) return;
+  if(!currentAuthSession?.authenticated&&!isAdmin&&!isSuperAdmin) return;
+  currentAuthSession=null;
+  canAdmin=false;
+  canSuperAdmin=false;
   isAdmin=false;
   isSuperAdmin=false;
+  teacherName='';
+  authenticatedTeacherSourceCode='';
+  teacherIdentityConfirmedFor='';
+  closeTeacherPanel();
+  document.getElementById('teacherBar')?.classList.remove('show');
   refreshAccessUi();
   renderTable();
   showToast('La sesi\u00f3n ha caducado.','error');

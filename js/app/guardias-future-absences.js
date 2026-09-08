@@ -260,6 +260,7 @@
     return {
       id: cleanText(row && row.id),
       profesor: resolveTeacherCanonicalName(row && row.profesor) || cleanText(row && row.profesor),
+      sourceCode: cleanText(row && (row.sourceCode || row.source_code)).toUpperCase(),
       date: cleanText(row && row.date),
       note: cleanText(row && row.note),
       hours: normalizeHours(row && row.hours),
