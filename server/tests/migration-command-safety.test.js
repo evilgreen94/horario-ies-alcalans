@@ -52,7 +52,11 @@ async function testInitDbDoesNotRunWeeklyMaintenance() {
       );
       assert.deepEqual(
         (await migrated.all('SELECT name FROM schema_migrations ORDER BY name')).map(row => row.name),
-        ['001_individual_teacher_auth.sql', '002_academic_schedule_model.sql']
+        [
+          '001_individual_teacher_auth.sql',
+          '002_academic_schedule_model.sql',
+          '003_final_session_security_and_schedule_types.sql'
+        ]
       );
     } finally {
       await migrated.close();

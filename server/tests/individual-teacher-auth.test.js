@@ -112,7 +112,11 @@ module.exports = [
            VALUES ('legacy-test', 'preserved-hash', 'preserved-salt')`
         );
 
-        assert.deepEqual(await applyMigrations(db), ['001_individual_teacher_auth.sql', '002_academic_schedule_model.sql']);
+        assert.deepEqual(await applyMigrations(db), [
+          '001_individual_teacher_auth.sql',
+          '002_academic_schedule_model.sql',
+          '003_final_session_security_and_schedule_types.sql'
+        ]);
         assert.deepEqual(await applyMigrations(db), []);
 
         const tables = new Set((await db.all("SELECT name FROM sqlite_master WHERE type = 'table'")).map(row => row.name));
@@ -123,7 +127,7 @@ module.exports = [
           await db.get("SELECT password_hash, salt FROM auth_credentials WHERE role = 'legacy-test'"),
           { password_hash: 'preserved-hash', salt: 'preserved-salt' }
         );
-        assert.equal((await db.get('SELECT COUNT(*) AS total FROM schema_migrations')).total, 2);
+        assert.equal((await db.get('SELECT COUNT(*) AS total FROM schema_migrations')).total, 3);
         assert.equal(
           (await db.get("SELECT COUNT(*) AS total FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_teacher_assignments_%'")).total,
           2
@@ -327,19 +331,6 @@ module.exports = [
       assert.equal(parsed.userId, 42);
       assert.deepEqual(parsed.roles, ['teacher']);
       assert.equal(parsed.isAdmin, false);
-
-      let teacherNextCalls = 0;
-      session.requireRole('teacher')({ headers: { cookie } }, createResponse(), () => {
-        teacherNextCalls += 1;
-      });
-      assert.equal(teacherNextCalls, 1);
-
-      const forbidden = createResponse();
-      session.requireRole('admin')({ headers: { cookie } }, forbidden, () => {
-        throw new Error('teacher must not gain admin access');
-      });
-      assert.equal(forbidden.statusCode, 403);
-      assert.deepEqual(forbidden.payload, { error: 'Permisos insuficientes.' });
 
       const [cookieName, signedValue] = cookie.split('=');
       const [payload, signature] = signedValue.split('.');

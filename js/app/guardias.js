@@ -134,10 +134,13 @@ function parseSesion(item){
   const texto=cleanText(item.texto);
   const aula=cleanText(item.aula);
   const partes=texto.split('|').map(parte=>cleanText(parte)).filter(Boolean);
-  if(isGuardiaTexto(texto)) return {tipo:'guardia',materia:'Guardia',detalle:'Guardia',grupo:'',aula:aula||''};
-  if(partes.length>=3) return {tipo:'clase',materia:partes[0],grupo:partes[1],detalle:texto,aula:aula||partes[2]||''};
-  if(partes.length===2) return {tipo:'clase',materia:partes[0],grupo:'',detalle:texto,aula:aula||partes[1]||''};
-  return {tipo:'clase',materia:partes[0]||texto||'Sesión',grupo:'',detalle:texto||'Sesión',aula:aula||''};
+  const canonicalType=cleanText(item.sessionType).toLowerCase();
+  const coverage=item.automaticCoverageRequired!==false;
+  if(canonicalType==='guardia'||isGuardiaTexto(texto)) return {tipo:'guardia',materia:'Guardia',detalle:'Guardia',grupo:'',aula:aula||'',automaticCoverageRequired:false};
+  if(canonicalType&&canonicalType!=='class') return {tipo:canonicalType,materia:partes[0]||texto||'Sesión',detalle:texto||'Sesión',grupo:'',aula:aula||'',automaticCoverageRequired:coverage};
+  if(partes.length>=3) return {tipo:'clase',materia:partes[0],grupo:partes[1],detalle:texto,aula:aula||partes[2]||'',automaticCoverageRequired:coverage};
+  if(partes.length===2) return {tipo:'clase',materia:partes[0],grupo:'',detalle:texto,aula:aula||partes[1]||'',automaticCoverageRequired:coverage};
+  return {tipo:'clase',materia:partes[0]||texto||'Sesión',grupo:'',detalle:texto||'Sesión',aula:aula||'',automaticCoverageRequired:coverage};
 }
 function buildProfesoradoData(){
   const profesoresBase={};
@@ -1781,7 +1784,7 @@ function getPatioTeacherAssignmentsForSlot(dia,hora,weekKey=getSelectedWeekKey()
   }));
 }
 function getPatioUnallocatedDutiesForSlot(dia,hora,weekKey=getSelectedWeekKey()){
-  return (getPatioSlotConfigForWeek(dia,hora,weekKey).duties||[]).filter(duty=>!duty.positionId);
+  return (getPatioSlotConfigForWeek(dia,hora,weekKey).duties||[]).filter(duty=>!duty.positionId&&!duty.fixedPost);
 }
 function getTeacherPatioAssignmentsForSlot(profesor,dia,hora,weekKey=getSelectedWeekKey()){
   const canonical=resolveTeacherCanonicalName(profesor);
@@ -1811,11 +1814,12 @@ function getTeacherPatioAssignmentsForSlot(profesor,dia,hora,weekKey=getSelected
       positionId:'',
       teachers:[canonical],
       responsable:canonical,
-      label:'Sin puesto asignado',
+      label:item.fixedPost||'Sin puesto asignado',
       dutyLabel:item.label,
       kind:item.kind,
       sourceCode:item.sourceCode,
-      unallocated:true
+      fixedPost:item.fixedPost||'',
+      unallocated:!item.fixedPost
     }));
   return [...positioned,...unallocated];
 }
@@ -1948,7 +1952,18 @@ function getPatioExtraPostsForSlot(dia,hora,weekKey=getSelectedWeekKey()){
     statusKind:'pending',
     statusLabel:'Sin puesto'
   }));
-  return normalizePatioExtraPosts([...configured,...unresolved]);
+  const fixed=(getPatioSlotConfigForWeek(dia,hora,weekKey).duties||[])
+    .filter(duty=>!duty.positionId&&duty.fixedPost)
+    .map(duty=>({
+      id:`fixed-${duty.kind}-${duty.sourceCode}`,
+      label:duty.kind==='library'?'Biblioteca patio':duty.label,
+      responsable:getVisibleTeacherName(duty.teacherName),
+      covered:true,
+      note:duty.label,
+      statusKind:'covered',
+      statusLabel:`Puesto fijo: ${duty.fixedPost}`
+    }));
+  return normalizePatioExtraPosts([...configured,...fixed,...unresolved]);
 }
 function isSchoolSlotActiveNow(targetDay,targetHora){
   const {hours,minutes,date}=formatNowParts();
@@ -2374,7 +2389,8 @@ function normalizePatioSlotDuties(rows){
     const kind=['patio','library','other'].includes(cleanText(row?.kind).toLowerCase())?cleanText(row.kind).toLowerCase():'other';
     const label=cleanText(row?.label)||(kind==='library'?'BIBLIOTECA PATI':'GUÀRDIES PATI');
     const positionId=cleanText(row?.positionId).toLowerCase();
-    return identity?{...identity,kind,label,positionId}:null;
+    const fixedPost=cleanText(row?.fixedPost);
+    return identity?{...identity,kind,label,positionId,fixedPost}:null;
   }).filter(Boolean);
 }
 function normalizePatioSlotConfig(source,dayIndex,hora,legacyDays={},defaultPositions=PATIO_SECTORS){
@@ -2620,6 +2636,7 @@ function resolveTeacherSession(nombre,dia,hora){
 function doesAbsenceNeedCoverage(ausente,dia,hora){
   const session=resolveTeacherSession(ausente,dia,hora);
   if(session?.grupo&&!isGroupCurrentlyActive(session.grupo)) return false;
+  if(session?.automaticCoverageRequired===false) return false;
   return session?.tipo!=='guardia';
 }
 function rowNeedsCoverage(row){
@@ -2741,6 +2758,8 @@ let realtimeSyncChannel=null;
 let superAdminOpsInfo=null;
 let superAdminOpsLoading=false;
 let superAdminOpsLastFetchAt='';
+let superAdminUsers=[];
+let superAdminUsersTimer=null;
 const superAdminStatus={
   lastAdminSyncAt:'',
   lastTeacherSyncAt:'',
@@ -3352,6 +3371,75 @@ async function refreshSuperAdminOps(force){
     superAdminOpsLoading=false;
     renderSuperAdminMonitor();
   }
+}
+async function refreshSuperAdminUsers(){
+  if(!isSuperAdmin||!storage.hasBackend()) return;
+  clearTimeout(superAdminUsersTimer);
+  superAdminUsersTimer=setTimeout(async()=>{
+    const list=document.getElementById('superAdminUserList');
+    try{
+      const query=document.getElementById('superAdminUserSearch')?.value||'';
+      const result=await storage.fetchUsers(query);
+      superAdminUsers=Array.isArray(result?.users)?result.users:[];
+      if(list) list.innerHTML=superAdminUsers.length?superAdminUsers.map(user=>`
+        <article class="superadmin-user-row">
+          <div class="superadmin-user-main"><div><strong>${escapeHtml(user.displayName||user.username)}</strong><div class="superadmin-user-meta">${escapeHtml(user.username)} · ${escapeHtml((user.roles||[]).join(', ')||'sin rol')} · ${escapeHtml((user.sourceCodes||[]).join(', '))}</div></div><span class="superadmin-pill ${user.active?'superadmin-pill-ok':'superadmin-pill-warn'}">${user.active?'Activa':'Desactivada'}</span></div>
+          <div class="superadmin-user-actions">
+            <button class="btn-add btn-add-secondary" type="button" onclick="resetUserPasswordFlow(${Number(user.id)})">Resetear contraseña</button>
+            <button class="btn-add btn-add-secondary" type="button" onclick="revokeUserSessionsFlow(${Number(user.id)})">Revocar sesiones</button>
+            <button class="btn-add btn-add-secondary" type="button" onclick="setUserRolesFlow(${Number(user.id)})">Gestionar roles</button>
+            <button class="btn-add btn-add-secondary" type="button" onclick="showUserAuditFlow(${Number(user.id)})">Ver auditoría</button>
+            <button class="btn-add btn-add-secondary" type="button" onclick="setUserActiveFlow(${Number(user.id)},${user.active?'false':'true'})">${user.active?'Desactivar':'Activar'}</button>
+          </div>
+        </article>`).join(''):'<div class="superadmin-user-meta">No hay cuentas que coincidan.</div>';
+    }catch(error){if(list) list.textContent=error.message||'No se pudieron cargar los usuarios.';}
+  },180);
+}
+async function createUserFlow(){
+  if(!isSuperAdmin) return;
+  const username=window.prompt('Nombre de usuario'); if(!username) return;
+  const displayName=window.prompt('Nombre visible'); if(!displayName) return;
+  const role=window.prompt('Rol inicial: teacher, admin o superadmin','teacher'); if(!role) return;
+  try{
+    const result=await storage.createUser({username,displayName,roles:[role]});
+    window.prompt('Contraseña temporal (se muestra una sola vez). El usuario deberá cambiarla al iniciar sesión.',result.temporaryPassword||'');
+    refreshSuperAdminUsers();
+  }catch(error){showToast(error.message||'No se pudo crear la cuenta.','error');}
+}
+async function resetUserPasswordFlow(userId){
+  if(!await askConfirm('Resetear contraseña','Se invalidarán todas las sesiones y se generará una contraseña temporal.','Resetear')) return;
+  try{
+    const result=await storage.resetUserPassword(userId);
+    window.prompt('Contraseña temporal (se muestra una sola vez).',result.temporaryPassword||'');
+    refreshSuperAdminUsers();
+  }catch(error){showToast(error.message||'No se pudo resetear la contraseña.','error');}
+}
+async function revokeUserSessionsFlow(userId){
+  if(!await askConfirm('Revocar sesiones','Las sesiones actuales de esta cuenta dejarán de ser válidas.','Revocar')) return;
+  try{await storage.revokeUserSessions(userId);showToast('Sesiones revocadas.','success');refreshSuperAdminUsers();}
+  catch(error){showToast(error.message||'No se pudieron revocar las sesiones.','error');}
+}
+async function setUserActiveFlow(userId,active){
+  if(!await askConfirm(active?'Activar cuenta':'Desactivar cuenta',active?'La cuenta podrá volver a iniciar sesión.':'La cuenta perderá acceso inmediatamente.',active?'Activar':'Desactivar')) return;
+  try{await storage.setUserActive(userId,active);refreshSuperAdminUsers();}
+  catch(error){showToast(error.message||'No se pudo cambiar el estado.','error');}
+}
+async function setUserRolesFlow(userId){
+  const user=superAdminUsers.find(item=>Number(item.id)===Number(userId));
+  if(!user) return;
+  const value=window.prompt('Roles separados por coma: teacher, admin, superadmin',(user.roles||[]).join(','));
+  if(!value) return;
+  const roles=value.split(',').map(item=>item.trim()).filter(Boolean);
+  if(!await askConfirm('Cambiar roles',`Roles nuevos: ${roles.join(', ')}`,'Confirmar')) return;
+  try{await storage.setUserRoles(userId,roles);refreshSuperAdminUsers();}
+  catch(error){showToast(error.message||'No se pudieron cambiar los roles.','error');}
+}
+async function showUserAuditFlow(userId){
+  try{
+    const result=await storage.fetchUserAudit(userId);
+    const summary=(result.events||[]).slice(0,20).map(event=>`${event.created_at} · ${event.action} · ${event.outcome}`).join('\n')||'Sin eventos.';
+    window.alert(summary);
+  }catch(error){showToast(error.message||'No se pudo consultar la auditoría.','error');}
 }
 function pushSuperAdminEvent(type,message){
   superAdminEvents.unshift({
@@ -5131,6 +5219,7 @@ function refreshAccessUi(){
   renderSuperAdminMonitor();
   if(isSuperAdmin){
     refreshSuperAdminOps(false);
+    refreshSuperAdminUsers();
   }
 }
 function setSuperAdminHint(message,type){
@@ -5858,12 +5947,19 @@ async function importAnnualXmlFile(file){
     'Importar XML'
   );
   if(!confirmed) return;
+  const academicYear=window.prompt('Curso académico obligatorio (AAAA/AA)', '2026/27');
+  if(!academicYear) return;
   const saveTs=document.getElementById('saveTs');
   const previousStatus=saveTs?.textContent||'';
   try{
     if(saveTs) saveTs.textContent=`Importando ${file.name}...`;
-    const xmlText=await file.text();
-    const result=await storage.importAnnualXml(file.name,xmlText);
+    const xmlBase64=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');
+      reader.onerror=()=>reject(reader.error||new Error('No se pudo leer el XML.'));
+      reader.readAsDataURL(file);
+    });
+    const result=await storage.importAnnualXml(file.name,xmlBase64,academicYear);
     const summary=`XML validado en SQLite · ${result?.teachers ?? 0} profesores · ${result?.sessions ?? 0} sesiones · dataset ${result?.datasetId || '-'}`;
     if(saveTs) saveTs.textContent=summary;
     showToast('Dataset validado. Debe activarlo una cuenta superadmin para usarlo.','success');

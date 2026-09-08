@@ -66,7 +66,8 @@ function serializeSessionCookie(subject, req) {
       username,
       displayName: String(subject?.displayName || '').trim(),
       roles,
-      role: getPrimaryRole(roles)
+      role: getPrimaryRole(roles),
+      sessionVersion: Number(subject?.sessionVersion || 1)
     };
   }
 
@@ -121,6 +122,7 @@ function readSessionFromRequest(req) {
         displayName: String(parsed.displayName || ''),
         roles,
         role,
+        sessionVersion: Number(parsed.sessionVersion || 0),
         isAdmin: roles.includes('admin') || roles.includes('superadmin'),
         isSuperAdmin: roles.includes('superadmin')
       };
@@ -135,23 +137,79 @@ function readSessionFromRequest(req) {
   }
 }
 
-function requireAuthenticated(req, res, next) {
+function validateSessionFromRequest(req, options = {}) {
   const session = readSessionFromRequest(req);
-  if (!session) {
-    return res.status(401).json({ error: 'Sesion no valida.' });
-  }
+  if (!session || !session.userId) return session;
+  return (async () => {
+    const { getDatabase } = require('./db');
+    const db = await getDatabase();
+    const row = await db.get(
+      `SELECT u.id, u.username, u.display_name, u.is_active, u.session_version,
+              u.must_change_password, GROUP_CONCAT(r.key, ',') AS role_keys
+       FROM users u
+       LEFT JOIN user_roles ur ON ur.user_id = u.id
+       LEFT JOIN roles r ON r.id = ur.role_id
+       WHERE u.id = ?
+       GROUP BY u.id`,
+      [session.userId]
+    );
+    const roles = String(row?.role_keys || '').split(',').map(value => value.trim()).filter(Boolean);
+    if (!row || !row.is_active || !roles.length || Number(row.session_version) !== Number(session.sessionVersion)) {
+      return null;
+    }
+    const role = getPrimaryRole(roles);
+    return {
+      userId: row.id,
+      username: row.username,
+      displayName: row.display_name,
+      roles,
+      role,
+      sessionVersion: Number(row.session_version),
+      mustChangePassword: !!row.must_change_password,
+      passwordChangeOnly: !!row.must_change_password && !options.allowPasswordChange,
+      isAdmin: roles.includes('admin') || roles.includes('superadmin'),
+      isSuperAdmin: roles.includes('superadmin')
+    };
+  })();
+}
+
+function rejectForcedPasswordChange(session, res) {
+  if (!session?.passwordChangeOnly) return false;
+  res.status(403).json({
+    error: 'Debes cambiar la contraseña temporal antes de continuar.',
+    code: 'PASSWORD_CHANGE_REQUIRED'
+  });
+  return true;
+}
+
+function finishAuthentication(session, req, res, next) {
+  if (!session) return res.status(401).json({ error: 'Sesion no valida.' });
+  if (rejectForcedPasswordChange(session, res)) return undefined;
+  req.sessionUser = session;
+  return next();
+}
+
+function requireAuthenticated(req, res, next) {
+  const session = validateSessionFromRequest(req);
+  return session instanceof Promise
+    ? session.then(value => finishAuthentication(value, req, res, next)).catch(next)
+    : finishAuthentication(session, req, res, next);
+}
+
+async function requireAuthenticatedForPasswordChange(req, res, next) {
+  const session = await validateSessionFromRequest(req, { allowPasswordChange: true });
+  if (!session) return res.status(401).json({ error: 'Sesion no valida.' });
   req.sessionUser = session;
   next();
 }
 
 function requireRole(role) {
   return (req, res, next) => {
-    const session = readSessionFromRequest(req);
-    if (!session) {
-      return res.status(401).json({ error: 'Sesion no valida.' });
-    }
+    const authorize = session => {
+      if (!session) return res.status(401).json({ error: 'Sesion no valida.' });
+      if (rejectForcedPasswordChange(session, res)) return undefined;
     const allowed = role === 'admin'
-      ? session.isAdmin
+      ? (session.userId ? session.roles.includes('admin') : session.isAdmin)
       : role === 'superadmin'
         ? session.isSuperAdmin
         : Array.isArray(session.roles) && session.roles.includes(role);
@@ -159,7 +217,10 @@ function requireRole(role) {
       return res.status(403).json({ error: 'Permisos insuficientes.' });
     }
     req.sessionUser = session;
-    next();
+      return next();
+    };
+    const session = validateSessionFromRequest(req);
+    return session instanceof Promise ? session.then(authorize).catch(next) : authorize(session);
   };
 }
 
@@ -169,6 +230,8 @@ module.exports = {
   getSessionSecret,
   readSessionFromRequest,
   requireAuthenticated,
+  requireAuthenticatedForPasswordChange,
   requireRole,
-  serializeSessionCookie
+  serializeSessionCookie,
+  validateSessionFromRequest
 };

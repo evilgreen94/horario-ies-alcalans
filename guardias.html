@@ -217,6 +217,19 @@
         </div>
         <div class="superadmin-ops-list" id="superAdminOpsList"></div>
       </section>
+      <section class="superadmin-panel superadmin-panel-users">
+        <div class="superadmin-section-head">
+          <div>
+            <div class="superadmin-section-title">Usuarios</div>
+            <div class="superadmin-section-copy">Cuentas y credenciales. Las contrase&ntilde;as actuales nunca son visibles.</div>
+          </div>
+          <button class="btn-add btn-add-secondary btn-add-compact" type="button" onclick="createUserFlow()">Crear cuenta</button>
+        </div>
+        <div class="superadmin-user-search">
+          <input id="superAdminUserSearch" type="search" placeholder="Buscar usuario o nombre" oninput="refreshSuperAdminUsers()">
+        </div>
+        <div class="superadmin-user-list" id="superAdminUserList"></div>
+      </section>
       <section class="superadmin-panel">
         <div class="superadmin-section-head">
           <div>

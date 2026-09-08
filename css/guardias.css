@@ -4309,3 +4309,12 @@ tbody td:nth-child(7) {
   .teacher-bar .btn-teacher { flex-basis: 100%; }
   .admin-status { min-height: 0; }
 }
+
+.superadmin-user-search { margin: .8rem 0; }
+.superadmin-user-search input { width: 100%; padding: .7rem .8rem; border: 1px solid #c7d2cc; border-radius: .65rem; font: inherit; }
+.superadmin-user-list { display: grid; gap: .65rem; }
+.superadmin-user-row { border: 1px solid #d9e1dc; border-radius: .8rem; padding: .75rem; display: grid; gap: .45rem; }
+.superadmin-user-main { display: flex; justify-content: space-between; gap: .75rem; align-items: start; }
+.superadmin-user-meta { color: #607069; font-size: .82rem; }
+.superadmin-user-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.superadmin-user-actions button { font-size: .78rem; padding: .45rem .65rem; }

@@ -399,7 +399,7 @@ async function testWeeklyReset() {
     assert.strictEqual(after.grupos_estado, 1);
     assert.strictEqual(after.auth_credentials, 2);
     assert.strictEqual(after.roles, 3);
-    assert.strictEqual(after.schema_migrations, 2);
+    assert.strictEqual(after.schema_migrations, 3);
     for (const table of ['users', 'user_roles', 'teacher_profiles', 'teacher_assignments', 'audit_log']) {
       assert.strictEqual(after[table], before[table], `${table} should survive weekly maintenance`);
     }

@@ -25,6 +25,16 @@
       </form>
     </section>
 
+    <section id="passwordChangePanel" class="card auth-card" hidden>
+      <h2>Cambia la contrase&ntilde;a temporal</h2>
+      <p class="muted">El acceso al resto de ARGOS permanecer&aacute; bloqueado hasta que elijas una contrase&ntilde;a privada.</p>
+      <form id="passwordChangeForm">
+        <label>Contrase&ntilde;a temporal<input id="currentPassword" type="password" autocomplete="current-password" minlength="6" required></label>
+        <label>Nueva contrase&ntilde;a<input id="newPassword" type="password" autocomplete="new-password" minlength="12" required></label>
+        <button type="submit">Guardar contrase&ntilde;a</button>
+      </form>
+    </section>
+
     <section id="schedulePanel" hidden>
       <article class="card now-card">
         <div>

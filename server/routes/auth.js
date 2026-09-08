@@ -5,7 +5,8 @@ const { appendAuditEvent } = require('../audit');
 const {
   clearSessionCookieHeader,
   readSessionFromRequest,
-  requireAuthenticated,
+  requireAuthenticatedForPasswordChange,
+  validateSessionFromRequest,
   serializeSessionCookie
 } = require('../session');
 
@@ -87,6 +88,8 @@ async function findIndividualUser(db, username) {
        u.password_hash,
        u.password_salt,
        u.is_active,
+       u.session_version,
+       u.must_change_password,
        GROUP_CONCAT(r.key, ',') AS role_keys
      FROM users u
      LEFT JOIN user_roles ur ON ur.user_id = u.id
@@ -110,8 +113,13 @@ async function auditAuthentication(db, event) {
   }
 }
 
-router.get('/session', (req, res) => {
-  const session = readSessionFromRequest(req);
+router.get('/session', async (req, res, next) => {
+  let session;
+  try {
+    session = await validateSessionFromRequest(req, { allowPasswordChange: true });
+  } catch (error) {
+    return next(error);
+  }
   if (!session) {
     return res.json({ authenticated: false, role: null, isAdmin: false, isSuperAdmin: false });
   }
@@ -155,7 +163,8 @@ router.post('/login', async (req, res, next) => {
         userId: user.id,
         username: user.username,
         displayName: user.display_name,
-        roles: user.roles
+        roles: user.roles,
+        sessionVersion: user.session_version
       };
       res.setHeader('Set-Cookie', serializeSessionCookie(identity, req));
       const session = readSessionFromRequest({ headers: { cookie: res.getHeader('Set-Cookie').split(';')[0] } });
@@ -165,7 +174,7 @@ router.post('/login', async (req, res, next) => {
         targetType: 'user',
         targetId: String(user.id)
       });
-      return res.json({ ok: true, ...session });
+      return res.json({ ok: true, ...session, mustChangePassword: !!user.must_change_password });
     }
 
     const role = normalizeRole(req.body?.role);
@@ -202,7 +211,7 @@ router.post('/logout', (_req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/change-password', requireAuthenticated, async (req, res, next) => {
+router.post('/change-password', requireAuthenticatedForPasswordChange, async (req, res, next) => {
   try {
     const currentPassword = ensurePassword(req.body?.currentPassword, 'currentPassword');
     const newPassword = ensurePassword(req.body?.newPassword, 'newPassword');
@@ -214,7 +223,7 @@ router.post('/change-password', requireAuthenticated, async (req, res, next) => 
       }
       const db = await getDatabase();
       const row = await db.get(
-        'SELECT password_hash, password_salt FROM users WHERE id = ? AND is_active = 1',
+        'SELECT password_hash, password_salt, session_version FROM users WHERE id = ? AND is_active = 1',
         [req.sessionUser.userId]
       );
       if (!row || !verifyPassword(currentPassword, row.password_salt, row.password_hash)) {
@@ -223,7 +232,8 @@ router.post('/change-password', requireAuthenticated, async (req, res, next) => 
       const { salt, hash } = hashPassword(newPassword);
       await db.run(
         `UPDATE users
-         SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP
+         SET password_hash = ?, password_salt = ?, must_change_password = 0,
+             session_version = session_version + 1, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
         [hash, salt, req.sessionUser.userId]
       );
@@ -233,7 +243,14 @@ router.post('/change-password', requireAuthenticated, async (req, res, next) => 
         targetType: 'user',
         targetId: String(req.sessionUser.userId)
       });
-      return res.json({ ok: true });
+      const refreshed = {
+        ...req.sessionUser,
+        sessionVersion: Number(row.session_version) + 1
+      };
+      delete refreshed.passwordChangeOnly;
+      delete refreshed.mustChangePassword;
+      res.setHeader('Set-Cookie', serializeSessionCookie(refreshed, req));
+      return res.json({ ok: true, mustChangePassword: false });
     }
 
     const requestedRole = normalizeRole(req.body?.role || sessionRole);

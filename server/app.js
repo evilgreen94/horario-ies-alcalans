@@ -16,6 +16,7 @@ const authRouter = require('./routes/auth');
 const avisosRouter = require('./routes/avisos');
 const gruposRouter = require('./routes/grupos');
 const scheduleRouter = require('./routes/schedule');
+const { router: usersRouter } = require('./routes/users');
 
 const app = express();
 const HOST = '127.0.0.1';
@@ -156,6 +157,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/avisos', avisosRouter);
 app.use('/api/grupos', gruposRouter);
 app.use('/api/schedule', scheduleRouter);
+app.use('/api/users', usersRouter);
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'guardias.html'));
@@ -173,10 +175,19 @@ app.get('/app', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'app', 'index.html'));
 });
 
-app.use((error, _req, res, _next) => {
-  console.error(error);
-  res.status(error.status || 500).json({
-    error: error.message || 'Internal server error',
+app.use((error, req, res, _next) => {
+  const status = Number(error?.status) || 500;
+  const malformedJson = error?.type === 'entity.parse.failed';
+  const message = malformedJson ? 'JSON inválido.' : (error?.message || 'Internal server error');
+  console.error('[http:error]', {
+    method: req.method,
+    path: req.path,
+    status,
+    type: String(error?.type || error?.code || 'application_error'),
+    message
+  });
+  res.status(status).json({
+    error: message,
     details: error.details || null
   });
 });

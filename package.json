@@ -18,12 +18,16 @@
     "stability:guardias": "node server/scripts/guardias-stability-check.js",
     "course:reset": "node server/scripts/reset-course.js",
     "schedule:prepare": "node server/scripts/prepare-canonical-schedule.js",
+    "schedule:prepare-ghc": "node server/scripts/prepare-ghc-schedule.js",
+    "schedule:reconcile": "node server/scripts/reconcile-annual-sources.js",
     "schedule:activate": "node server/scripts/activate-canonical-schedule.js",
-    "schedule:local-teacher": "node server/scripts/create-local-teacher.js"
+    "schedule:local-teacher": "node server/scripts/create-local-teacher.js",
+    "security:reset-superadmin": "node server/scripts/reset-superadmin.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "fast-xml-parser": "^5.2.5",
     "pdfkit": "^0.17.2",
     "sqlite": "^5.1.1",
     "sqlite3": "^6.0.1"

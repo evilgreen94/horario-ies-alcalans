@@ -302,16 +302,37 @@
     fetchSuperAdminInfo(){
       return request('/export/info');
     },
+    fetchUsers(query=''){
+      return request(`/users?q=${encodeURIComponent(query)}`);
+    },
+    createUser(payload){
+      return request('/users', { method:'POST', body:JSON.stringify(payload) });
+    },
+    resetUserPassword(userId){
+      return request(`/users/${userId}/reset-password`, { method:'POST', body:JSON.stringify({confirm:true}) });
+    },
+    revokeUserSessions(userId){
+      return request(`/users/${userId}/revoke-sessions`, { method:'POST', body:JSON.stringify({confirm:true}) });
+    },
+    setUserActive(userId,active){
+      return request(`/users/${userId}/status`, { method:'PUT', body:JSON.stringify({confirm:true,active}) });
+    },
+    setUserRoles(userId,roles){
+      return request(`/users/${userId}/roles`, { method:'PUT', body:JSON.stringify({confirm:true,roles}) });
+    },
+    fetchUserAudit(userId){
+      return request(`/users/${userId}/audit`);
+    },
     changeRolePassword(role, currentPassword, newPassword){
       return request('/auth/change-password', {
         method: 'POST',
         body: JSON.stringify({ role, currentPassword, newPassword })
       });
     },
-    importAnnualXml(fileName, xmlText){
+    importAnnualXml(fileName, xmlBase64, academicYear){
       return request('/profesorado/annual-import/xml', {
         method: 'POST',
-        body: JSON.stringify({ fileName, xmlText })
+        body: JSON.stringify({ fileName, xmlBase64, academicYear })
       });
     }
   };
