@@ -34,7 +34,8 @@ Nunca imprimir `.env`, cookies, tokens, claves, hashes ni contraseñas.
 
 ## 1. Artefactos preparados localmente
 
-Desde un árbol limpio de `rescue/preproduction-2026-09`:
+Desde el commit limpio y aprobado de `feat/argos-1.0.1-unified-web-auth`, marcado
+con `argos-v1.0.1-rc1`:
 
 ```powershell
 $out = Join-Path $env:TEMP ('guardias-release-' + [guid]::NewGuid().ToString('N'))
@@ -310,6 +311,12 @@ guardias/ausencias sin escribir contraseñas en comandos.
 
 ## 10. Importar, validar y activar el XML oficial
 
+El procedimiento obligatorio es: XML oficial → inspección/parseo → validación
+canónica → importación SQLite como `validated` → informe y diferencias →
+aprobación humana → activación explícita. La importación nunca autoactiva. Si el
+horario cambia durante septiembre, se importa otra versión por el mismo proceso;
+no se edita ni sustituye silenciosamente la activa.
+
 ```bash
 export IMPORT_DIR="/var/tmp/guardias-import-$RELEASE"
 install -d -m 700 "$IMPORT_DIR"
@@ -419,6 +426,20 @@ El XML oficial es primario. Exige curso explícito y `source_code`, rechaza matc
 solo por nombre y queda `validated`. El PDF permanece fuera del servidor como
 contraste independiente. Cualquier XML posterior se importa como nueva versión,
 se reconcilia, se aprueba y solo después se activa con backup preactivación.
+
+### Aprovisionamiento de cuentas
+
+Solo después de aprobar el XML final: obtener sus identidades docentes, exigir
+unos 88 `source_code` únicos, crear o enlazar cada cuenta ARGOS con el perfil del
+curso, asignar `teacher`, generar una contraseña temporal criptográficamente
+aleatoria y exigir cambio en el primer acceso. No derivar claves de nombres, DNI
+o códigos; no guardar texto plano ni escribir credenciales en Git o logs. Una
+exportación temporal solo puede hacerse mediante un proceso seguro aprobado.
+
+Los pocos usuarios de Jefatura reciben `admin`; los de Administración técnica,
+`superadmin`; una cuenta combinada recibe ambos de forma explícita. Ninguno se
+deduce del otro. El reset Superadmin mantiene el cambio forzado y revoca sesiones.
+Detenerse antes de provisionar o asignar roles si no existe aprobación humana.
 
 ## 14. Rollback por dominios
 

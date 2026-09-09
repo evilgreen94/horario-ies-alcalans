@@ -2,8 +2,8 @@
 
 > Documento contextual. Para operar, empezar por [docs/START_HERE.md](docs/START_HERE.md).
 
-ARGOS (Aplicación de Registro y Gestión de Organización y Sustituciones) es el
-producto; Guardias es el módulo actual. La rama de preparación es
+ARGOS / A.R.G.O.S es el producto, sin expansión oficial aprobada; Guardias es el
+módulo actual. ARGOS 1.0.1 es el candidato de despliegue en la rama
 `feat/argos-1.0.1-unified-web-auth`, desde el ARGOS 1.0 congelado en
 `argos-v1.0-rc1`. Producción y su SQLite no se han modificado.
 
@@ -17,8 +17,10 @@ producto; Guardias es el módulo actual. La rama de preparación es
 | Identidad | Cuenta persistente; perfil, identidad externa y asignación por curso/fecha. |
 | Horario | Periodos dinámicos y datasets `draft/validated/active/archived`. |
 | Fuente 2026/27 | XML oficial GHC ISO-8859-1 primario; PDF solo contraste independiente. |
-| Autenticación | Identidad individual compartida por `guardias.html` y `/app/`; Jefatura exige rol `admin` explícito y Superadmin no lo implica. |
+| Autenticación | Una cuenta/sesión compartida por web normal, perfil docente, Jefatura, Administración técnica y `/app/`. |
 | Superadmin | Gestión de cuentas, reset temporal, cambio forzado, auditoría y recuperación break-glass. |
+| Roles | `teacher`, `admin` y `superadmin` independientes; Superadmin no implica Jefatura/admin. |
+| Descubrimiento | Siete pulsaciones sobre ARGOS solo revelan la UI a un Superadmin ya autenticado; el backend decide el permiso. |
 | Despliegue | Redeploy limpio por artefacto Linux offline; nunca upgrade del checkout contaminado. |
 
 ## XML oficial validado localmente
@@ -53,6 +55,7 @@ sin forzar recuentos del PDF.
 
 ## Pendiente antes de producción
 
-- Smoke funcional visual de Rafa con [docs/MANUAL_SMOKE_CHECKLIST.md](docs/MANUAL_SMOKE_CHECKLIST.md).
+- El smoke funcional visual de ARGOS 1.0.1 fue completado y aceptado el 9-09-2026.
 - Auditoría adversarial independiente y certificación de carga hasta 150 usuarios.
-- Aprobar ventana, backup/rollback, XML exacto y activación explícita.
+- Aprobar ventana, backup/rollback, XML final exacto, activación explícita y
+  aprovisionamiento de cuentas/roles.

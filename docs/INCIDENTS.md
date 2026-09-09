@@ -74,6 +74,13 @@ Después comprobar desde el navegador:
 No pegar contraseñas, cookies, hashes o `.env` en diagnósticos. No restablecer
 credenciales desde SQL durante una incidencia rutinaria.
 
+ARGOS 1.0.1 usa la misma cuenta/sesión en la web normal, el perfil docente,
+Jefatura, Administración técnica y `/app/`. Comprobar cada rol por separado:
+`admin` no concede Superadmin y `superadmin` no concede Jefatura. El gesto de
+siete pulsaciones solo descubre el panel a quien ya tiene permiso; nunca corrige
+un problema de autorización. Un login docente correcto sin horario apunta a su
+asignación/`source_code` o al dataset, no a la contraseña.
+
 ## Falta el horario
 
 ```bash

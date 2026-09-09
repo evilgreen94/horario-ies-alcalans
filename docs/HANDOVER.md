@@ -9,6 +9,11 @@ ARGOS es el producto interno y Guardias su módulo actual para horarios, ausenci
 coberturas, tareas y patio. La red entra por Nginx; el proceso Node se llama
 `guardias` en PM2 y usa una base SQLite.
 
+La web normal, el perfil docente, Jefatura, Administración técnica y `/app/`
+comparten cuenta y sesión. `teacher`, `admin` y `superadmin` son permisos
+independientes. Las siete pulsaciones sobre ARGOS solo muestran un acceso a un
+Superadmin ya autorizado; no conceden permisos.
+
 No hay acceso remoto desde fuera de la red escolar y no debe suponerse.
 
 ## 2. ¿Cómo sé si funciona?
@@ -93,6 +98,11 @@ el release no contiene `.git`.
 
 No ejecutes `course:reset`, migraciones, restore, activación de dataset, limpieza
 o `pm2 delete`.
+
+Tampoco importes el XML final, lo actives ni des de alta cuentas sin aprobación.
+El XML debe quedar primero `validated` y revisarse. Las cuentas docentes se
+enlazan por `source_code`, reciben solo `teacher` y una contraseña temporal
+aleatoria con cambio obligatorio; `admin`/`superadmin` se asignan explícitamente.
 
 ## 10. ¿Qué envío si falla?
 

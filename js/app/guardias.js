@@ -455,6 +455,8 @@ function recordArgosDiscoveryActivation(){
   superAdminAccessDiscovered=true;
   try{window.sessionStorage.setItem(SUPERADMIN_DISCOVERY_STORAGE_KEY,String(currentAuthSession.userId));}catch(_error){}
   refreshAccessUi();
+  const displayName=cleanText(currentAuthSession.displayName);
+  showToast(`Modo Superadmin activado${displayName?`\nBienvenido, ${displayName}.`:''}`,'success');
   return true;
 }
 const teacherState={

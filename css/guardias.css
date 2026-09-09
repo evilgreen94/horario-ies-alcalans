@@ -2311,6 +2311,7 @@ tbody td:nth-child(7) {
   font-size: .86rem;
   font-weight: 600;
   line-height: 1.4;
+  white-space: pre-line;
 }
 .toast.is-error { border-color: rgba(217,83,79,0.24); color: #8f2724; background: #fff7f7; }
 .toast.is-success { border-color: rgba(31,157,99,0.24); color: #14663f; background: #f3fbf7; }

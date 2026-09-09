@@ -32,6 +32,10 @@ redeploy. No abrir ni publicar su contenido.
 
 ## Disposición objetivo
 
+ARGOS 1.0.1 es el candidato actual para esta disposición; aún no está instalado
+en producción. El artefacto final debe identificarse por SHA y por el tag anotado
+`argos-v1.0.1-rc1`, sin modificar el rollback `argos-v1.0-rc1` de ARGOS 1.0.
+
 ```text
 /srv/guardias/
 ├── releases/
@@ -74,6 +78,7 @@ activa junto con PM2.
 - `.git`, `.env`, `.ssh`, `.pm2`, `.npm`, cachés, HOME o historial shell;
 - `BD/`, SQLite, WAL/SHM, backups y tarballs antiguos;
 - PDF/censo/XML externos o datos personales;
+- exportaciones de credenciales o contraseñas temporales de aprovisionamiento;
 - `json_profes` y datasets 2025/26 retirados;
 - `node_modules` Windows, tests, temporales o metadatos de editor.
 

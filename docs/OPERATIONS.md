@@ -193,5 +193,16 @@ backup verificado y aprobación humana:
 - ejecutar la recuperación `security:reset-superadmin` (acceso OS, backup,
   usuario explícito y confirmación exacta; la clave temporal se muestra una vez).
 
+También requieren runbook y aprobación separada la importación del XML final,
+su activación y el aprovisionamiento de cuentas. El orden es XML → parseo →
+validación canónica → SQLite `validated` → revisión → aprobación → activación.
+Nunca se autoactiva ni se reconcilia por nombre.
+
+Para altas docentes, verificar `source_code` único, enlazar el perfil del curso,
+asignar solo `teacher`, generar una clave temporal criptográfica y forzar su
+cambio. No registrar ni conservar la clave en texto plano. `admin` (Jefatura) y
+`superadmin` (Administración técnica) se asignan por separado; las cuentas
+combinadas reciben ambos explícitamente y cualquier cambio revoca sesiones.
+
 Nunca probar una operación peligrosa directamente en producción. Primero usar una
 copia SQLite aislada con sufijo `.test.sqlite` o `.tmp.sqlite`.

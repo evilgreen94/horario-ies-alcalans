@@ -6,24 +6,27 @@
 
 1. Finalizar y congelar el RC local: suite, artefacto Linux, extracción limpia,
    smoke HTTP/runtime y Git sincronizado.
-2. Ejecutar el checklist visual manual de Rafa.
-3. Realizar auditoría adversarial independiente y prueba de carga escalonada
+2. Realizar auditoría adversarial independiente y prueba de carga escalonada
    (kiosco, 25, 80, 100 y certificación 150).
-4. Obtener de Jefatura la primera rotación física de `GUÀRDIES PATI`; no bloquea
+3. Obtener de Jefatura la primera rotación física de `GUÀRDIES PATI`; no bloquea
    la corrección del horario ni autoriza inventar puestos.
-5. Aprobar fuente XML, backup, rollback, ventana y activación transaccional.
+4. Aprobar el XML final, backup, rollback, ventana y activación transaccional.
+5. Aprobar el aprovisionamiento de unas 88 cuentas docentes y asignar
+   explícitamente los pocos roles `admin`, `superadmin` o combinados.
 
 ## Después de estabilizar
 
 - Unificar el doble flujo temporal de sustituciones operativas e identidad.
 - Observar latencia, SQLite BUSY/LOCKED, CPU/RAM, backups y reinicios.
 - Alta gradual de cuentas individuales; nunca credenciales masivas improvisadas.
-- Mejoras de UI, PWA, identidad visual ARGOS y eventual rename del repositorio.
+- Mejoras de UI, PWA y eventual rename del repositorio.
 
 ## Completado
 
 - Identidad web individual unificada y navegación por roles en `guardias.html`;
   las operaciones docentes propias se resuelven desde la sesión.
+- Identidad visual ARGOS aprobada, descubrimiento Superadmin sin efecto de
+  autorización y smoke visual manual de ARGOS 1.0.1 completado.
 - Persistencia backend SQLite y retirada de datasets anuales legacy.
 - Modelo anual, perfiles/identidades externas/asignaciones y periodos dinámicos.
 - Importadores PDF y GHC XML al mismo contrato canónico.

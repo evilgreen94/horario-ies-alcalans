@@ -43,6 +43,14 @@ reports. Stop the server and clean up temporary artifacts safely.
   active dataset—never silent legacy fallback.
 - Never log or expose passwords, hashes, salts, cookies, session IDs, tokens, or
   authorization headers.
+- Treat ARGOS 1.0.1 as one account/session system across the normal web,
+  teacher UI, Jefatura, technical administration, and `/app/`. Roles are
+  independent: never infer `admin` from `superadmin`, or identity from a visible
+  name. The seven-click logo gesture is UI discovery only.
+- Timetable XML imports must stop at `validated`; activation and account
+  provisioning require separate human approval. Provision teacher links by
+  unique `source_code`, use random one-time passwords with forced change, and
+  never grant `admin` or `superadmin` implicitly.
 
 ## Browser integration
 

@@ -11,6 +11,7 @@ function createDiscoveryHarness() {
 
   let now = 1000;
   const values = new Map();
+  const toasts = [];
   const context = {
     Date: { now: () => now },
     window: {
@@ -20,6 +21,8 @@ function createDiscoveryHarness() {
         removeItem: key => values.delete(key)
       }
     },
+    showToast: (message, type) => toasts.push({ message, type }),
+    cleanText: value => String(value || '').trim(),
     refreshCount: 0
   };
   vm.createContext(context);
@@ -41,6 +44,7 @@ function createDiscoveryHarness() {
   return {
     api: context.discoveryTestApi,
     values,
+    toasts,
     refreshCount: () => context.refreshCount,
     setNow: value => { now = value; }
   };
@@ -61,13 +65,17 @@ module.exports = [{
     for (let index = 0; index < 7; index += 1) assert.equal(api.activate(), false);
     assert.equal(api.discovered(), false);
 
-    api.setSession({ authenticated: true, userId: 30, roles: ['superadmin'] }, true);
+    api.setSession({ authenticated: true, userId: 30, displayName: 'Super de Prueba', roles: ['superadmin'] }, true);
     for (let index = 0; index < 6; index += 1) assert.equal(api.activate(), false);
     assert.equal(api.count(), 6);
     assert.equal(api.activate(), true);
     assert.equal(api.discovered(), true);
     assert.equal(harness.refreshCount(), 1);
     assert.equal([...harness.values.values()][0], '30');
+    assert.deepEqual(harness.toasts, [{
+      message: 'Modo Superadmin activado\nBienvenido, Super de Prueba.',
+      type: 'success'
+    }]);
 
     api.setSession({ authenticated: true, userId: 30, roles: ['teacher', 'superadmin'] }, true);
     api.restore();

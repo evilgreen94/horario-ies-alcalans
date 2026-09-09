@@ -35,7 +35,7 @@ escribir en rutas administrativas.
 
 ### Jefatura / admin
 
-La sesión `admin` conserva el contrato legacy. Puede gestionar la operación
+Una cuenta individual con rol explícito `admin` puede gestionar la operación
 diaria: ausencias, coberturas, tareas, estados, avisos, importación XML a estado
 `validated` e informes. No puede activar datasets ni descargar/restaurar la
 SQLite completa cuando la ruta exige `superadmin`.
@@ -58,6 +58,13 @@ node server/scripts/reset-superadmin.js --db /ruta/absoluta/guardias.sqlite \
 ```
 
 No es un endpoint HTTP y debe ejecutarse solo tras backup y autorización.
+
+Los roles `teacher`, `admin` y `superadmin` son independientes y pueden
+combinarse solo mediante asignación explícita. `superadmin` no implica `admin`.
+Una única sesión individual sirve `guardias.html`, el perfil, Jefatura,
+Administración técnica y `/app/`. Las siete pulsaciones sobre el logo ARGOS son
+solo descubrimiento visual para un Superadmin ya autenticado: no cambian roles y
+conocer el gesto no evita la autorización del servidor.
 
 ### Sustituto
 
@@ -146,6 +153,8 @@ datos 2025/26.
 El XML GHC oficial usa relaciones e IDs explícitos, `source_code` y su marco de
 periodos. El PDF 2026/27 conserva una plantilla específica de coordenadas para
 contraste. Ambos producen el mismo contrato canónico sin cambiar runtime ni frontends.
+Una revisión posterior del horario en septiembre se importa como un dataset
+nuevo `validated`, se compara y necesita otra aprobación antes de activarse.
 
 ## 6. Modelo canónico de horario
 
@@ -426,10 +435,10 @@ Los comandos concretos están en [INCIDENTS.md](INCIDENTS.md).
 ## 18. Pendientes actuales
 
 - Ejecutar el redeploy limpio controlado y verificar Node/Nginx/PM2/backups.
-- Smoke visual manual previo al despliegue.
 - Configurar la primera rotación física de `GUÀRDIES PATI` suministrada por Jefatura.
-- Definir altas graduales y doble flujo temporal de sustituciones.
-- Ejecutar smoke visual, auditoría adversarial y certificación de carga del RC.
+- Aprobar y ejecutar el alta controlada de cuentas, incluido el reparto explícito
+  de roles administrativos; no crear credenciales antes de esa aprobación.
+- Ejecutar auditoría adversarial y certificación de carga del RC.
 
 ## 19. Modelo mental en una página
 
