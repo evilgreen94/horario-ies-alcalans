@@ -429,17 +429,35 @@ se reconcilia, se aprueba y solo después se activa con backup preactivación.
 
 ### Aprovisionamiento de cuentas
 
-Solo después de aprobar el XML final: obtener sus identidades docentes, exigir
-unos 88 `source_code` únicos, crear o enlazar cada cuenta ARGOS con el perfil del
-curso, asignar `teacher`, generar una contraseña temporal criptográficamente
-aleatoria y exigir cambio en el primer acceso. No derivar claves de nombres, DNI
-o códigos; no guardar texto plano ni escribir credenciales en Git o logs. Una
-exportación temporal solo puede hacerse mediante un proceso seguro aprobado.
+Solo después de aprobar el XML final y el paso de provisión, crear la cuenta
+bootstrap con el CLI versionado y la confirmación operativa exacta:
+
+```bash
+sudo -iu "$APP_USER" bash -lc \
+  "cd '$CURRENT' && ./runtime/node server/scripts/bootstrap-superadmin.js \
+   --db '$DB' --source-code RMLL \
+   --allow-operational-db BOOTSTRAP_APPROVED_SUPERADMIN"
+```
+
+La salida entrega una clave temporal una vez. No capturarla en logs ni historial;
+guardarla solo por el canal privado aprobado y comprobar el cambio obligatorio.
+Repetir el comando debe informar la cuenta existente sin resetearla.
+
+Después, entrar como Superadmin en Usuarios → Crear cuentas del profesorado,
+seleccionar el dataset aprobado y revisar todas las clasificaciones. Cualquier
+`CONFLICT` o `INVALID` bloquea la operación. Tras confirmación, las cuentas nuevas
+reciben únicamente `teacher`; las ya enlazadas se omiten y las históricas se
+enlazan al perfil anual sin cambiar clave ni roles. Descargar el CSV de un solo
+uso desde el navegador, distribuirlo en privado y eliminarlo: el servidor no lo
+persiste. Si se pierde una clave, usar el reset individual; no hay recuperación.
 
 Los pocos usuarios de Jefatura reciben `admin`; los de Administración técnica,
 `superadmin`; una cuenta combinada recibe ambos de forma explícita. Ninguno se
 deduce del otro. El reset Superadmin mantiene el cambio forzado y revoca sesiones.
-Detenerse antes de provisionar o asignar roles si no existe aprobación humana.
+Mantener al menos dos Superadmins activos. Resolver el segundo por identidad
+confirmada, nunca por coincidencia de nombre, y no añadir `admin` salvo aprobación
+explícita. Detenerse antes de provisionar o asignar roles si no existe aprobación
+humana.
 
 ## 14. Rollback por dominios
 

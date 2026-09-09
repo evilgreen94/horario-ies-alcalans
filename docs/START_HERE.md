@@ -7,8 +7,8 @@
 
 ARGOS es el producto interno del IES Alcalans; Guardias es el módulo actual para horarios docentes,
 ausencias, coberturas, tareas, guardias ordinarias, patio y consulta personal.
-ARGOS / A.R.G.O.S no tiene una expansión oficial aprobada. ARGOS 1.0.1 es el
-candidato de despliegue actual.
+ARGOS / A.R.G.O.S no tiene una expansión oficial aprobada. ARGOS 1.0.2 es la
+línea candidata actual; ARGOS 1.0.1 permanece congelado como base aceptada.
 
 La web normal, el perfil docente, Jefatura, Administración técnica y `/app/`
 comparten una cuenta/sesión individual. `teacher`, `admin` y `superadmin` son

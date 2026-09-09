@@ -11,8 +11,8 @@
 3. Obtener de Jefatura la primera rotación física de `GUÀRDIES PATI`; no bloquea
    la corrección del horario ni autoriza inventar puestos.
 4. Aprobar el XML final, backup, rollback, ventana y activación transaccional.
-5. Aprobar el aprovisionamiento de unas 88 cuentas docentes y asignar
-   explícitamente los pocos roles `admin`, `superadmin` o combinados.
+5. Completar el smoke humano del bootstrap/provisionamiento 1.0.2, resolver de
+   forma inequívoca el segundo Superadmin y aprobar su ejecución en la ventana.
 
 ## Después de estabilizar
 
@@ -33,4 +33,6 @@
 - XML oficial ISO-8859-1 por `source_code`, validado sin autoactivación.
 - Semántica final de guardias/patio/biblioteca/Patis Inclusius.
 - Gestión Superadmin segura, cambio forzado y revocación inmediata de sesiones.
+- Bootstrap RMLL explícito e idempotente y provisión transaccional por
+  `source_code`, con preview y credenciales de un solo uso generadas en cliente.
 - Listener loopback, tooling de backup, artefacto Linux offline y redeploy limpio documentado.

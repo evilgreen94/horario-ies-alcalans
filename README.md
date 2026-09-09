@@ -8,7 +8,8 @@ oficial aprobada. Guardias es su módulo actual para organizar ausencias,
 coberturas, tareas del profesorado, guardias ordinarias y obligaciones de patio.
 Incluye la interfaz central `guardias.html` y la vista personal móvil `/app/`.
 
-ARGOS 1.0.1 es el candidato actual de despliegue. Una única cuenta y sesión
+ARGOS 1.0.2 es la línea candidata actual, construida sobre el cierre aceptado de
+ARGOS 1.0.1. Una única cuenta y sesión
 individual sirve la web normal, el perfil docente, Jefatura, Administración
 técnica y `/app/`. Los roles `teacher`, `admin` y `superadmin` son independientes:
 `superadmin` no concede `admin`. La identidad docente se enlaza por `source_code`,
@@ -65,6 +66,9 @@ Scripts relevantes:
   permanece bloqueada incluso con confirmación.
 - `npm run security:reset-superadmin`: recuperación break-glass solo con acceso OS,
   ruta SQLite absoluta y confirmación exacta; la clave temporal se muestra una vez.
+- `npm run security:bootstrap-superadmin -- --db <ruta.test.sqlite> --source-code RMLL`:
+  bootstrap explícito e idempotente de la primera cuenta, siempre sobre una DB
+  indicada y con identidad presente en un dataset `validated` o `active`.
 - `npm run course:reset`: operación destructiva; consultar primero el runbook.
 
 ## Persistencia y fuentes

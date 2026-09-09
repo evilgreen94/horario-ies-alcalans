@@ -47,6 +47,14 @@ ver una contraseña actual. Conserva las operaciones técnicas ya autorizadas
 (salud, backup/restore y activación explícita), pero el rol por sí solo no ofrece
 un editor de sesiones canónicas ni permite saltarse backup o validación.
 
+También puede previsualizar y ejecutar la provisión docente desde un dataset
+`validated` o `active`. La vista clasifica `READY`, `ALREADY_LINKED`, `CONFLICT`
+e `INVALID`, y muestra aparte cuentas docentes sin perfil en el roster elegido.
+Un conflicto bloquea toda la operación. Las cuentas nuevas reciben únicamente
+`teacher`; las existentes conservan contraseña, roles y estado de seguridad.
+Las credenciales nuevas se devuelven una sola vez y el CSV se construye solo en
+el navegador: no se guarda en SQLite, logs, auditoría, backups ni servidor.
+
 El reset genera aleatoriamente una contraseña temporal, persiste solo scrypt,
 incrementa `session_version` y exige cambio propio. La clave se entrega una vez y
 no entra en auditoría/logs. Desactivar, revocar o cambiar roles sensibles también
@@ -58,6 +66,14 @@ node server/scripts/reset-superadmin.js --db /ruta/absoluta/guardias.sqlite \
 ```
 
 No es un endpoint HTTP y debe ejecutarse solo tras backup y autorización.
+
+La primera cuenta puede crearse mediante el CLI explícito e idempotente
+`server/scripts/bootstrap-superadmin.js`, resolviendo un `source_code` único en
+un dataset validado. No existe bypass por código: los permisos proceden de los
+roles almacenados. Perder una clave temporal requiere un reset; ARGOS no ofrece
+recuperación de contraseña. Para evitar un único punto humano de fallo deben
+existir dos Superadmins activos, promoviendo la segunda cuenta solo después de
+confirmar inequívocamente su identidad y sin añadir `admin` por implicación.
 
 Los roles `teacher`, `admin` y `superadmin` son independientes y pueden
 combinarse solo mediante asignación explícita. `superadmin` no implica `admin`.
@@ -341,6 +357,8 @@ cambio de contraseña y logout. No es todavía PWA, offline ni Web Push.
 - `ghc-xml-import.js`, `annual-source.js` y `pdf-schedule-import.js`: adaptadores GHC/XML/PDF.
 - `schedule-source-types.js` y `session-semantics.js`: mapeo y semántica central.
 - `routes/users.js`: administración segura de cuentas Superadmin.
+- `user-provisioning.js`: preview, enlace anual, provisión transaccional y
+  bootstrap explícito de cuentas.
 - rutas `guardias`, `profesorado`, `grupos`, `biblioteca`: operación.
 - rutas `schedule`: dataset activo, compatibilidad, vista personal y activación.
 - rutas `export` y `sqlite-backup.js`: snapshots, SQLite y restore.

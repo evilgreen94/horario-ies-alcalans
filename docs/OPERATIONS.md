@@ -204,5 +204,13 @@ cambio. No registrar ni conservar la clave en texto plano. `admin` (Jefatura) y
 `superadmin` (Administración técnica) se asignan por separado; las cuentas
 combinadas reciben ambos explícitamente y cualquier cambio revoca sesiones.
 
+El bootstrap inicial se ejecuta solo con DB y `source_code` explícitos; una
+segunda ejecución no regenera la clave ni altera roles. La provisión ordinaria se
+hace desde Superadministración → Usuarios → Crear cuentas del profesorado:
+primero preview, después confirmación y, solo si no hay bloqueos, creación
+transaccional. El CSV de claves de un solo uso se descarga en ese momento por un
+canal privado y se elimina tras distribuirlo. Si se pierde una clave se usa
+«Resetear contraseña»; no hay recuperación de contraseñas.
+
 Nunca probar una operación peligrosa directamente en producción. Primero usar una
 copia SQLite aislada con sufijo `.test.sqlite` o `.tmp.sqlite`.

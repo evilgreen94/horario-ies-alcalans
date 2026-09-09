@@ -3,9 +3,10 @@
 > Documento contextual. Para operar, empezar por [docs/START_HERE.md](docs/START_HERE.md).
 
 ARGOS / A.R.G.O.S es el producto, sin expansión oficial aprobada; Guardias es el
-módulo actual. ARGOS 1.0.1 es el candidato de despliegue en la rama
-`feat/argos-1.0.1-unified-web-auth`, desde el ARGOS 1.0 congelado en
-`argos-v1.0-rc1`. Producción y su SQLite no se han modificado.
+módulo actual. ARGOS 1.0.2 es la línea candidata en la rama
+`feat/argos-1.0.2-user-provisioning`, basada en el cierre aceptado de ARGOS 1.0.1
+`cb5681593b904dc81addd875f2eca132f1a420c1`. Producción y su SQLite no se han
+modificado.
 
 ## Estado técnico
 
@@ -18,7 +19,7 @@ módulo actual. ARGOS 1.0.1 es el candidato de despliegue en la rama
 | Horario | Periodos dinámicos y datasets `draft/validated/active/archived`. |
 | Fuente 2026/27 | XML oficial GHC ISO-8859-1 primario; PDF solo contraste independiente. |
 | Autenticación | Una cuenta/sesión compartida por web normal, perfil docente, Jefatura, Administración técnica y `/app/`. |
-| Superadmin | Gestión de cuentas, reset temporal, cambio forzado, auditoría y recuperación break-glass. |
+| Superadmin | Gestión de cuentas, preview/provisión docente, reset temporal, cambio forzado, auditoría y recuperación break-glass. |
 | Roles | `teacher`, `admin` y `superadmin` independientes; Superadmin no implica Jefatura/admin. |
 | Descubrimiento | Siete pulsaciones sobre ARGOS solo revelan la UI a un Superadmin ya autenticado; el backend decide el permiso. |
 | Despliegue | Redeploy limpio por artefacto Linux offline; nunca upgrade del checkout contaminado. |
@@ -57,5 +58,7 @@ sin forzar recuentos del PDF.
 
 - El smoke funcional visual de ARGOS 1.0.1 fue completado y aceptado el 9-09-2026.
 - Auditoría adversarial independiente y certificación de carga hasta 150 usuarios.
+- Validar manualmente bootstrap, cambio forzado, preview, credenciales de un solo
+  uso, idempotencia y asignación inequívoca del segundo Superadmin.
 - Aprobar ventana, backup/rollback, XML final exacto, activación explícita y
-  aprovisionamiento de cuentas/roles.
+  ejecución de cuentas/roles.
