@@ -4384,3 +4384,23 @@ tbody td:nth-child(7) {
 .superadmin-user-meta { color: #607069; font-size: .82rem; }
 .superadmin-user-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
 .superadmin-user-actions button { font-size: .78rem; padding: .45rem .65rem; }
+.superadmin-provisioning { margin-top: 1rem; padding: 1rem; border: 1px solid #d9e1dc; border-radius: .9rem; background: #f8fbf9; display: grid; gap: .8rem; }
+.superadmin-provisioning[hidden], .superadmin-credential-result[hidden] { display: none; }
+.superadmin-provisioning-field { display: grid; gap: .35rem; color: #46564f; font-size: .82rem; font-weight: 700; }
+.superadmin-provisioning-field select { width: 100%; padding: .65rem .75rem; border: 1px solid #c7d2cc; border-radius: .65rem; background: white; font: inherit; }
+.superadmin-provisioning-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+.superadmin-provisioning-stat { padding: .65rem; border-radius: .65rem; background: white; border: 1px solid #e0e7e3; font-size: .78rem; }
+.superadmin-provisioning-stat strong { display: block; font-size: 1.05rem; color: #24332d; }
+.superadmin-provisioning-rows, .superadmin-credential-rows { max-height: 280px; overflow: auto; border: 1px solid #e0e7e3; border-radius: .65rem; background: white; }
+.superadmin-provisioning-row, .superadmin-credential-row { display: grid; grid-template-columns: minmax(130px, 1.4fr) minmax(70px, .6fr) minmax(100px, .8fr) minmax(120px, 1fr); gap: .5rem; padding: .55rem .65rem; border-bottom: 1px solid #edf1ee; align-items: center; font-size: .76rem; }
+.superadmin-provisioning-row:last-child, .superadmin-credential-row:last-child { border-bottom: 0; }
+.superadmin-provisioning-status { font-weight: 800; }
+.superadmin-provisioning-status.is-ready { color: #14663f; }
+.superadmin-provisioning-status.is-blocked { color: #8f2724; }
+.superadmin-provisioning-actions { display: flex; justify-content: flex-end; }
+.superadmin-credential-result { padding: .85rem; border: 1px solid rgba(217,161,29,.4); border-radius: .75rem; background: #fffaf0; display: grid; gap: .75rem; }
+.superadmin-credential-warning { color: #765713; font-size: .84rem; }
+@media(max-width:700px) {
+  .superadmin-provisioning-summary { grid-template-columns: 1fr 1fr; }
+  .superadmin-provisioning-row, .superadmin-credential-row { grid-template-columns: 1fr; gap: .2rem; }
+}

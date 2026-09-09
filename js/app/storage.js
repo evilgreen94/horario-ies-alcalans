@@ -326,6 +326,18 @@
     fetchUsers(query=''){
       return request(`/users?q=${encodeURIComponent(query)}`);
     },
+    fetchProvisioningDatasets(){
+      return request('/users/provisioning/datasets');
+    },
+    fetchProvisioningPreview(datasetId){
+      return request(`/users/provisioning/preview?datasetId=${encodeURIComponent(datasetId)}`);
+    },
+    provisionTeachers(datasetId){
+      return request('/users/provisioning', {
+        method:'POST',
+        body:JSON.stringify({datasetId,confirm:true})
+      });
+    },
     createUser(payload){
       return request('/users', { method:'POST', body:JSON.stringify(payload) });
     },

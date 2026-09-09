@@ -1,9 +1,13 @@
-const crypto = require('crypto');
 const express = require('express');
 const { getDatabase, withImmediateTransaction } = require('../db');
-const { hashPassword } = require('../auth');
+const { generateTemporaryPassword, hashPassword } = require('../auth');
 const { appendAuditEvent } = require('../audit');
 const { requireRole } = require('../session');
+const {
+  buildProvisioningPreview,
+  listProvisioningDatasets,
+  provisionTeachers
+} = require('../user-provisioning');
 const { requireSameOriginWrite } = require('./profesorado/shared');
 
 const router = express.Router();
@@ -30,10 +34,6 @@ function normalizeRoles(input) {
   const roles = [...new Set(input.map(value => String(value || '').trim().toLowerCase()))];
   if (roles.some(role => !ALLOWED_ROLES.has(role))) throw httpError(400, 'La lista de roles no es válida.');
   return roles;
-}
-
-function generateTemporaryPassword() {
-  return `A7!${crypto.randomBytes(18).toString('base64url')}`;
 }
 
 async function activeSuperadminCount(db) {
@@ -104,6 +104,34 @@ router.get('/', async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+router.get('/provisioning/datasets', async (_req, res, next) => {
+  try {
+    const datasets = await listProvisioningDatasets(await getDatabase());
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ datasets });
+  } catch (error) { next(error); }
+});
+
+router.get('/provisioning/preview', async (req, res, next) => {
+  try {
+    const preview = await buildProvisioningPreview(await getDatabase(), req.query.datasetId);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(preview);
+  } catch (error) { next(error); }
+});
+
+router.post('/provisioning', requireSameOriginWrite, async (req, res, next) => {
+  try {
+    requireConfirmation(req.body);
+    const result = await provisionTeachers(await getDatabase(), {
+      actorUserId: req.sessionUser.userId,
+      datasetId: req.body?.datasetId
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json(result);
+  } catch (error) { next(error); }
 });
 
 router.get('/:id/audit', async (req, res, next) => {
@@ -263,4 +291,4 @@ router.post('/:id/revoke-sessions', requireSameOriginWrite, async (req, res, nex
   } catch (error) { next(error); }
 });
 
-module.exports = { generateTemporaryPassword, router };
+module.exports = { router };

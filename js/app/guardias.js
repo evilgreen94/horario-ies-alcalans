@@ -2811,6 +2811,8 @@ let superAdminOpsLoading=false;
 let superAdminOpsLastFetchAt='';
 let superAdminUsers=[];
 let superAdminUsersTimer=null;
+let superAdminProvisioningPreview=null;
+let superAdminProvisioningCredentials=[];
 const superAdminStatus={
   lastAdminSyncAt:'',
   lastTeacherSyncAt:'',
@@ -3457,6 +3459,108 @@ async function createUserFlow(){
     window.prompt('Contraseña temporal (se muestra una sola vez). El usuario deberá cambiarla al iniciar sesión.',result.temporaryPassword||'');
     refreshSuperAdminUsers();
   }catch(error){showToast(error.message||'No se pudo crear la cuenta.','error');}
+}
+function clearTeacherProvisioningState(){
+  superAdminProvisioningPreview=null;
+  superAdminProvisioningCredentials=[];
+  const result=document.getElementById('superAdminCredentialResult');
+  const rows=document.getElementById('superAdminCredentialRows');
+  if(result) result.hidden=true;
+  if(rows) rows.replaceChildren();
+}
+function renderTeacherProvisioningPreview(){
+  const preview=superAdminProvisioningPreview;
+  const summary=document.getElementById('superAdminProvisioningSummary');
+  const rows=document.getElementById('superAdminProvisioningRows');
+  const confirm=document.getElementById('superAdminProvisioningConfirm');
+  if(!summary||!rows||!confirm) return;
+  if(!preview){summary.textContent='Seleccione un dataset.';rows.replaceChildren();confirm.disabled=true;return;}
+  const totals=preview.totals||{};
+  const stats=[
+    ['Identidades',totals.teacherIdentities||0],['Ya vinculadas',totals.alreadyLinked||0],
+    ['READY',totals.ready||0],['Conflictos',totals.conflicts||0],
+    ['Inválidas',totals.invalid||0],['Cuentas huérfanas',totals.orphanedAccounts||0]
+  ];
+  summary.innerHTML=stats.map(([label,value])=>`<div class="superadmin-provisioning-stat"><strong>${Number(value)}</strong>${escapeHtml(label)}</div>`).join('');
+  const entries=[...(preview.rows||[]),...(preview.orphanedAccounts||[])];
+  rows.innerHTML=entries.length?entries.map(row=>{
+    const ready=row.classification==='READY'||row.classification==='ALREADY_LINKED';
+    return `<div class="superadmin-provisioning-row"><strong>${escapeHtml(row.displayName||'')}</strong><span>${escapeHtml(row.sourceCode||'—')}</span><span>${escapeHtml(row.username||'—')}</span><span class="superadmin-provisioning-status ${ready?'is-ready':'is-blocked'}">${escapeHtml(row.classification||'')}<br><small>${escapeHtml(row.reason||'')}</small></span></div>`;
+  }).join(''):'<div class="superadmin-user-meta">El dataset no contiene identidades docentes.</div>';
+  confirm.disabled=!(Number(totals.ready)>0)||Number(totals.conflicts)>0||Number(totals.invalid)>0;
+}
+async function openTeacherProvisioningFlow(){
+  if(!isSuperAdmin||!storage.hasBackend()) return;
+  const panel=document.getElementById('superAdminProvisioning');
+  const select=document.getElementById('superAdminProvisioningDataset');
+  if(!panel||!select) return;
+  clearTeacherProvisioningState();
+  panel.hidden=false;
+  select.disabled=true;
+  select.innerHTML='<option value="">Cargando datasets…</option>';
+  try{
+    const result=await storage.fetchProvisioningDatasets();
+    const datasets=Array.isArray(result?.datasets)?result.datasets:[];
+    select.innerHTML=datasets.map(dataset=>`<option value="${Number(dataset.id)}">${escapeHtml(dataset.academicYear)} · ${escapeHtml(dataset.label)} · ${escapeHtml(dataset.status)} · ${Number(dataset.teacherCount)} docentes</option>`).join('');
+    select.disabled=!datasets.length;
+    if(datasets.length) await previewTeacherProvisioning();
+    else renderTeacherProvisioningPreview();
+  }catch(error){showToast(error.message||'No se pudieron cargar los datasets.','error');}
+}
+function closeTeacherProvisioningFlow(){
+  clearTeacherProvisioningState();
+  const panel=document.getElementById('superAdminProvisioning');
+  if(panel) panel.hidden=true;
+}
+async function previewTeacherProvisioning(){
+  superAdminProvisioningCredentials=[];
+  renderProvisioningCredentials();
+  const datasetId=Number(document.getElementById('superAdminProvisioningDataset')?.value);
+  if(!datasetId){superAdminProvisioningPreview=null;renderTeacherProvisioningPreview();return;}
+  try{
+    superAdminProvisioningPreview=await storage.fetchProvisioningPreview(datasetId);
+    renderTeacherProvisioningPreview();
+  }catch(error){superAdminProvisioningPreview=null;renderTeacherProvisioningPreview();showToast(error.message||'No se pudo preparar la vista previa.','error');}
+}
+function renderProvisioningCredentials(){
+  const panel=document.getElementById('superAdminCredentialResult');
+  const rows=document.getElementById('superAdminCredentialRows');
+  if(!panel||!rows) return;
+  panel.hidden=!superAdminProvisioningCredentials.length;
+  rows.innerHTML=superAdminProvisioningCredentials.map(item=>`<div class="superadmin-credential-row"><strong>${escapeHtml(item.display_name)}</strong><span>${escapeHtml(item.source_code)}</span><span>${escapeHtml(item.username)}</span><code>${escapeHtml(item.temporary_password)}</code></div>`).join('');
+}
+async function executeTeacherProvisioning(){
+  const preview=superAdminProvisioningPreview;
+  if(!preview||!isSuperAdmin) return;
+  if(!await askConfirm('Crear cuentas del profesorado',`Se crearán ${Number(preview.totals?.ready||0)} vínculos/cuentas READY. Las credenciales nuevas se mostrarán una sola vez.`,'Crear cuentas')) return;
+  try{
+    const result=await storage.provisionTeachers(preview.dataset.id);
+    await previewTeacherProvisioning();
+    superAdminProvisioningCredentials=Array.isArray(result?.credentials)?result.credentials:[];
+    renderProvisioningCredentials();
+    showToast(`Provisión completada: ${Number(result?.summary?.created||0)} cuentas creadas y ${Number(result?.summary?.linked||0)} enlazadas.`,'success');
+    refreshSuperAdminUsers();
+  }catch(error){showToast(error.message||'No se pudo completar la provisión.','error');}
+}
+function provisioningCsvCell(value){
+  let text=String(value||'');
+  if(/^[=+\-@]/.test(text)) text=`'${text}`;
+  return `"${text.replace(/"/g,'""')}"`;
+}
+function downloadProvisioningCredentialsCsv(){
+  if(!superAdminProvisioningCredentials.length) return;
+  const header=['display_name','source_code','username','temporary_password'];
+  const lines=[header,...superAdminProvisioningCredentials.map(item=>header.map(key=>item[key]))]
+    .map(row=>row.map(provisioningCsvCell).join(','));
+  const blob=new Blob([`\uFEFF${lines.join('\r\n')}\r\n`],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const anchor=document.createElement('a');
+  anchor.href=url;
+  anchor.download=`argos-credenciales-temporales-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 async function resetUserPasswordFlow(userId){
   if(!await askConfirm('Resetear contraseña','Se invalidarán todas las sesiones y se generará una contraseña temporal.','Resetear')) return;
@@ -5347,6 +5451,7 @@ async function loadAuthenticatedTeacherIdentity(silent=false){
 }
 async function logoutCurrentRole(){
   clearSuperAdminDiscovery();
+  clearTeacherProvisioningState();
   if(storage.hasBackend()){
     try{
       await storage.logoutRole();

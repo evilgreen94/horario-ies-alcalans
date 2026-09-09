@@ -85,6 +85,7 @@ async function testAnnualXmlPersistsOnlyInSqlite() {
       assert.equal((await persisted.get("SELECT COUNT(*) AS total FROM schedule_datasets WHERE status = 'validated'")).total, 1);
       assert.equal((await persisted.get('SELECT COUNT(*) AS total FROM teacher_schedule_sessions')).total, 2);
       assert.equal((await persisted.get("SELECT COUNT(*) AS total FROM schedule_datasets WHERE status = 'active'")).total, 0);
+      assert.equal((await persisted.get('SELECT COUNT(*) AS total FROM users')).total, 1);
       const identities = await persisted.all(
         `SELECT identity.external_key AS source_code,
                 profile.display_name,

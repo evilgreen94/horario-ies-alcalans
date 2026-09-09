@@ -230,12 +230,37 @@
             <div class="superadmin-section-title">Usuarios</div>
             <div class="superadmin-section-copy">Cuentas y credenciales. Las contrase&ntilde;as actuales nunca son visibles.</div>
           </div>
-          <button class="btn-add btn-add-secondary btn-add-compact" type="button" onclick="createUserFlow()">Crear cuenta</button>
+          <div class="superadmin-user-actions">
+            <button class="btn-add btn-add-secondary btn-add-compact" type="button" onclick="createUserFlow()">Crear cuenta</button>
+            <button class="btn-add btn-add-secondary btn-add-compact" type="button" onclick="openTeacherProvisioningFlow()">Crear cuentas del profesorado</button>
+          </div>
         </div>
         <div class="superadmin-user-search">
           <input id="superAdminUserSearch" type="search" placeholder="Buscar usuario o nombre" oninput="refreshSuperAdminUsers()">
         </div>
         <div class="superadmin-user-list" id="superAdminUserList"></div>
+        <section class="superadmin-provisioning" id="superAdminProvisioning" hidden aria-labelledby="superAdminProvisioningTitle">
+          <div class="superadmin-section-head">
+            <div>
+              <div class="superadmin-section-title" id="superAdminProvisioningTitle">Provisi&oacute;n del profesorado</div>
+              <div class="superadmin-section-copy">Seleccione un dataset validado y revise todos los conflictos antes de crear cuentas.</div>
+            </div>
+            <button class="btn-add btn-add-ghost btn-add-compact" type="button" onclick="closeTeacherProvisioningFlow()">Cerrar</button>
+          </div>
+          <label class="superadmin-provisioning-field" for="superAdminProvisioningDataset">Dataset horario
+            <select id="superAdminProvisioningDataset" onchange="previewTeacherProvisioning()"></select>
+          </label>
+          <div id="superAdminProvisioningSummary" class="superadmin-provisioning-summary" aria-live="polite"></div>
+          <div id="superAdminProvisioningRows" class="superadmin-provisioning-rows"></div>
+          <div class="superadmin-provisioning-actions">
+            <button class="btn-add" id="superAdminProvisioningConfirm" type="button" onclick="executeTeacherProvisioning()" disabled>Crear cuentas READY</button>
+          </div>
+          <section id="superAdminCredentialResult" class="superadmin-credential-result" hidden aria-labelledby="superAdminCredentialTitle">
+            <div class="superadmin-credential-warning" id="superAdminCredentialTitle"><strong>Las contrase&ntilde;as temporales se mostrar&aacute;n una sola vez.</strong><br>Guarde o imprima esta informaci&oacute;n antes de cerrar.</div>
+            <div id="superAdminCredentialRows" class="superadmin-credential-rows"></div>
+            <button class="btn-add" type="button" onclick="downloadProvisioningCredentialsCsv()">Descargar CSV ahora</button>
+          </section>
+        </section>
       </section>
       <section class="superadmin-panel">
         <div class="superadmin-section-head">

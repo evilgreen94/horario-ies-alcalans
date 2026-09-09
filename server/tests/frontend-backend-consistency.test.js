@@ -16,6 +16,7 @@ const futureAbsencesSource = fs.readFileSync(path.join(projectRoot, 'js', 'app',
 const teacherSource = fs.readFileSync(path.join(projectRoot, 'js', 'app', 'guardias-teacher.js'), 'utf8');
 const appSource = fs.readFileSync(path.join(projectRoot, 'js', 'app', 'guardias.js'), 'utf8');
 const storageSource = fs.readFileSync(path.join(projectRoot, 'js', 'app', 'storage.js'), 'utf8');
+const guardiasHtml = fs.readFileSync(path.join(projectRoot, 'guardias.html'), 'utf8');
 
 function makeError(status, message) {
   const error = new Error(message || (status ? `Request failed: ${status}` : 'fetch failed'));
@@ -264,6 +265,20 @@ module.exports = [
         await stopServer(server).catch(() => {});
         cleanupTestEnvironment(environment);
       }
+    }
+  },
+  {
+    name: 'teacher provisioning UI keeps credentials client-side and clears stale batches',
+    fn() {
+      assert.ok(guardiasHtml.includes('id="superAdminProvisioning"'));
+      assert.ok(guardiasHtml.includes('id="superAdminCredentialResult"'));
+      assert.ok(guardiasHtml.includes('Las contrase&ntilde;as temporales se mostrar&aacute;n una sola vez.'));
+      assert.ok(storageSource.includes("request('/users/provisioning'"));
+      assert.ok(appSource.includes("new Blob([`\\uFEFF${lines.join('\\r\\n')}\\r\\n`]"));
+      assert.ok(appSource.includes('URL.createObjectURL(blob)'));
+      assert.ok(appSource.includes('superAdminProvisioningCredentials=[];\n  renderProvisioningCredentials();'));
+      assert.ok(appSource.includes('clearTeacherProvisioningState();\n  if(storage.hasBackend())'));
+      assert.equal(/provisioning[^'"\n]*\.csv[^'"\n]*request\(/i.test(storageSource), false);
     }
   },
   {

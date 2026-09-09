@@ -2,9 +2,8 @@ const path = require('path');
 const { open } = require('sqlite');
 const sqlite3 = require('sqlite3');
 const { withImmediateTransaction } = require('../db');
-const { hashPassword } = require('../auth');
+const { generateTemporaryPassword, hashPassword } = require('../auth');
 const { appendAuditEvent } = require('../audit');
-const { generateTemporaryPassword } = require('../routes/users');
 
 function valueAfter(args, name) {
   const index = args.indexOf(name);
