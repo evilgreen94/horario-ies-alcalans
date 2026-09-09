@@ -414,6 +414,49 @@ const requestedWeekOffset=Number(APP_URL_PARAMS.get('weekOffset'));
 const FORCE_TV_HORA=Number(APP_URL_PARAMS.get('forceTvHora'));
 const FORCE_TV_DIA=Number(APP_URL_PARAMS.get('forceTvDia'));
 let superAdminRoutePrompted=false;
+const SUPERADMIN_DISCOVERY_STORAGE_KEY='argos-superadmin-discovery-user';
+const SUPERADMIN_DISCOVERY_REQUIRED_ACTIVATIONS=7;
+const SUPERADMIN_DISCOVERY_RESET_MS=5000;
+let superAdminDiscoveryCount=0;
+let superAdminDiscoveryLastActivation=0;
+let superAdminAccessDiscovered=false;
+function clearSuperAdminDiscovery(){
+  superAdminDiscoveryCount=0;
+  superAdminDiscoveryLastActivation=0;
+  superAdminAccessDiscovered=false;
+  try{window.sessionStorage.removeItem(SUPERADMIN_DISCOVERY_STORAGE_KEY);}catch(_error){}
+}
+function restoreSuperAdminDiscovery(){
+  superAdminDiscoveryCount=0;
+  superAdminDiscoveryLastActivation=0;
+  superAdminAccessDiscovered=false;
+  try{
+    const storedUserId=window.sessionStorage.getItem(SUPERADMIN_DISCOVERY_STORAGE_KEY);
+    if(canSuperAdmin&&currentAuthSession?.authenticated&&storedUserId===String(currentAuthSession.userId)){
+      superAdminAccessDiscovered=true;
+    }else if(storedUserId){
+      window.sessionStorage.removeItem(SUPERADMIN_DISCOVERY_STORAGE_KEY);
+    }
+  }catch(_error){}
+}
+function recordArgosDiscoveryActivation(){
+  if(!currentAuthSession?.authenticated||!canSuperAdmin){
+    superAdminDiscoveryCount=0;
+    superAdminDiscoveryLastActivation=0;
+    return false;
+  }
+  const now=Date.now();
+  if(now-superAdminDiscoveryLastActivation>SUPERADMIN_DISCOVERY_RESET_MS) superAdminDiscoveryCount=0;
+  superAdminDiscoveryLastActivation=now;
+  superAdminDiscoveryCount+=1;
+  if(superAdminDiscoveryCount<SUPERADMIN_DISCOVERY_REQUIRED_ACTIVATIONS) return false;
+  superAdminDiscoveryCount=0;
+  superAdminDiscoveryLastActivation=0;
+  superAdminAccessDiscovered=true;
+  try{window.sessionStorage.setItem(SUPERADMIN_DISCOVERY_STORAGE_KEY,String(currentAuthSession.userId));}catch(_error){}
+  refreshAccessUi();
+  return true;
+}
 const teacherState={
   get teacherName(){return teacherName;},
   set teacherName(value){teacherName=value||'';},
@@ -5220,7 +5263,7 @@ function refreshAccessUi(){
     btnAdmin.textContent=isAdmin?(teacherName?'Mi perfil':'Salir de Jefatura'):'Jefatura';
   }
   if(btnSuperAdmin){
-    btnSuperAdmin.style.display=(SUPERADMIN_ENABLED&&canSuperAdmin)?'':'none';
+    btnSuperAdmin.style.display=(canSuperAdmin&&(SUPERADMIN_ENABLED||superAdminAccessDiscovered))?'':'none';
     btnSuperAdmin.classList.toggle('on',isSuperAdmin);
     btnSuperAdmin.textContent=isSuperAdmin?'Salir de administración técnica':'Administración técnica';
   }
@@ -5248,6 +5291,7 @@ async function loadAuthSession(){
     currentAuthSession=null;
     canAdmin=false;
     canSuperAdmin=false;
+    clearSuperAdminDiscovery();
     isAdmin=false;
     isSuperAdmin=false;
     refreshAccessUi();
@@ -5259,6 +5303,7 @@ async function loadAuthSession(){
     const roles=Array.isArray(currentAuthSession?.roles)?currentAuthSession.roles:[];
     canAdmin=roles.includes('admin');
     canSuperAdmin=roles.includes('superadmin');
+    restoreSuperAdminDiscovery();
     isAdmin=false;
     isSuperAdmin=SUPERADMIN_ENABLED&&canSuperAdmin;
     teacherName='';
@@ -5272,6 +5317,7 @@ async function loadAuthSession(){
     currentAuthSession=null;
     canAdmin=false;
     canSuperAdmin=false;
+    clearSuperAdminDiscovery();
     isAdmin=false;
     isSuperAdmin=false;
     refreshAccessUi();
@@ -5298,6 +5344,7 @@ async function loadAuthenticatedTeacherIdentity(silent=false){
   }
 }
 async function logoutCurrentRole(){
+  clearSuperAdminDiscovery();
   if(storage.hasBackend()){
     try{
       await storage.logoutRole();
@@ -5317,6 +5364,10 @@ async function logoutCurrentRole(){
   teacherIdentityConfirmedFor='';
   document.getElementById('teacherBar')?.classList.remove('show');
   backendHydrated=false;
+  if(SUPERADMIN_ENABLED){
+    window.location.href=getMainRouteUrl();
+    return;
+  }
   refreshAccessUi();
   renderTable();
   showToast('Sesi\u00f3n cerrada.','info');
@@ -6861,9 +6912,16 @@ async function toggleAdmin(){
   showToast(isAdmin?'Vista de Jefatura activada.':'Vista personal activada.','info');
 }
 async function toggleSuperAdmin(){
-  if(!SUPERADMIN_ENABLED||!canSuperAdmin) return;
+  if(!canSuperAdmin) return;
   if(isSuperAdmin){
     window.location.href=getMainRouteUrl();
+    return;
+  }
+  if(!SUPERADMIN_ENABLED){
+    if(!superAdminAccessDiscovered) return;
+    const url=new URL(window.location.href);
+    url.searchParams.set('panel','superadmin');
+    window.location.href=`${url.pathname}${url.search}${url.hash}`;
     return;
   }
   isSuperAdmin=true;
@@ -7053,6 +7111,7 @@ async function loginTeacher(){
     const roles=Array.isArray(currentAuthSession?.roles)?currentAuthSession.roles:[];
     canAdmin=roles.includes('admin');
     canSuperAdmin=roles.includes('superadmin');
+    restoreSuperAdminDiscovery();
     isAdmin=false;
     isSuperAdmin=SUPERADMIN_ENABLED&&canSuperAdmin;
     await loadAuthenticatedTeacherIdentity(!roles.includes('teacher'));

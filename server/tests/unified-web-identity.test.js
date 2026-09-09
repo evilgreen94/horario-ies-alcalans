@@ -117,15 +117,18 @@ module.exports = [{
       assert.match(htmlText, />Acceso personal</);
       assert.match(htmlText, />Sala del profesorado</);
       assert.match(htmlText, /id="btnAdmin"[^>]*style="display:none"/);
+      assert.match(htmlText, /id="btnSuperAdmin"[^>]*style="display:none"/);
       assert.doesNotMatch(htmlText, /onclick="changeTeacherUser\(\)"/);
       assert.match(htmlText, /name="username"/);
       assert.match(htmlText, /name="password"/);
       assert.match(htmlText, /class="argos-brand"[^>]*role="img"[^>]*aria-label="A\.R\.G\.O\.S, identidad del sistema"/);
+      assert.match(htmlText, /class="argos-brand"[^>]*onclick="recordArgosDiscoveryActivation\(\)"/);
       assert.match(htmlText, /class="argos-eye__pupil"/);
       assert.match(htmlText, />A\.R\.G\.O\.S</);
       assert.equal((await request(server.baseUrl, '/app/')).response.status, 200);
       const webStyles = (await request(server.baseUrl, '/css/guardias.css')).body.toString('utf8');
       assert.match(webStyles, /\.argos-eye\s*\{/);
+      assert.match(webStyles, /\.argos-eye\s*\{[^}]*border-radius:/s);
       assert.match(webStyles, /background:\s*var\(--accent\)/);
       assert.match(webStyles, /@keyframes argos-pupil-watch/);
       assert.match(webStyles, /@media \(prefers-reduced-motion: reduce\)/);
@@ -136,6 +139,9 @@ module.exports = [{
       assert.doesNotMatch(webRuntime, /storage\.loginRole\('admin'/);
       assert.match(webRuntime, /url\.searchParams\.delete\('panel'\)/);
       assert.match(webRuntime, /if\(isSuperAdmin\)\{\s*window\.location\.href=getMainRouteUrl\(\);\s*return;/);
+      assert.match(webRuntime, /btnSuperAdmin\.style\.display=\(canSuperAdmin&&\(SUPERADMIN_ENABLED\|\|superAdminAccessDiscovered\)\)\?'':'none'/);
+      assert.match(webRuntime, /async function logoutCurrentRole\(\)\{\s*clearSuperAdminDiscovery\(\)/);
+      assert.match(webRuntime, /if\(SUPERADMIN_ENABLED\)\{\s*window\.location\.href=getMainRouteUrl\(\);\s*return;/);
 
       const teacher = await loginAccount(server, 'teacher.only');
       const own = await request(server.baseUrl, '/api/schedule/me?date=2026-09-07&source_code=JGP2&teacherProfileId=999&userId=999', {}, teacher.jar);
