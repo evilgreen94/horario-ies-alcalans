@@ -1,7 +1,7 @@
 # Empezar aquí: ARGOS
 
 > **AUTORITATIVO / ACTUAL.** Entrada canónica para una persona mantenedora o un
-> asistente de programación. Revisado el 7 de septiembre de 2026.
+> asistente de programación. Revisado el 9 de septiembre de 2026.
 
 ## Qué es y dónde encaja
 

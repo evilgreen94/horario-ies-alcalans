@@ -36,3 +36,5 @@
 - Bootstrap RMLL explícito e idempotente y provisión transaccional por
   `source_code`, con preview y credenciales de un solo uso generadas en cliente.
 - Listener loopback, tooling de backup, artefacto Linux offline y redeploy limpio documentado.
+- Artefacto 1.0.2 archivado localmente con checksum verificado y runbook de
+  producción preparado en 24 puertas con STOP y rollback explícitos.

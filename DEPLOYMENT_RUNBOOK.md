@@ -1,215 +1,263 @@
-# Despliegue limpio y reversible — ARGOS / Guardias 2026/27
+# ARGOS 1.0.2 — despliegue limpio, controlado y reversible
 
-Este documento prepara una ventana autorizada; no la autoriza. El despliegue es
-por artefacto offline, no usa `git pull`, GitHub, `npm install` ni `npm ci` en el
-servidor. Arquitectura objetivo:
-
-```text
-LAN → Nginx :80 → Node 127.0.0.1:3000 → /var/lib/guardias/guardias.sqlite
-```
-
-## 0. Hechos auditados y condiciones de parada
-
-Producción fue inventariada en lectura el 7-09-2026: usuario `rafa`, PM2
-`guardias`, `PM2_HOME=/home/rafa/.pm2`, unidad `pm2-rafa.service`, aplicación
-legacy en `/srv/guardias/horario-ies-alcalans`, Nginx en
-`/etc/nginx/sites-available/guardias` y symlink en `sites-enabled`. El proxy
-actual usa `localhost:3000`; Node escucha en `*:3000`. La SQLite legacy y su WAL
-están activos. No hay backup periódico verificado. El checkout y el tarball
-antiguos contienen estado local y material sensible: se ha elegido un
-**redeploy limpio controlado**, no una actualización incremental.
-
-Abortar la ventana si:
-
-- el SHA o checksum del artefacto no son los aprobados;
-- el runtime Node incluido no es `>=22.9 <23`, o faltan `sqlite3`, PM2/Nginx;
-- no hay espacio para dos releases y tres copias de la DB;
-- no se obtiene un backup SQLite verificable y una copia fuera del servidor;
-- `quick_check` no es `ok` o `foreign_key_check` devuelve filas;
-- aparece otro escritor, otro gestor de Guardias o un segundo proxy a `:3000`;
-- falla una migración, el listener no es loopback o el smoke no coincide;
-- no existe aprobación humana para importar o activar el dataset.
-
-Nunca imprimir `.env`, cookies, tokens, claves, hashes ni contraseñas.
-
-## 1. Artefactos preparados localmente
-
-Desde el commit limpio y aprobado de `feat/argos-1.0.1-unified-web-auth`, marcado
-con `argos-v1.0.1-rc1`:
-
-```powershell
-$out = Join-Path $env:TEMP ('guardias-release-' + [guid]::NewGuid().ToString('N'))
-.\deploy\build-release.ps1 -OutputDirectory $out
-Get-ChildItem $out
-```
-
-El script usa `node:22-bookworm-slim` en Docker Linux/amd64, extrae una allowlist
-del commit, compila las dependencias nativas dentro de esa imagen mediante
-`npm ci --omit=dev`, carga el módulo `sqlite3` resultante y rechaza el artefacto
-si `sqlite3` o el Node portable requieren una versión superior a `GLIBC_2.35`.
-El tar incluye `runtime/node`; producción no descarga ni instala Node/npm. Después crea:
+Este runbook prepara una ventana autorizada; no la autoriza. Se ejecuta puerta a
+puerta y se detiene ante cualquier diferencia. El despliegue es offline: no usa
+`git pull`, GitHub, `npm install`, `npm ci` ni `apt install` en producción.
 
 ```text
-guardias-release-<sha-corto>-linux-x64.tar.gz
-guardias-release-<sha-corto>-linux-x64.tar.gz.sha256
+LAN → Nginx :80 → Node 127.0.0.1:3000 → SQLite
 ```
 
-El tar incluye runtime, frontend, imágenes, `ops/`, tooling Linux,
-`.env.example`, `package*.json`, `node_modules` Linux y `.deployed-release`.
-Excluye Git, BD, secretos, PDF/censo/XML, `json_profes`, datasets retirados,
-tests, utilidades locales de credenciales y `node_modules` Windows.
+Release aprobado:
 
-Transferir exactamente: tarball, checksum y —por canal privado separado— el XML
-oficial aprobado. PDF/censo solo son evidencia diagnóstica y no son necesarios
-para operar. No transferir checkout, `.env`, SQLite local ni temporales.
+```text
+commit   ccb2f7a88fbf9815c13df501d1aa972d31384129
+artifact guardias-release-ccb2f7a88fbf-linux-x64.tar.gz
+sha256   8275e5162f9a392a17ff33b9f111a2d8708ecfae6fa923aa6ae0aa6756f38cf8
+Node     v22.23.2, requiere GLIBC_2.28
+sqlite3  requiere GLIBC_2.34
+```
 
-## 2. Variables de la ventana
+XML candidato local, separado del artefacto y pendiente de confirmación humana
+el día de la ventana:
 
-En producción, sustituir solo los marcadores aprobados:
+```text
+ruta      C:\Users\usuario\Desktop\Censo_docente_26-27\censo def\Horario.xml
+tamaño    1.415.492 bytes
+modificado 2026-09-07 12:04:51 +02:00
+sha256    859901bb2bfecec6b468798128413fadbc5e2d23fead0bff1818d241dc708e2e
+estado    DEPLOYMENT XML CANDIDATE
+curso     2026/27
+```
+
+No está en Git ni en el tar y no se ha importado en producción.
+
+El operador registra PASS/STOP, hora y evidencia no sensible en cada puerta.
+Nunca copia en el acta `.env`, cookies, tokens, claves, hashes, salts ni
+contraseñas. Ningún comando de este documento se ha ejecutado en producción.
+
+## Variables de la ventana
+
+Rafa debe confirmar el XML y su hash el mismo día. No reutilizar estas variables
+en otra máquina sin verificar todas las rutas.
 
 ```bash
 set -u
-export RELEASE='<sha-completo-aprobado>'
-export SHORT='<sha-corto-12>'
-export ARTIFACT="/var/tmp/guardias-release-$SHORT-linux-x64.tar.gz"
-export ARTIFACT_SHA="$ARTIFACT.sha256"
+export RELEASE='ccb2f7a88fbf9815c13df501d1aa972d31384129'
+export SHORT='ccb2f7a88fbf'
+export EXPECTED_ARTIFACT_SHA='8275e5162f9a392a17ff33b9f111a2d8708ecfae6fa923aa6ae0aa6756f38cf8'
 export ROOT='/srv/guardias'
-export OLD_APP='/srv/guardias/horario-ies-alcalans'
+export INCOMING="$ROOT/incoming"
+export ARTIFACT="$INCOMING/guardias-release-$SHORT-linux-x64.tar.gz"
+export CHECKSUM="$ARTIFACT.sha256"
 export RELEASE_DIR="$ROOT/releases/$RELEASE"
 export CURRENT="$ROOT/current"
+export OLD_APP="$ROOT/horario-ies-alcalans"
 export OLD_DB="$OLD_APP/BD/guardias.sqlite"
 export DB='/var/lib/guardias/guardias.sqlite'
 export ENV_FILE='/etc/guardias/guardias.env'
 export BACKUP_ROOT='/var/backups/guardias'
 export DEPLOY_BACKUPS="$BACKUP_ROOT/deployments"
-export PM2_USER='rafa'
 export APP_USER='rafa'
-export APP_GROUP='rafa'
-export LAN_URL='http://172.28.244.250'
+export PM2_USER='rafa'
 export STAMP="$(date +%Y%m%d-%H%M%S)"
+export LEGACY_APP="$ROOT/legacy-$STAMP"
 
 test "${#RELEASE}" -eq 40
-test -f "$ARTIFACT" -a -f "$ARTIFACT_SHA"
-test -d "$OLD_APP" -a -f "$OLD_DB"
 ```
 
-## 3. Preflight, backup y copia fuera del servidor
+## GATE 0 — preflight
 
-Primero, solo lectura:
+Acción, inicialmente solo lectura:
 
 ```bash
-id
+hostname
+whoami
+uname -a
 uname -m
-node --version
-npm --version
-sqlite3 --version
-sudo -iu "$PM2_USER" pm2 status
-sudo systemctl status pm2-rafa.service nginx --no-pager
+ldd --version | head -1
+df -h
+df -i
+free -h
+pm2 status
+pm2 describe guardias | sed -E '/(password|passwd|secret|token|cookie|authorization)/Id'
+systemctl status nginx --no-pager
 sudo nginx -t
-sudo nginx -T | grep -n -E 'listen|server_name|proxy_pass'
-sudo ss -ltnp
-df -h "$ROOT" /var/lib /var/backups /var/tmp
-df -i "$ROOT" /var/lib /var/backups
-sha256sum -c "$ARTIFACT_SHA"
+sudo ss -lntp
+readlink -f "$OLD_APP"
+test -d "$OLD_APP" -a ! -L "$OLD_APP"
+stat -c '%A %a %U:%G %s %y %n' "$OLD_DB" "$OLD_DB-wal" "$OLD_DB-shm" 2>&1
+stat -c '%A %a %U:%G %s %y %n' "$OLD_APP/.env" /srv/guardias/guardias-predeploy-2026-09-04.tar.gz 2>&1
+sudo systemctl cat pm2-rafa.service --no-pager
+sudo nginx -T 2>&1 |
+  sed -E '/(authorization|cookie|password|passwd|token|secret)/Id' |
+  grep -n -E 'listen|server_name|proxy_pass'
+```
+
+PASS: x86_64, glibc >= 2.34, espacio para dos releases y tres DB, un único
+Guardias/PM2 y un único proxy a 3000. STOP: cualquier dato distinto, integridad
+no comprobable, glibc < 2.34 o secreto visible. No actualizar el SO como atajo.
+
+## GATE 1 — artifact transfer/hash
+
+En el servidor se crea el staging; desde el portátil se envían solo tar y
+checksum:
+
+```bash
+# servidor
+install -d -m 750 "$INCOMING"
+```
+
+```powershell
+$archive = 'C:\Users\usuario\Documents\ARGOS\releases\1.0.2'
+scp "$archive\guardias-release-ccb2f7a88fbf-linux-x64.tar.gz" rafa@172.28.244.250:/srv/guardias/incoming/
+scp "$archive\guardias-release-ccb2f7a88fbf-linux-x64.tar.gz.sha256" rafa@172.28.244.250:/srv/guardias/incoming/
+```
+
+```bash
+# servidor
+test -f "$ARTIFACT" -a -f "$CHECKSUM"
+printf '%s  %s\n' "$EXPECTED_ARTIFACT_SHA" "$(basename "$ARTIFACT")" |
+  (cd "$INCOMING" && sha256sum -c -)
 tar -tzf "$ARTIFACT" >/dev/null
 ```
 
-Crear el área de backups y una copia coherente mientras el servicio sigue vivo:
+PASS: hash OK y tar legible. STOP: nombre, tamaño o hash distinto. No descargar
+otra copia de Internet.
+
+## GATE 2 — coherent backup
+
+Crear primero el destino restringido. `.backup` es seguro con WAL activo; una
+copia aislada del fichero principal no lo es.
 
 ```bash
-sudo install -d -m 750 -o "$APP_USER" -g "$APP_GROUP" \
-  "$BACKUP_ROOT" "$BACKUP_ROOT/daily" "$BACKUP_ROOT/weekly" \
-  "$BACKUP_ROOT/monthly" "$DEPLOY_BACKUPS"
-
+sudo install -d -m 750 -o "$APP_USER" -g "$APP_USER" \
+  "$BACKUP_ROOT" "$DEPLOY_BACKUPS"
 export LIVE_BACKUP="$DEPLOY_BACKUPS/guardias-live-$STAMP.sqlite"
+
+sudo -u "$APP_USER" sqlite3 -readonly "$OLD_DB" 'PRAGMA quick_check;'
+sudo -u "$APP_USER" sqlite3 -readonly "$OLD_DB" 'PRAGMA foreign_key_check;'
 sudo -u "$APP_USER" sqlite3 -cmd '.timeout 5000' "$OLD_DB" ".backup '$LIVE_BACKUP'"
-sudo -u "$APP_USER" sqlite3 -readonly "$LIVE_BACKUP" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
-sudo -u "$APP_USER" sha256sum "$LIVE_BACKUP" > "$LIVE_BACKUP.sha256"
+sudo -u "$APP_USER" sqlite3 -readonly "$LIVE_BACKUP" 'PRAGMA quick_check;'
+sudo -u "$APP_USER" sqlite3 -readonly "$LIVE_BACKUP" 'PRAGMA foreign_key_check;'
+sudo chmod 600 "$LIVE_BACKUP"
+sudo -u "$APP_USER" sha256sum "$LIVE_BACKUP" |
+  sudo -u "$APP_USER" tee "$LIVE_BACKUP.sha256" >/dev/null
+sudo chmod 600 "$LIVE_BACKUP.sha256"
 ```
 
-Debe verse `ok` y ninguna fila adicional. Antes de parar, copiar `$LIVE_BACKUP`
-y su checksum a un equipo autorizado de la LAN y verificar allí el SHA-256. Sin
-esa segunda copia, parar.
+PASS: ambos `quick_check` devuelven solo `ok`; ambos FK no devuelven filas.
+STOP: cualquier error, fila FK, timeout o copia no verificable.
 
-Preservar rollback sin mostrar entornos:
+## GATE 3 — off-server backup
+
+Desde el portátil autorizado:
+
+```powershell
+$dest = Join-Path $env:USERPROFILE 'Documents\ARGOS\production-backups'
+$stamp = 'AAAAMMDD-HHMMSS' # copiar exactamente el valor mostrado por el servidor
+New-Item -ItemType Directory -Force -Path $dest | Out-Null
+scp "rafa@172.28.244.250:/var/backups/guardias/deployments/guardias-live-$stamp.sqlite" $dest
+scp "rafa@172.28.244.250:/var/backups/guardias/deployments/guardias-live-$stamp.sqlite.sha256" $dest
+Get-FileHash -Algorithm SHA256 (Join-Path $dest "guardias-live-$stamp.sqlite")
+```
+
+PASS: el hash local coincide con el checksum del servidor. STOP: no existe copia
+fuera del servidor verificada. No parar PM2 antes de este PASS.
+
+## GATE 4 — stop/freeze legacy
 
 ```bash
 sudo cp -a /home/rafa/.pm2/dump.pm2 "$DEPLOY_BACKUPS/pm2-dump-$STAMP.pm2"
 sudo cp -a /etc/nginx/sites-available/guardias "$DEPLOY_BACKUPS/nginx-guardias-$STAMP.conf"
-sudo tar -C "$OLD_APP" --exclude='./BD' -czpf \
-  "$DEPLOY_BACKUPS/legacy-app-$STAMP.tar.gz" .
-sudo chmod 600 "$DEPLOY_BACKUPS/legacy-app-$STAMP.tar.gz"
-sudo sha256sum "$DEPLOY_BACKUPS/legacy-app-$STAMP.tar.gz" > \
-  "$DEPLOY_BACKUPS/legacy-app-$STAMP.tar.gz.sha256"
-```
+sudo chmod 600 "$DEPLOY_BACKUPS/pm2-dump-$STAMP.pm2" "$DEPLOY_BACKUPS/nginx-guardias-$STAMP.conf"
 
-Ese tar legacy contiene material sensible: no compartirlo y retirarlo solo tras
-inventario y aprobación.
-
-## 4. Detener escritores y congelar la SQLite legacy
-
-```bash
 sudo -iu "$PM2_USER" pm2 stop guardias
-sudo ss -ltnp | grep ':3000' && { echo 'Aún hay un escritor'; exit 1; } || true
-
-export FROZEN="$DEPLOY_BACKUPS/legacy-db-files-$STAMP"
-sudo install -d -m 700 "$FROZEN"
-sudo cp -a "$OLD_DB" "$FROZEN/guardias.sqlite"
-sudo test ! -e "$OLD_DB-wal" || sudo cp -a "$OLD_DB-wal" "$FROZEN/guardias.sqlite-wal"
-sudo test ! -e "$OLD_DB-shm" || sudo cp -a "$OLD_DB-shm" "$FROZEN/guardias.sqlite-shm"
+if sudo ss -lntp | grep -q ':3000'; then echo 'STOP: queda un listener en 3000'; exit 1; fi
+test ! -e "$LEGACY_APP"
 
 export STOPPED_BACKUP="$DEPLOY_BACKUPS/guardias-stopped-$STAMP.sqlite"
 sudo -u "$APP_USER" sqlite3 -cmd '.timeout 5000' "$OLD_DB" ".backup '$STOPPED_BACKUP'"
 sudo -u "$APP_USER" sqlite3 -readonly "$STOPPED_BACKUP" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
-sudo -u "$APP_USER" sha256sum "$STOPPED_BACKUP" > "$STOPPED_BACKUP.sha256"
+sudo chmod 600 "$STOPPED_BACKUP"
+sudo -u "$APP_USER" sha256sum "$STOPPED_BACKUP" |
+  sudo -u "$APP_USER" tee "$STOPPED_BACKUP.sha256" >/dev/null
+sudo chmod 600 "$STOPPED_BACKUP.sha256"
+
+sudo mv -- "$OLD_APP" "$LEGACY_APP"
+sudo ln -s "$LEGACY_APP" "$OLD_APP"
+test "$(readlink -f "$OLD_APP")" = "$LEGACY_APP"
 ```
 
-No borrar ni mezclar el DB/WAL/SHM original. El directorio legacy se conserva
-sin uso hasta cerrar el piloto.
+PASS: no writer, stopped backup íntegro, árbol legacy renombrado e inactivo; el
+symlink conserva la ruta de rollback del dump PM2. STOP: escritor residual,
+backup defectuoso o destino legacy existente. No borrar DB/WAL/SHM ni el tarball
+histórico sensible.
 
-## 5. Instalar release, DB externa y entorno
+## GATE 5 — install release
 
 ```bash
-sudo install -d -m 755 -o "$APP_USER" -g "$APP_GROUP" "$ROOT/releases"
-sudo install -d -m 755 -o "$APP_USER" -g "$APP_GROUP" "$RELEASE_DIR"
+sudo install -d -m 755 -o "$APP_USER" -g "$APP_USER" "$ROOT/releases"
+test ! -e "$RELEASE_DIR"
+sudo install -d -m 755 -o "$APP_USER" -g "$APP_USER" "$RELEASE_DIR"
 sudo -u "$APP_USER" tar -xzf "$ARTIFACT" -C "$RELEASE_DIR"
 test "$(sed -n 's/^commit=//p' "$RELEASE_DIR/.deployed-release")" = "$RELEASE"
-test -d "$RELEASE_DIR/node_modules/sqlite3"
-
-sudo install -d -m 750 -o "$APP_USER" -g "$APP_GROUP" /var/lib/guardias
-sudo install -m 600 -o "$APP_USER" -g "$APP_GROUP" "$STOPPED_BACKUP" "$DB"
-sudo -u "$APP_USER" sqlite3 -readonly "$DB" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
-
-sudo install -d -m 700 -o "$APP_USER" -g "$APP_GROUP" /etc/guardias
-sudo install -m 600 -o "$APP_USER" -g "$APP_GROUP" /dev/null "$ENV_FILE"
-sudo -u "$APP_USER" "${EDITOR:-nano}" "$ENV_FILE"
-sudo chmod 600 "$ENV_FILE"
+sudo -u "$APP_USER" "$RELEASE_DIR/runtime/node" -e "require('$RELEASE_DIR/node_modules/sqlite3'); console.log('sqlite3=ok')"
 ```
 
-Contenido mínimo, introducido interactivamente:
+PASS: marker exacto y sqlite3 carga con el Node incluido. STOP: cualquier
+dependencia ausente o intento de usar `node_modules`/Node del sistema.
+
+## GATE 6 — external DB/env
+
+```bash
+sudo install -d -m 750 -o "$APP_USER" -g "$APP_USER" /var/lib/guardias
+sudo install -m 600 -o "$APP_USER" -g "$APP_USER" "$STOPPED_BACKUP" "$DB"
+sudo -u "$APP_USER" sqlite3 -readonly "$DB" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
+
+sudo install -d -m 700 -o "$APP_USER" -g "$APP_USER" /etc/guardias
+sudo install -m 600 -o "$APP_USER" -g "$APP_USER" /dev/null "$ENV_FILE"
+sudo -u "$APP_USER" nano "$ENV_FILE"
+sudo chmod 600 "$ENV_FILE"
+test ! -e "$CURRENT" -a ! -L "$CURRENT"
+sudo ln -s "$RELEASE_DIR" "$ROOT/current.next"
+sudo mv -T "$ROOT/current.next" "$CURRENT"
+```
+
+Contenido mínimo introducido interactivamente, nunca en el historial:
 
 ```dotenv
 NODE_ENV=production
 PORT=3000
 GUARDIAS_DB_PATH=/var/lib/guardias/guardias.sqlite
-GUARDIAS_SESSION_SECRET=<aleatorio-largo-y-nuevo>
+GUARDIAS_SESSION_SECRET=<secreto nuevo largo y aleatorio>
 GUARDIAS_TRUST_PROXY=1
 GUARDIAS_CORS_ORIGINS=
 ```
 
-Las variables admin/superadmin solo son necesarias si esos roles aún no existen
-en `auth_credentials`; se usan una vez para `db:init` y se retiran antes de PM2.
-Nunca guardar claves reales en Git, comandos o actas.
+PASS: DB `0600`, directorio `0750`, entorno `0600`, todo propiedad de
+`rafa`, y `current` resuelve al SHA. STOP: secreto heredado, ruta ambigua o
+permisos más amplios.
+
+## GATE 7 — migraciones
+
+El artefacto aplica exactamente:
+`001_individual_teacher_auth.sql`,
+`002_academic_schedule_model.sql` y
+`003_final_session_security_and_schedule_types.sql`.
+`db:init` usa `skipWeeklyReset: true`: no ejecuta mantenimiento semanal.
+
+Antes de inicializar, confirmar sin mostrar hashes que el legacy conserva las
+dos credenciales de contrato:
 
 ```bash
-sudo ln -s "$RELEASE_DIR" "$ROOT/current.next"
-sudo mv -Tf "$ROOT/current.next" "$CURRENT"
-readlink -f "$CURRENT"
+sudo -u "$APP_USER" sqlite3 -readonly "$DB" \
+  "SELECT role FROM auth_credentials WHERE role IN ('admin','superadmin') ORDER BY role;"
 ```
 
-## 6. Migración exacta e integridad
-
-Guardar recuentos legacy antes de migrar:
+Deben aparecer ambas. Si falta alguna, STOP: definir en una decisión separada
+cómo sembrar esa credencial legacy; no introducir contraseñas en el comando,
+runbook ni acta.
 
 ```bash
 sudo -u "$APP_USER" sqlite3 -readonly "$DB" \
@@ -217,34 +265,23 @@ sudo -u "$APP_USER" sqlite3 -readonly "$DB" \
    SELECT 'biblioteca_guardias',COUNT(*) FROM biblioteca_guardias UNION ALL
    SELECT 'historial',COUNT(*) FROM historial UNION ALL
    SELECT 'tareas_profesorado',COUNT(*) FROM tareas_profesorado UNION ALL
-   SELECT 'app_state',COUNT(*) FROM app_state;" \
-  > "$DEPLOY_BACKUPS/counts-before-$STAMP.txt"
-```
+   SELECT 'app_state',COUNT(*) FROM app_state;" > "$DEPLOY_BACKUPS/counts-before-$STAMP.txt"
 
-Ejecutar dos veces. `db:init` usa `skipWeeklyReset`; no ejecuta mantenimiento:
-
-```bash
-sudo -iu "$APP_USER" bash -lc \
-  "set -a; . '$ENV_FILE'; set +a; cd '$CURRENT'; ./runtime/node server/scripts/init-db.js"
-sudo -iu "$APP_USER" bash -lc \
-  "set -a; . '$ENV_FILE'; set +a; cd '$CURRENT'; ./runtime/node server/scripts/init-db.js"
-
-sudo -u "$APP_USER" sqlite3 -readonly "$DB" \
-  'PRAGMA quick_check; PRAGMA foreign_key_check;'
+for pass in 1 2; do
+  sudo -iu "$APP_USER" env GUARDIAS_ENV_FILE="$ENV_FILE" \
+    bash -lc "set -a; . '$ENV_FILE'; set +a; cd '$CURRENT'; ./runtime/node server/scripts/init-db.js"
+done
+sudo -u "$APP_USER" sqlite3 -readonly "$DB" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
 sudo -u "$APP_USER" sqlite3 -readonly -header -column "$DB" \
   'SELECT name,applied_at FROM schema_migrations ORDER BY name;'
 ```
 
-Deben figurar `001_individual_teacher_auth.sql`,
-`002_academic_schedule_model.sql` y `003_final_session_security_and_schedule_types.sql`.
-Repetir los recuentos y compararlos: las
-tablas legacy no cambian. Si falla, no arrancar; volver al par PM2/DB legacy con
-aprobación.
+Repetir los recuentos en `counts-after` y compararlos. PASS: tres migraciones,
+segunda ejecución idempotente, integridad y recuentos legacy intactos. STOP:
+cualquier diferencia; no marcar migraciones a mano. Rollback: preservar la DB
+fallida y restaurar el par legacy + backup detenido.
 
-## 7. PM2 sin CWD ni secretos legacy
-
-Se reutiliza PM2 con el wrapper versionado. Este carga el entorno externo después
-de iniciar, por lo que no depende de `.env` dentro del release.
+## GATE 8 — PM2
 
 ```bash
 sudo -iu "$PM2_USER" pm2 delete guardias
@@ -253,12 +290,12 @@ sudo -iu "$PM2_USER" env GUARDIAS_ENV_FILE="$ENV_FILE" \
   --name guardias --interpreter bash --cwd "$CURRENT"
 sudo -iu "$PM2_USER" pm2 status
 sudo -iu "$PM2_USER" pm2 logs guardias --lines 100 --nostream
-sudo ss -ltnp | grep ':3000'
+sudo ss -lntp | grep ':3000'
 curl -fsS http://127.0.0.1:3000/api/health
 ```
 
-Único listener válido: `127.0.0.1:3000`. Revisar solo nombres de variables en
-PM2/dump; si contiene secretos en su definición, parar sin imprimir valores.
+PASS: usa `runtime/node`, cwd `current`, un único listener
+`127.0.0.1:3000`, health OK y sin secretos en logs. Solo entonces:
 
 ```bash
 sudo -iu "$PM2_USER" pm2 save
@@ -266,65 +303,83 @@ sudo systemctl is-enabled pm2-rafa.service
 sudo systemctl is-active pm2-rafa.service
 ```
 
-`pm2 save` se ejecuta solo aquí, en la ventana autorizada y tras el smoke Node.
+STOP/rollback: no guardar un proceso fallido; borrar el nuevo, conservar
+`current` como evidencia y usar el dump legacy preservado, cuyo script sigue
+resolviendo por el symlink `$OLD_APP`.
 
-## 8. Nginx objetivo y rollback inmediato
+## GATE 9 — Nginx
 
-El archivo exacto es `deploy/linux/guardias.nginx.conf`. Se confía en una sola
-capa (`GUARDIAS_TRUST_PROXY=1`); `X-Forwarded-For` permite limitar login por
-cliente y `X-Forwarded-Proto` prepara cookies seguras si se añade TLS.
+Se confía exactamente en un proxy local (`GUARDIAS_TRUST_PROXY=1`). El fichero
+versionado envía `Host`, `X-Real-IP`, `X-Forwarded-For` y
+`X-Forwarded-Proto`; Node no queda expuesto a la LAN.
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
 
 ```bash
 export NGINX_CONF='/etc/nginx/sites-available/guardias'
-export NGINX_BACKUP="$DEPLOY_BACKUPS/nginx-guardias-$STAMP.conf"
 sudo install -m 644 "$CURRENT/deploy/linux/guardias.nginx.conf" "$NGINX_CONF.new"
-sudo mv -f "$NGINX_CONF.new" "$NGINX_CONF"
+sudo mv "$NGINX_CONF.new" "$NGINX_CONF"
 sudo nginx -t
 sudo systemctl reload nginx
 curl -fsS http://127.0.0.1/api/health
 ```
 
-Si falla:
+PASS: sintaxis y health vía Nginx, sin otro proxy a 3000. STOP/rollback:
+restaurar `nginx-guardias-$STAMP.conf`, ejecutar `nginx -t` y recargar.
 
-```bash
-sudo cp -a "$NGINX_BACKUP" "$NGINX_CONF"
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-Confirmar con `sudo nginx -T` que nada más proxifica a `:3000`.
-
-## 9. Smoke previo al dataset
+## GATE 10 — base smoke
 
 ```bash
 curl -fsS http://127.0.0.1:3000/api/health
-curl -fsSI http://127.0.0.1:3000/
-curl -fsSI http://127.0.0.1:3000/guardias.html
-curl -fsSI http://127.0.0.1:3000/app/
-curl -sS -o /var/tmp/no-active.json -w '%{http_code}\n' \
-  http://127.0.0.1:3000/api/schedule/active
+curl -fsSI http://127.0.0.1/
+curl -fsSI http://127.0.0.1/guardias.html
+curl -fsSI http://127.0.0.1/app/
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/api/schedule/active
+sudo ss -lntp | grep ':3000'
 ```
 
-Sin dataset activo, `/api/schedule/active` devuelve `503`; `guardias.html` no
-muestra 2025/26. Verificar login/logout legacy, permisos y endpoints de
-guardias/ausencias sin escribir contraseñas en comandos.
+PASS: páginas accesibles, dataset ausente produce 503 visible y Node solo
+loopback. Desde otro equipo LAN, `:3000` no debe responder. STOP: fallback
+2025/26, listener global, 500 o recurso sensible servido.
 
-## 10. Importar, validar y activar el XML oficial
+## GATE 11 — official XML import
 
-El procedimiento obligatorio es: XML oficial → inspección/parseo → validación
-canónica → importación SQLite como `validated` → informe y diferencias →
-aprobación humana → activación explícita. La importación nunca autoactiva. Si el
-horario cambia durante septiembre, se importa otra versión por el mismo proceso;
-no se edita ni sustituye silenciosamente la activa.
+Transferir `Horario.xml` por separado a un directorio `0700`, verificar el SHA
+aprobado y no incorporarlo al release.
 
 ```bash
 export IMPORT_DIR="/var/tmp/guardias-import-$RELEASE"
 install -d -m 700 "$IMPORT_DIR"
-# Transferir por canal privado y verificar SHA-256: Horario.xml
+```
 
+```powershell
+$xml = 'C:\Users\usuario\Desktop\Censo_docente_26-27\censo def\Horario.xml'
+Get-FileHash -Algorithm SHA256 -LiteralPath $xml
+scp $xml rafa@172.28.244.250:/var/tmp/guardias-import-ccb2f7a88fbf9815c13df501d1aa972d31384129/Horario.xml
+```
+
+```bash
+export EXPECTED_XML_SHA='859901bb2bfecec6b468798128413fadbc5e2d23fead0bff1818d241dc708e2e'
+printf '%s  %s\n' "$EXPECTED_XML_SHA" 'Horario.xml' |
+  (cd "$IMPORT_DIR" && sha256sum -c -)
 sudo -iu "$PM2_USER" pm2 stop guardias
 export PRE_IMPORT_BACKUP="$DEPLOY_BACKUPS/guardias-before-import-$STAMP.sqlite"
 sudo -u "$APP_USER" sqlite3 "$DB" ".backup '$PRE_IMPORT_BACKUP'"
+sudo -u "$APP_USER" sqlite3 -readonly "$PRE_IMPORT_BACKUP" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
+sudo chmod 600 "$PRE_IMPORT_BACKUP"
 
 sudo -iu "$APP_USER" bash -lc \
   "cd '$CURRENT' && ./runtime/node server/scripts/prepare-ghc-schedule.js \
@@ -335,102 +390,56 @@ sudo -iu "$APP_USER" bash -lc \
    --allow-operational-db IMPORT_VALIDATED_GHC_DATASET_ONLY"
 ```
 
-La salida debe indicar `activated: false`, `validated` y:
+PASS: ISO-8859-1 sin mojibake, `source_code` únicos, referencias resueltas,
+periodos/recreos explícitos, cero duplicados/anomalías y resultado
+`activated:false` / `validated`. Los recuentos históricos (88 docentes,
+2.143 obligaciones, 57 patio, 5 biblioteca y 6 inclusivos) son comparación, no
+un requisito para un XML más nuevo. STOP: referencia sin resolver, identidad
+ambigua, duplicado, anomalía o activación automática.
 
-| Métrica | Total |
-|---|---:|
-| docentes | 88/88 |
-| total canónico | 2.143 |
-| clase | 1.206 |
-| guardia lectiva | 155 |
-| reunión | 220 |
-| other/complementaria | 494 |
-| `GUÀRDIES PATI` | 57 |
-| `BIBLIOTECA PATI` | 5 |
-| `PATIS INCLUSIUS` | 6 |
-| duplicados / anomalías | 0 / 0 |
-
-Las obligaciones de recreo están ocupadas y sin puesto inventado. Revisar
-dataset, periodos, recuentos y `validation_report_json`; fijar el ID aprobado:
+## GATE 12 — validate XML
 
 ```bash
-export DATASET_ID='<id-validado-y-revisado>'
-sudo -u "$APP_USER" sqlite3 -readonly "$DB" \
-  "SELECT id,label,status FROM schedule_datasets ORDER BY id;
-   SELECT session_type,COUNT(*) FROM teacher_schedule_sessions
-   WHERE dataset_id=$DATASET_ID GROUP BY session_type;
-   SELECT COUNT(*) FROM teacher_schedule_sessions WHERE dataset_id=$DATASET_ID;"
+sudo -u "$APP_USER" sqlite3 -readonly -header -column "$DB" "
+SELECT d.id,y.code,d.label,d.source_format,d.status,d.validated_at,d.activated_at
+FROM schedule_datasets d JOIN academic_years y ON y.id=d.academic_year_id
+ORDER BY d.id;
+SELECT dataset_id,session_type,COUNT(*) total
+FROM teacher_schedule_sessions GROUP BY dataset_id,session_type ORDER BY dataset_id,session_type;"
+```
 
+Revisar también `validation_report_json` sin imprimir datos personales
+innecesarios. PASS: Rafa selecciona un único ID `validated` y confirma las
+semánticas `guardia`, `guardia_patio`, `biblioteca_patio` y
+`patio_inclusivo`. STOP: no hay selección humana inequívoca.
+
+## GATE 13 — pre-activation backup
+
+```bash
+export DATASET_ID='<id-validado-y-aprobado>'
 export PRE_ACTIVATION_BACKUP="$DEPLOY_BACKUPS/guardias-before-activation-$STAMP.sqlite"
 sudo -u "$APP_USER" sqlite3 "$DB" ".backup '$PRE_ACTIVATION_BACKUP'"
-sudo -u "$APP_USER" sqlite3 -readonly "$PRE_ACTIVATION_BACKUP" \
-  'PRAGMA quick_check; PRAGMA foreign_key_check;'
+sudo -u "$APP_USER" sqlite3 -readonly "$PRE_ACTIVATION_BACKUP" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
+sudo chmod 600 "$PRE_ACTIVATION_BACKUP"
+```
 
+PASS: backup íntegro y DATASET_ID aprobado. STOP: no activar.
+
+## GATE 14 — activate dataset
+
+```bash
 sudo -iu "$APP_USER" bash -lc \
   "cd '$CURRENT' && ./runtime/node server/scripts/activate-canonical-schedule.js \
    --db '$DB' --dataset-id '$DATASET_ID' \
    --allow-operational-db ACTIVATE_APPROVED_DATASET"
+sudo -iu "$PM2_USER" pm2 start guardias
+curl -fsS http://127.0.0.1:3000/api/health
 ```
 
-Arrancar Guardias y repetir listener, health y smoke. Debe existir exactamente
-un curso y un dataset `active`.
+PASS: exactamente un curso/dataset operativo activo. STOP/rollback: parar
+Guardias y restaurar el backup preactivación completo; nunca hacer cirugía SQL.
 
-## 11. Backups programados
-
-El script usa `.backup`, verifica origen/destino, crea SHA-256 y retiene 14
-diarios, 8 semanales y 12 mensuales.
-
-```bash
-sudo install -m 644 "$CURRENT/deploy/linux/guardias-backup-daily.service" /etc/systemd/system/
-sudo install -m 644 "$CURRENT/deploy/linux/guardias-backup-daily.timer" /etc/systemd/system/
-sudo install -m 644 "$CURRENT/deploy/linux/guardias-backup-weekly.service" /etc/systemd/system/
-sudo install -m 644 "$CURRENT/deploy/linux/guardias-backup-weekly.timer" /etc/systemd/system/
-sudo install -m 644 "$CURRENT/deploy/linux/guardias-backup-monthly.service" /etc/systemd/system/
-sudo install -m 644 "$CURRENT/deploy/linux/guardias-backup-monthly.timer" /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now guardias-backup-daily.timer \
-  guardias-backup-weekly.timer guardias-backup-monthly.timer
-sudo systemctl start guardias-backup-daily.service
-sudo systemctl status guardias-backup-daily.service --no-pager
-sudo systemctl list-timers 'guardias-backup-*' --all
-sudo -u "$APP_USER" bash "$CURRENT/ops/status.sh"
-```
-
-No instalar `deploy/linux/guardias.service`: producción usa PM2.
-
-## 12. Checklist humano obligatorio
-
-Rafa comprueba desde servidor y otro equipo LAN:
-
-- `/`, `/guardias.html`, `/app/`; `http://SERVER_IP` funciona;
-- `http://SERVER_IP:3000` **no** es accesible;
-- admin/Jefatura, superadmin, logout y sesión;
-- cuenta individual piloto aprobada RMLL y otra docente normal;
-- manipular rol, `userId`, body, parámetros o cookie no eleva permisos;
-- actividad actual/siguiente, aula/grupo, clase, guardia, reunión, `other`, libre,
-  recreo, patio, biblioteca y fuera de horario;
-- ausencia, asignación/retirada de guardia y sustitución controlada;
-- ningún dato 2025/26 aparece como fallback;
-- `BIBLIOTECA PATI` está ocupada en Biblioteca fija y no rota;
-- `PATIS INCLUSIUS` está ocupado y no es guardia;
-- ninguno de los tres conceptos especiales genera cobertura automática;
-- consola/red del navegador sin errores inesperados.
-
-No usar `create-local-teacher.js` en producción. Si aún no existen cuentas
-individuales aprobadas, esa parte del piloto espera autorización separada; no se
-crean 88 credenciales.
-
-## 13. Política anual de fuentes
-
-El XML oficial es primario. Exige curso explícito y `source_code`, rechaza match
-solo por nombre y queda `validated`. El PDF permanece fuera del servidor como
-contraste independiente. Cualquier XML posterior se importa como nueva versión,
-se reconcilia, se aprueba y solo después se activa con backup preactivación.
-
-### Aprovisionamiento de cuentas
-
-Solo después de aprobar el XML final y el paso de provisión, crear la cuenta
-bootstrap con el CLI versionado y la confirmación operativa exacta:
+## GATE 15 — bootstrap RMLL
 
 ```bash
 sudo -iu "$APP_USER" bash -lc \
@@ -439,55 +448,158 @@ sudo -iu "$APP_USER" bash -lc \
    --allow-operational-db BOOTSTRAP_APPROVED_SUPERADMIN"
 ```
 
-La salida entrega una clave temporal una vez. No capturarla en logs ni historial;
-guardarla solo por el canal privado aprobado y comprobar el cambio obligatorio.
-Repetir el comando debe informar la cuenta existente sin resetearla.
+PASS: usuario `rmll`, identidad `RMLL`, roles `teacher/admin/superadmin` y
+cambio obligatorio. La clave temporal aparece una sola vez en la terminal del
+operador: no capturarla ni guardarla en scripts/logs. Repetir no debe resetear.
+STOP: identidad ausente/ambigua, roles distintos o segunda ejecución destructiva.
 
-Después, entrar como Superadmin en Usuarios → Crear cuentas del profesorado,
-seleccionar el dataset aprobado y revisar todas las clasificaciones. Cualquier
-`CONFLICT` o `INVALID` bloquea la operación. Tras confirmación, las cuentas nuevas
-reciben únicamente `teacher`; las ya enlazadas se omiten y las históricas se
-enlazan al perfil anual sin cambiar clave ni roles. Descargar el CSV de un solo
-uso desde el navegador, distribuirlo en privado y eliminarlo: el servidor no lo
-persiste. Si se pierde una clave, usar el reset individual; no hay recuperación.
+## GATE 16 — Rafa first login/change password
 
-Los pocos usuarios de Jefatura reciben `admin`; los de Administración técnica,
-`superadmin`; una cuenta combinada recibe ambos de forma explícita. Ninguno se
-deduce del otro. El reset Superadmin mantiene el cambio forzado y revoca sesiones.
-Mantener al menos dos Superadmins activos. Resolver el segundo por identidad
-confirmada, nunca por coincidencia de nombre, y no añadir `admin` salvo aprobación
-explícita. Detenerse antes de provisionar o asignar roles si no existe aprobación
-humana.
+Rafa entra como RMLL, cambia la clave temporal, cierra sesión, vuelve a entrar y
+comprueba perfil, horario, Jefatura y Superadmin. PASS: sesión antigua revocada y
+cuatro áreas correctas. STOP: no provisionar personal si falla.
 
-## 14. Rollback por dominios
+## GATE 17 — bulk provisioning preview
 
-Nunca restaurar SQLite automáticamente. Preservar dump PM2, Nginx, release
-legacy, DB/WAL/SHM congelados, backup detenido y backup preactivación.
+En Superadmin: `Usuarios → Crear cuentas del profesorado → preview`. Referencia
+histórica: 88 identidades, 1 enlazada, 87 READY, 0 conflictos, 0 inválidas. La
+vista real de producción manda. PASS obligatorio: `CONFLICT=0` e
+`INVALID=0`. STOP: resolver por `source_code`, nunca por nombre.
 
-- **Node nuevo no arranca/regresión de código:** con aprobación, detener y borrar
-  el proceso nuevo, restaurar el dump PM2 y `pm2 resurrect`. El legacy vuelve
-  con su DB legacy; no mezclar versiones.
-- **Migración falla:** no arrancar. Preservar `$DB` fallida y volver al par
-  release/DB legacy. No sobrescribir el backup detenido.
-- **Nginx falla:** restaurar `nginx-guardias-$STAMP.conf`, `nginx -t` y recargar.
-- **Dataset malo aún validated:** no activar; no restaurar ni borrar.
-- **Activación mala:** con aprobación y sin tráfico, parar PM2, preservar la DB
-  actual, instalar el backup preactivación como `$DB`, comprobar PRAGMA y
-  reiniciar el release nuevo.
-- **Regresión posterior:** clasificar código/Nginx/dataset/datos y aplicar un
-  único rollback. No encadenar restauraciones ni borrar evidencia.
+## GATE 18 — staff provisioning
 
-## 15. Seguridad y cierre
+Tras aprobación humana explícita, confirmar una sola vez. PASS: transacción
+completa, nuevas cuentas solo `teacher`, existentes enlazadas sin alterar clave
+ni roles y ninguna clave persistida en texto plano. STOP: parcialidad, rol
+elevado implícito o recuento inesperado.
 
-- entorno externo `0600`, propiedad `rafa`;
-- restringir tar legacy y revisar PM2 dumps/logs sin imprimir valores;
-- rotar la clave SSH privada incluida en el archivo antiguo;
-- rotar secreto de sesión y credenciales admin/bootstrap expuestas/archivadas;
-- conservar release actual y uno anterior verificado;
-- crear backup postdespliegue y copiarlo fuera del servidor;
-- borrar solo cookies/fuentes temporales tras verificar rutas exactas;
-- registrar SHA, checksum, PRAGMA, backups, smoke y decisiones humanas.
+## GATE 19 — local credential CSV
 
-No bloquean el release técnico: la tabla física de rotación de `GUÀRDIES PATI`,
-pulido UI/PWA/branding y el rename futuro del repositorio. Las semánticas de
-Biblioteca, Patis Inclusius y ausencia especial ya son finales.
+Descargar el CSV únicamente en el navegador de Rafa a una ubicación local
+protegida; preparar tarjetas individuales y distribución privada. No copiarlo al
+servidor, backups, GitHub ni nube; no crear QR con contraseñas. Eliminar la lista
+maestra tras distribuir. Una pérdida se resuelve con reset individual.
+PASS: cada entrega es privada y la lista maestra queda bajo control de Rafa.
+STOP: descarga perdida, servidor/nube como destino o exposición colectiva.
+
+## GATE 20 — JMH Superadmin
+
+Seleccionar por identidad confirmada `JMH — Joaquín Maestre Hernándiz` y asignar
+solo `superadmin` además de `teacher`. No conceder `admin`. JMH cambia su
+clave inicial y verifica Superadmin, perfil y horario; Jefatura debe quedar
+denegada. PASS: dos Superadmins activos y sesiones independientes.
+STOP: coincidencia solo por nombre, `admin` implícito o imposibilidad de revocar
+cada sesión por separado.
+
+## GATE 21 — auth/functional smoke
+
+Comprobar RMLL, JMH, docente normal y docente admin. Deben rechazarse rol,
+`source_code`, `userId` y cookie manipulados; docente no accede a Jefatura ni
+Superadmin; admin no accede a Superadmin; JMH no accede a Jefatura.
+
+Comprobar landing, acceso personal, Sala del profesorado, horario, ausencia
+futura y recepción en Jefatura, guardia/cobertura, patio, Biblioteca, Patis
+Inclusius, F5, logout, revocación y kiosco Raspberry. Los registros de prueba
+deben ser identificables y retirarse con la UI/API normal. Verificar por HTTP que
+`.env`, SQLite, `.git`, `.ssh` y backups no se sirven. PASS requiere
+`P0=0` y `P1=0`.
+STOP: cualquier escalada, secreto en logs/HTTP, puerto 3000 accesible desde LAN o
+fallo operativo que pueda confundir una guardia.
+
+## GATE 22 — post-deploy backup
+
+```bash
+sudo -u "$APP_USER" env GUARDIAS_DB_PATH="$DB" \
+  BACKUP_ROOT="$BACKUP_ROOT" bash "$CURRENT/ops/backup.sh"
+sudo -u "$APP_USER" sqlite3 -readonly "$DB" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
+```
+
+Copiar backup y checksum al portátil y verificar SHA como en GATE 3. PASS: primer
+punto de recuperación ARGOS completo fuera del servidor. Los timers se instalan
+solo después de este PASS; no instalar `guardias.service` porque producción usa
+PM2.
+
+```bash
+for file in \
+  guardias-backup-daily.service guardias-backup-daily.timer \
+  guardias-backup-weekly.service guardias-backup-weekly.timer \
+  guardias-backup-monthly.service guardias-backup-monthly.timer; do
+  sudo install -m 644 "$CURRENT/deploy/linux/$file" "/etc/systemd/system/$file"
+done
+sudo systemctl daemon-reload
+sudo systemctl enable --now guardias-backup-daily.timer \
+  guardias-backup-weekly.timer guardias-backup-monthly.timer
+sudo systemctl start guardias-backup-daily.service
+sudo systemctl status guardias-backup-daily.service --no-pager
+sudo systemctl list-timers 'guardias-backup-*' --all
+```
+
+STOP: backup no íntegro, checksum no verificable fuera del servidor o timer
+fallido. No declarar GO sin este punto de recuperación.
+
+## GATE 23 — GO / rollback decision
+
+GO solo si todas las puertas están firmadas, PM2/Nginx están sanos, Node no sale
+de loopback, DB íntegra, dataset/usuarios correctos, backup posterior fuera del
+servidor y `P0=P1=0`. No borrar legacy, el tarball histórico ni backups.
+
+Rollback según el fallo:
+
+- antes de migrar: parar/borrar el proceso nuevo, repuntar Nginx si cambió y
+  resucitar el dump legacy;
+- migración: preservar DB fallida, restaurar el backup detenido y el par legacy;
+- HTTP/Node: si no se corrige inmediatamente, restaurar PM2/Nginx legacy;
+- dataset: restaurar el backup preactivación, no editar SQL;
+- bootstrap/auth: no provisionar; restaurar el estado anterior si procede.
+
+Siempre restaurar código y DB compatibles juntos, validar PRAGMA antes de
+arrancar y no encadenar restauraciones improvisadas.
+
+### Recuperación exacta del legacy
+
+```bash
+sudo -iu "$PM2_USER" pm2 delete guardias || true
+sudo install -m 600 -o "$PM2_USER" -g "$PM2_USER" \
+  "$DEPLOY_BACKUPS/pm2-dump-$STAMP.pm2" /home/rafa/.pm2/dump.pm2
+sudo cp -a "$DEPLOY_BACKUPS/nginx-guardias-$STAMP.conf" /etc/nginx/sites-available/guardias
+sudo nginx -t
+sudo systemctl reload nginx
+sudo -iu "$PM2_USER" pm2 resurrect
+sudo -iu "$PM2_USER" pm2 status
+curl -fsS http://127.0.0.1/api/health
+```
+
+El symlink `$OLD_APP` debe seguir resolviendo a `$LEGACY_APP`; su DB/WAL/SHM no
+se han tocado. No ejecutar `pm2 save` hasta validar el rollback.
+
+### Recuperación exacta tras una activación errónea
+
+```bash
+sudo -iu "$PM2_USER" pm2 stop guardias
+export FAILED_DB_DIR="$DEPLOY_BACKUPS/guardias-failed-$STAMP"
+sudo install -d -m 700 "$FAILED_DB_DIR"
+sudo mv -- "$DB" "$FAILED_DB_DIR/guardias.sqlite"
+sudo test ! -e "$DB-wal" || sudo mv -- "$DB-wal" "$FAILED_DB_DIR/guardias.sqlite-wal"
+sudo test ! -e "$DB-shm" || sudo mv -- "$DB-shm" "$FAILED_DB_DIR/guardias.sqlite-shm"
+sudo install -m 600 -o "$APP_USER" -g "$APP_USER" "$PRE_ACTIVATION_BACKUP" "$DB"
+sudo -u "$APP_USER" sqlite3 -readonly "$DB" 'PRAGMA quick_check; PRAGMA foreign_key_check;'
+sudo -iu "$PM2_USER" pm2 start guardias
+curl -fsS http://127.0.0.1:3000/api/health
+```
+
+## Continuidad y limpieza posterior
+
+En el servidor deben quedar `docs/START_HERE.md`, `SERVER_LAYOUT.md`,
+`OPERATIONS.md`, `INCIDENTS.md`, este runbook y los scripts `ops/`. Cubren
+estado, diagnóstico, backup, restart, XML, usuarios, reset, break-glass y
+rollback sin incluir secretos.
+
+La limpieza es otra operación con aprobación separada. Inventariar antes de
+eliminar el HOME copiado, `.ssh`, `.env`, tarball sensible, PM2 viejo, logs,
+backups o releases. Conservar el árbol legacy y su DB/WAL/SHM congelados durante
+el piloto.
+
+La prueba de carga tampoco forma parte de la cirugía inicial. Se ejecutará desde
+otra máquina por los escalones kiosco, 15–25, 60–80, 100 y 150, exigiendo cero
+500, cero `SQLITE_BUSY` inesperados, cero reinicios, cero escrituras perdidas,
+`quick_check=ok` y FK limpias.

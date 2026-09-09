@@ -32,9 +32,10 @@ redeploy. No abrir ni publicar su contenido.
 
 ## Disposición objetivo
 
-ARGOS 1.0.1 es el candidato actual para esta disposición; aún no está instalado
-en producción. El artefacto final debe identificarse por SHA y por el tag anotado
-`argos-v1.0.1-rc1`, sin modificar el rollback `argos-v1.0-rc1` de ARGOS 1.0.
+ARGOS 1.0.2 es el candidato actual para esta disposición; aún no está instalado
+en producción. Su artefacto está vinculado al commit
+`ccb2f7a88fbf9815c13df501d1aa972d31384129`. Los tags y artefactos congelados
+`argos-v1.0.1-rc1` y `argos-v1.0-rc1` no se modifican.
 
 ```text
 /srv/guardias/

@@ -6,7 +6,9 @@ ARGOS / A.R.G.O.S es el producto, sin expansión oficial aprobada; Guardias es e
 módulo actual. ARGOS 1.0.2 es la línea candidata en la rama
 `feat/argos-1.0.2-user-provisioning`, basada en el cierre aceptado de ARGOS 1.0.1
 `cb5681593b904dc81addd875f2eca132f1a420c1`. Producción y su SQLite no se han
-modificado.
+modificado. El artefacto Linux aprobado procede del commit
+`ccb2f7a88fbf9815c13df501d1aa972d31384129`; cualquier commit exclusivamente
+documental posterior no cambia esa procedencia ni obliga a reconstruirlo.
 
 ## Estado técnico
 
@@ -57,8 +59,9 @@ sin forzar recuentos del PDF.
 ## Pendiente antes de producción
 
 - El smoke funcional visual de ARGOS 1.0.1 fue completado y aceptado el 9-09-2026.
-- Auditoría adversarial independiente y certificación de carga hasta 150 usuarios.
-- Validar manualmente bootstrap, cambio forzado, preview, credenciales de un solo
-  uso, idempotencia y asignación inequívoca del segundo Superadmin.
+- Auditoría adversarial independiente y certificación de carga hasta 150 usuarios
+  después de estabilizar, sin hacerlas parte de la cirugía destructiva inicial.
+- Ejecutar en la ventana las puertas humanas de bootstrap, cambio forzado,
+  preview, credenciales de un solo uso, idempotencia y segundo Superadmin JMH.
 - Aprobar ventana, backup/rollback, XML final exacto, activación explícita y
   ejecución de cuentas/roles.
