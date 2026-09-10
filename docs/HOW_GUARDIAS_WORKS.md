@@ -6,9 +6,11 @@
 
 ## 1. El problema que resuelve
 
-ARGOS es el producto; Guardias es el módulo operativo actual. En un día lectivo Jefatura necesita saber quién falta, qué clases requieren
-cobertura, qué docentes tienen guardia, dónde se imparte la sesión y si el
-profesor ausente dejó tarea. Guardias mantiene ese estado común, ayuda a repartir
+ARGOS — Aplicación de Registro y Gestión de Organización y Sustituciones — es el
+producto; Guardias es actualmente su principal módulo operativo. En un día
+lectivo Jefatura necesita saber quién falta, qué clases requieren cobertura, qué
+docentes tienen guardia, dónde se imparte la sesión y si el profesor ausente dejó
+tarea. Guardias mantiene ese estado común, ayuda a repartir
 coberturas, muestra la información en pantallas/impresos y permite a cada docente
 consultar su horario.
 

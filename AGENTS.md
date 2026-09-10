@@ -43,7 +43,7 @@ reports. Stop the server and clean up temporary artifacts safely.
   active dataset—never silent legacy fallback.
 - Never log or expose passwords, hashes, salts, cookies, session IDs, tokens, or
   authorization headers.
-- Treat ARGOS 1.0.1 as one account/session system across the normal web,
+- Treat ARGOS 1.0.2 as one account/session system across the normal web,
   teacher UI, Jefatura, technical administration, and `/app/`. Roles are
   independent: never infer `admin` from `superadmin`, or identity from a visible
   name. The seven-click logo gesture is UI discovery only.

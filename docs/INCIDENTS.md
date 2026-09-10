@@ -142,8 +142,9 @@ sqlite3 -readonly -header -column "$GUARDIAS_DB_PATH" "
   ORDER BY p.period_key,s.label;"
 ```
 
-Para el XML oficial deben aparecer 57 `guardia_patio`, cinco
-`biblioteca_patio` y seis `patio_inclusivo`. Solo `guardia_patio` espera la futura
+En el candidato oficial validado el 10/9 aparecen 57 `guardia_patio`, cinco
+`biblioteca_patio` y seis `patio_inclusivo`; una revisión posterior puede tener
+recuentos legítimamente distintos. Solo `guardia_patio` espera la futura
 rotación; `biblioteca_patio` tiene Biblioteca fija y `patio_inclusivo` no es una
 guardia. Ninguno genera cobertura automática por ausencia.
 

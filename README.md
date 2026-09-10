@@ -3,9 +3,10 @@
 > **Documento actual / índice del repositorio.** La entrada operativa y técnica
 > canónica es [docs/START_HERE.md](docs/START_HERE.md).
 
-ARGOS / A.R.G.O.S es el producto interno del IES Alcalans; no tiene una expansión
-oficial aprobada. Guardias es su módulo actual para organizar ausencias,
-coberturas, tareas del profesorado, guardias ordinarias y obligaciones de patio.
+ARGOS — Aplicación de Registro y Gestión de Organización y Sustituciones — es el
+producto interno del IES Alcalans. Guardias es actualmente su principal módulo
+operativo para organizar ausencias, coberturas, tareas del profesorado, guardias
+ordinarias y obligaciones de patio.
 Incluye la interfaz central `guardias.html` y la vista personal móvil `/app/`.
 
 ARGOS 1.0.2 es la línea candidata actual, construida sobre el cierre aceptado de

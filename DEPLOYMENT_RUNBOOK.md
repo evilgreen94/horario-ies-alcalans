@@ -1,5 +1,9 @@
 # ARGOS 1.0.2 — despliegue limpio, controlado y reversible
 
+ARGOS significa Aplicación de Registro y Gestión de Organización y Sustituciones.
+Es el producto; Guardias es actualmente su principal módulo operativo y conserva
+sus identificadores técnicos durante este despliegue.
+
 Este runbook prepara una ventana autorizada; no la autoriza. Se ejecuta puerta a
 puerta y se detiene ante cualquier diferencia. El despliegue es offline: no usa
 `git pull`, GitHub, `npm install`, `npm ci` ni `apt install` en producción.
@@ -22,10 +26,10 @@ XML candidato local, separado del artefacto y pendiente de confirmación humana
 el día de la ventana:
 
 ```text
-ruta      C:\Users\usuario\Desktop\Censo_docente_26-27\censo def\Horario.xml
-tamaño    1.415.492 bytes
-modificado 2026-09-07 12:04:51 +02:00
-sha256    859901bb2bfecec6b468798128413fadbc5e2d23fead0bff1818d241dc708e2e
+ruta      C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\inputs\Horario_1.0.2.xml
+tamaño    1.417.006 bytes
+modificado 2026-09-10 04:50:06 +02:00
+sha256    cce81b938337938ff57506c06e0ce860e4ae57f0e7ff737de0122a9795c748dd
 estado    DEPLOYMENT XML CANDIDATE
 curso     2026/27
 ```
@@ -357,7 +361,7 @@ loopback. Desde otro equipo LAN, `:3000` no debe responder. STOP: fallback
 
 ## GATE 11 — official XML import
 
-Transferir `Horario.xml` por separado a un directorio `0700`, verificar el SHA
+Transferir `Horario_1.0.2.xml` por separado a un directorio `0700`, verificar el SHA
 aprobado y no incorporarlo al release.
 
 ```bash
@@ -366,14 +370,17 @@ install -d -m 700 "$IMPORT_DIR"
 ```
 
 ```powershell
-$xml = 'C:\Users\usuario\Desktop\Censo_docente_26-27\censo def\Horario.xml'
-Get-FileHash -Algorithm SHA256 -LiteralPath $xml
-scp $xml rafa@172.28.244.250:/var/tmp/guardias-import-ccb2f7a88fbf9815c13df501d1aa972d31384129/Horario.xml
+$xml = 'C:\Users\usuario\Documents\GitHub\horario-ies-alcalans\inputs\Horario_1.0.2.xml'
+$actualXmlSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $xml).Hash.ToLowerInvariant()
+$approvedXmlSha = (Read-Host 'Pega el SHA-256 aprobado por Rafa').Trim().ToLowerInvariant()
+if ($approvedXmlSha -ne $actualXmlSha) { throw 'STOP: el XML no coincide con el SHA aprobado' }
+scp $xml rafa@172.28.244.250:/var/tmp/guardias-import-ccb2f7a88fbf9815c13df501d1aa972d31384129/Horario_1.0.2.xml
 ```
 
 ```bash
-export EXPECTED_XML_SHA='859901bb2bfecec6b468798128413fadbc5e2d23fead0bff1818d241dc708e2e'
-printf '%s  %s\n' "$EXPECTED_XML_SHA" 'Horario.xml' |
+read -r -p 'SHA-256 aprobado del XML: ' EXPECTED_XML_SHA
+[[ "$EXPECTED_XML_SHA" =~ ^[[:xdigit:]]{64}$ ]] || { echo 'STOP: SHA inválido'; exit 1; }
+printf '%s  %s\n' "$EXPECTED_XML_SHA" 'Horario_1.0.2.xml' |
   (cd "$IMPORT_DIR" && sha256sum -c -)
 sudo -iu "$PM2_USER" pm2 stop guardias
 export PRE_IMPORT_BACKUP="$DEPLOY_BACKUPS/guardias-before-import-$STAMP.sqlite"
@@ -383,18 +390,18 @@ sudo chmod 600 "$PRE_IMPORT_BACKUP"
 
 sudo -iu "$APP_USER" bash -lc \
   "cd '$CURRENT' && ./runtime/node server/scripts/prepare-ghc-schedule.js \
-   --input '$IMPORT_DIR/Horario.xml' --academic-year 2026/27"
+   --input '$IMPORT_DIR/Horario_1.0.2.xml' --academic-year 2026/27"
 sudo -iu "$APP_USER" bash -lc \
   "cd '$CURRENT' && ./runtime/node server/scripts/prepare-ghc-schedule.js \
-   --input '$IMPORT_DIR/Horario.xml' --academic-year 2026/27 --db '$DB' --import \
+   --input '$IMPORT_DIR/Horario_1.0.2.xml' --academic-year 2026/27 --db '$DB' --import \
    --allow-operational-db IMPORT_VALIDATED_GHC_DATASET_ONLY"
 ```
 
 PASS: ISO-8859-1 sin mojibake, `source_code` únicos, referencias resueltas,
 periodos/recreos explícitos, cero duplicados/anomalías y resultado
-`activated:false` / `validated`. Los recuentos históricos (88 docentes,
-2.143 obligaciones, 57 patio, 5 biblioteca y 6 inclusivos) son comparación, no
-un requisito para un XML más nuevo. STOP: referencia sin resolver, identidad
+`activated:false` / `validated`. El candidato del 10/9 produjo 88 docentes,
+2.145 obligaciones, 57 patio, 5 biblioteca y 6 inclusivos; son valores de
+comparación, no un requisito para un XML más nuevo. STOP: referencia sin resolver, identidad
 ambigua, duplicado, anomalía o activación automática.
 
 ## GATE 12 — validate XML

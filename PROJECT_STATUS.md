@@ -2,8 +2,9 @@
 
 > Documento contextual. Para operar, empezar por [docs/START_HERE.md](docs/START_HERE.md).
 
-ARGOS / A.R.G.O.S es el producto, sin expansión oficial aprobada; Guardias es el
-módulo actual. ARGOS 1.0.2 es la línea candidata en la rama
+ARGOS — Aplicación de Registro y Gestión de Organización y Sustituciones — es el
+producto interno; Guardias es actualmente su principal módulo operativo. ARGOS
+1.0.2 es la línea candidata en la rama
 `feat/argos-1.0.2-user-provisioning`, basada en el cierre aceptado de ARGOS 1.0.1
 `cb5681593b904dc81addd875f2eca132f1a420c1`. Producción y su SQLite no se han
 modificado. El artefacto Linux aprobado procede del commit
@@ -33,20 +34,20 @@ documental posterior no cambia esa procedencia ni obliga a reconstruirlo.
 | Docentes / `source_code` únicos | 88 / 88 |
 | Referencias sin resolver | 0 |
 | Periodos / recreos | 9 / 2 |
-| Sesiones totales | 2.143 |
-| Clases | 1.206 |
-| Guardias ordinarias | 155 |
+| Sesiones totales | 2.145 |
+| Clases | 1.208 |
+| Guardias ordinarias | 154 |
 | Reuniones | 220 |
-| Otras actividades | 494 |
+| Otras actividades | 495 |
 | `GUÀRDIES PATI` | 57 |
 | `BIBLIOTECA PATI` | 5 |
 | `PATIS INCLUSIUS` | 6 |
 
-La importación deja el dataset `validated` y nunca lo activa. El XML del 7/9 y
-el PDF/censo del 4/9 comparten periodos y 2.061 slots. Hay 82 slots solo XML, 60
-solo PDF y dos códigos de plantilla distintos en cada roster; se documentan como
-revisión de fuente más reciente y mayor precisión estructural del XML oficial,
-sin forzar recuentos del PDF.
+La validación del candidato oficial `Horario_1.0.2.xml` del 10/9 deja el dataset
+`validated` y nunca lo activa. Frente al candidato histórico del 7/9 mantiene
+los mismos 88 `source_code`, sin altas, bajas ni conflictos de identidad; cambia
+el horario de 11 códigos y añade dos sesiones netas. Los recuentos son evidencia
+del candidato actual, no una condición fija para futuras revisiones.
 
 ## Reglas finales de patio
 

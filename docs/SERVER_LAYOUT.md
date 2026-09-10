@@ -8,7 +8,7 @@
 | Elemento | Estado observado |
 |---|---|
 | SO/arquitectura | Ubuntu Linux x86_64; kernel 6.8 observado |
-| glibc | Versión instalada no inventariada; objetivo de compatibilidad del release: Ubuntu 22.04+ / glibc 2.35 o superior |
+| glibc | Versión instalada no inventariada; mínimo del release: 2.34. El gate de build se validó hasta un máximo admitido de 2.35, que no es el mínimo productivo. |
 | Usuario runtime | `rafa` (`HOME=/home/rafa`) |
 | Aplicación | `/srv/guardias/horario-ies-alcalans` |
 | SQLite | `$APP/BD/guardias.sqlite`, legacy, sin `schema_migrations` |

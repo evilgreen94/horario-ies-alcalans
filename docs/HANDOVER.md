@@ -5,9 +5,10 @@
 
 ## 1. ¿Qué es?
 
-ARGOS es el producto interno y Guardias su módulo actual para horarios, ausencias,
-coberturas, tareas y patio. La red entra por Nginx; el proceso Node se llama
-`guardias` en PM2 y usa una base SQLite.
+ARGOS — Aplicación de Registro y Gestión de Organización y Sustituciones — es el
+producto interno; Guardias es actualmente su principal módulo operativo para
+horarios, ausencias, coberturas, tareas y patio. La red entra por Nginx; el
+proceso Node se llama `guardias` en PM2 y usa una base SQLite.
 
 La web normal, el perfil docente, Jefatura, Administración técnica y `/app/`
 comparten cuenta y sesión. `teacher`, `admin` y `superadmin` son permisos
