@@ -48,7 +48,10 @@ router.get('/me', requireAuthenticated, async (req, res, next) => {
       return res.status(403).json({ error: 'La vista docente requiere una cuenta individual.' });
     }
     const now = getMadridNow();
-    const dateKey = req.query.date ? normalizeDateKey(req.query.date) : formatDateKey(now);
+    if (req.query.date !== undefined && typeof req.query.date !== 'string') {
+      return res.status(400).json({ error: 'date must be a single YYYY-MM-DD value.' });
+    }
+    const dateKey = req.query.date !== undefined ? normalizeDateKey(req.query.date) : formatDateKey(now);
     const identity = await resolveActiveTeacherProfile(await getDatabase(), req.sessionUser.userId, dateKey);
     if (!identity) return res.status(404).json({ error: 'No hay un perfil docente activo asignado para esa fecha.' });
 

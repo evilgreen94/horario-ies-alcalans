@@ -35,7 +35,7 @@
     {
       scope:'tvPanel.assignments',
       reason:'Las tarjetas TV y la vista de impresion no pueden reconstruir coberturas por si solas sin los calculos del dominio principal.',
-      requiredHost:['assignGuardiasForRows','getBibliotecaAsignada','getBanosAsignado','resolveAulaRegistro']
+      requiredHost:['buildTvAbsenceAssignment','getBibliotecaAsignada','getBanosAsignado']
     }
   ];
 
@@ -371,8 +371,7 @@
     const getWeekOffset=()=>Number(getValue(options.getWeekOffset,0))||0;
     const getRowsForWeekOffset=requireFn('getRowsForWeekOffset',options.getRowsForWeekOffset);
     const getVisibleTeacherName=requireFn('getVisibleTeacherName',options.getVisibleTeacherName);
-    const resolveAulaRegistro=requireFn('resolveAulaRegistro',options.resolveAulaRegistro);
-    const assignGuardiasForRows=requireFn('assignGuardiasForRows',options.assignGuardiasForRows);
+    const buildTvAbsenceAssignment=requireFn('buildTvAbsenceAssignment',options.buildTvAbsenceAssignment);
     const getBibliotecaAsignada=requireFn('getBibliotecaAsignada',options.getBibliotecaAsignada);
     const getBanosAsignado=requireFn('getBanosAsignado',options.getBanosAsignado);
     const getPatioCoverageSummary=isFn(options.getPatioCoverageSummary)?options.getPatioCoverageSummary:null;
@@ -490,24 +489,7 @@
       const slotRows=currentRows
         .filter(row=>row.dia===slot.dia&&row.hora===slot.hora)
         .sort((a,b)=>String(a&&a.id||'').localeCompare(String(b&&b.id||'')));
-      const fallbackAssignmentsById=new Map(
-        assignGuardiasForRows(currentRows)
-          .filter(row=>row.dia===slot.dia&&row.hora===slot.hora)
-          .map(row=>[String(row&&row.id||''),row])
-      );
-      const rows=slotRows
-        .map(row=>{
-          if(shared.cleanText(row.guardia)) return row;
-          const fallback=fallbackAssignmentsById.get(String(row&&row.id||''));
-          return fallback&&shared.cleanText(fallback.guardia)?{...row,guardia:fallback.guardia}:row;
-        })
-        .sort((a,b)=>String(getVisibleTeacherName(a.guardia||'')).localeCompare(getVisibleTeacherName(b.guardia||''),'es'));
-      const assignments=rows.map(row=>({
-        teacher:getVisibleTeacherName(row.guardia||'')||'Sin cubrir',
-        location:resolveAulaRegistro(row)||'Sin ubicacion',
-        meta:getVisibleTeacherName(row.ausente||'')?`Cubre a ${getVisibleTeacherName(row.ausente)}`:'',
-        tone:'general'
-      }));
+      const assignments=slotRows.map(buildTvAbsenceAssignment);
       const assignedTeachers=new Set(assignments.map(item=>shared.cleanText(item.teacher)).filter(Boolean));
       const biblioteca=getBibliotecaAsignada(slot.dia,slot.hora,currentRows);
       const banos=getBanosAsignado(slot.dia,slot.hora,currentRows);

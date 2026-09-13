@@ -85,6 +85,11 @@ async function testEverySessionTypeRemainsOccupied() {
     server = await startServer({ dbPath: environment.dbPath });
     const login = await loginIndividual(server.baseUrl, 'runtime.state', 'Runtime-state-password-2026');
     assert.equal(login.response.status, 200);
+    for (const query of ['date=wrong', 'date=', 'date=2026-02-30', 'date=2026-09-14&date=2026-09-15', 'date[x]=2026-09-14']) {
+      const invalid = await request(server.baseUrl, `/api/schedule/me?${query}`, {}, login.jar);
+      assert.equal(invalid.response.status, 400, query);
+      assert.equal(typeof invalid.body.error, 'string');
+    }
     const madridParts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Europe/Madrid',
       year: 'numeric',

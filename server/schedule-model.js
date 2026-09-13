@@ -559,6 +559,8 @@ function buildLegacySchedulePayload(canonical) {
         franja: `${period.startsAt}-${period.endsAt}`,
         slot: period.position,
         texto: text,
+        materia: session.subject || (session.type === 'guardia' ? 'Guardia' : session.label) || '',
+        grupo: session.group || '',
         aula: session.room || '',
         sessionType: session.type,
         automaticCoverageRequired: session.type === 'class'

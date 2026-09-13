@@ -3,7 +3,8 @@ const crypto = require('crypto');
 const { getDatabase, withImmediateTransaction } = require('../db');
 const { ensureArray, ensureObject, ensureOptionalId, ensureRequiredString, normalizeBoolean, normalizeInteger, normalizeText, normalizeString, sanitizeAusencia } = require('./validation');
 const { requireRole } = require('../session');
-const { esHoraValida, getCanonicalTeacherSessionAtSlot, getResolvedTeacherSession, getSesionesCubriblesProfesor } = require('../teacher-schedule');
+const { esHoraValida, getResolvedTeacherSession, getSesionesCubriblesProfesor } = require('../teacher-schedule');
+const { ensureCoverageAssignmentsAllowed } = require('../coverage-assignment');
 const { getInactiveGroupSet, isGroupInactive, logInactiveGroupSkip } = require('../group-state');
 const {
   buildMonthlyGuardiaLoadResponse,
@@ -12,7 +13,6 @@ const {
 } = require('./guardias/monthly-load');
 
 const router = express.Router();
-let lastReplacePayloadHash = '';
 
 function notFound(message) {
   const error = new Error(message);
@@ -124,12 +124,12 @@ async function ensureNoDuplicateAbsence(db, row, excludeId = null) {
   return targetKeys;
 }
 
-async function ensureCoverageAssignmentAllowed(db, row) {
-  if (!String(row?.guardia || '').trim()) return;
-  const session = await getCanonicalTeacherSessionAtSlot(db, row.ausente, row.dia, row.hora);
-  if (session && ['guardia_patio', 'biblioteca_patio', 'patio_inclusivo'].includes(session.tipo)) {
-    throw conflict('Esta obligación puede registrar ausencia, pero no admite cobertura automática.');
-  }
+async function validateCoverageAtSlot(db, row, excludeId = null) {
+  const current = await db.all('SELECT * FROM ausencias WHERE dia = ? AND hora = ?', [row.dia, row.hora]);
+  await ensureCoverageAssignmentsAllowed(db, [
+    ...current.filter(item => String(item.id) !== String(excludeId ?? '')),
+    row
+  ]);
 }
 
 router.get('/', async (_req, res, next) => {
@@ -202,10 +202,10 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
           logAusenciasDayComplete('creada', { profesor: payload.profesor, dia: payload.dia, hora: session.hora, aula: session.aula || '', grupo: session.grupo || '' });
           saved.push(await db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]));
         }
+        await ensureCoverageAssignmentsAllowed(db, await db.all('SELECT * FROM ausencias WHERE dia = ?', [payload.dia]));
         await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
         return saved.sort((a, b) => Number(a.hora) - Number(b.hora) || Number(a.id) - Number(b.id));
       }, { label: `guardias:full-day:${payload.dia}:${normalizeText(payload.profesor)}` });
-      lastReplacePayloadHash = '';
       res.status(201).json({
         ok: true,
         tipo: 'dia_completo',
@@ -217,7 +217,6 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
     }
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
     const db = await getDatabase();
-    await ensureCoverageAssignmentAllowed(db, { dia, hora, ausente, guardia });
     if (await shouldSkipAbsenceRowByInactiveGroup(db, { dia, hora, ausente })) {
       throw conflict('La sesión pertenece a un grupo inactivo y no genera guardia.');
     }
@@ -225,6 +224,7 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
     let guardia_key = '';
     logGuardiasSave('save-single:start', { dia, hora, ausente });
     const row = await withImmediateTransaction(db, async () => {
+      await validateCoverageAtSlot(db, { dia, hora, ausente, guardia });
       const keys = await ensureNoDuplicateAbsence(db, { dia, hora, ausente, guardia });
       ausente_key = keys.ausente_key;
       guardia_key = keys.guardia_key;
@@ -236,7 +236,6 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
       return db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]);
     }, { label: `guardias:create:${dia}:${hora}:${ausente_key || normalizeText(ausente)}` });
-    lastReplacePayloadHash = '';
     logGuardiasSave('save-single:success', { id: row?.id, dia, hora, ausente });
     res.status(201).json({ ...row, ausente_key, guardia_key });
   } catch (error) {
@@ -252,7 +251,6 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
     const rows = [];
     for (const row of candidateRows) {
       if (await shouldSkipAbsenceRowByInactiveGroup(db, row, inactiveGroups)) continue;
-      await ensureCoverageAssignmentAllowed(db, row);
       rows.push(row);
     }
     const duplicateKeys = new Set();
@@ -266,17 +264,10 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
     const payloadHash = buildReplacePayloadHash(rows);
     const startedAt = Date.now();
     logGuardiasSave('replace:start', { total: rows.length, hash: payloadHash });
-    if (payloadHash === lastReplacePayloadHash) {
-      const currentRows = await db.all('SELECT * FROM ausencias ORDER BY dia, hora, id');
-      logGuardiasSave('replace:skipped duplicate payload', {
-        total: rows.length,
-        persisted: currentRows.length,
-        ms: Date.now() - startedAt
-      });
-      res.json(await filterVisibleAbsenceRows(db, currentRows));
-      return;
-    }
     const persisted = await withImmediateTransaction(db, async () => {
+      await ensureCoverageAssignmentsAllowed(db, rows);
+      const currentRows = await db.all('SELECT * FROM ausencias ORDER BY dia, hora, id');
+      if (payloadHash === buildReplacePayloadHash(currentRows)) return currentRows;
       await db.exec('DELETE FROM ausencias');
 
       for (const row of rows) {
@@ -298,7 +289,6 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
       return db.all('SELECT * FROM ausencias ORDER BY dia, hora, id');
     }, { label: `guardias:replace:${rows.length}` });
-    lastReplacePayloadHash = payloadHash;
     logGuardiasSave('replace:success', {
       requested: rows.length,
       persisted: persisted.length,
@@ -315,7 +305,6 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
     const { id } = req.params;
     const { dia, hora, ausente, guardia, aula, faena, obs } = sanitizeAusencia(req.body);
     const db = await getDatabase();
-    await ensureCoverageAssignmentAllowed(db, { dia, hora, ausente, guardia });
     if (await shouldSkipAbsenceRowByInactiveGroup(db, { dia, hora, ausente })) {
       throw conflict('La sesión pertenece a un grupo inactivo y no genera guardia.');
     }
@@ -323,6 +312,7 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
     let guardia_key = '';
     logGuardiasSave('save-update:start', { id, dia, hora, ausente });
     const row = await withImmediateTransaction(db, async () => {
+      await validateCoverageAtSlot(db, { dia, hora, ausente, guardia }, id);
       const keys = await ensureNoDuplicateAbsence(db, { dia, hora, ausente, guardia }, id);
       ausente_key = keys.ausente_key;
       guardia_key = keys.guardia_key;
@@ -338,7 +328,6 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
       return db.get('SELECT * FROM ausencias WHERE id = ?', [id]);
     }, { label: `guardias:update:${id}` });
-    lastReplacePayloadHash = '';
     logGuardiasSave('save-update:success', { id, dia, hora, ausente });
     res.json({ ...row, ausente_key, guardia_key });
   } catch (error) {
@@ -357,7 +346,6 @@ router.delete('/:id', requireRole('admin'), async (req, res, next) => {
       }
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
     }, { label: `guardias:delete:${req.params.id}` });
-    lastReplacePayloadHash = '';
     logGuardiasSave('delete:success', { id: req.params.id });
     res.status(204).end();
   } catch (error) {

@@ -136,6 +136,9 @@ function parseSesion(item){
   const partes=texto.split('|').map(parte=>cleanText(parte)).filter(Boolean);
   const canonicalType=cleanText(item.sessionType).toLowerCase();
   const coverage=item.automaticCoverageRequired!==false;
+  if(canonicalType&&Object.hasOwn(item,'grupo')&&Object.hasOwn(item,'materia')){
+    return {tipo:canonicalType==='class'?'clase':canonicalType,materia:cleanText(item.materia),grupo:cleanText(item.grupo),detalle:texto,aula,automaticCoverageRequired:coverage};
+  }
   if(canonicalType==='guardia'||isGuardiaTexto(texto)) return {tipo:'guardia',materia:'Guardia',detalle:'Guardia',grupo:'',aula:aula||'',automaticCoverageRequired:false};
   if(canonicalType&&canonicalType!=='class') return {tipo:canonicalType,materia:partes[0]||texto||'Sesión',detalle:texto||'Sesión',grupo:'',aula:aula||'',automaticCoverageRequired:coverage};
   if(partes.length>=3) return {tipo:'clase',materia:partes[0],grupo:partes[1],detalle:texto,aula:aula||partes[2]||'',automaticCoverageRequired:coverage};
@@ -1699,19 +1702,18 @@ function getProfesorDisponibilidadDetalle(profesor,dia,hora,options={}){
   const scheduledHours=getHorasProgramadasProfesorDia(nombre,safeDia);
   const scheduledInCenter=scheduledHours.includes(safeHora);
   const baseGuardiaCandidate=getGuardiaBaseTeachersForSlot(safeDia,safeHora).some(candidate=>sameNormalizedText(candidate,nombre));
-  const practicasCandidate=getPracticasGuardiaTeachersForSlot(safeDia,safeHora).some(candidate=>sameNormalizedText(candidate,nombre));
   const blockedByAbsence=(rowsSource||[]).some(row=>row.dia===safeDia&&row.hora===safeHora&&sameNormalizedText(row.ausente,nombre));
   const blockedAllDay=isTeacherAbsentAllDay(nombre,safeDia,rowsSource);
   const blockedByManualFlag=!!getPatioTeacherBlock(nombre,safeDia,safeHora,weekKey);
   const assignedGuardiaAtSlot=!ignoreAssignedGuardiasAtSlot&&(rowsSource||[]).some(row=>row.dia===safeDia&&row.hora===safeHora&&sameNormalizedText(row.guardia,nombre));
-  const hasTeachingSession=!!session&&session.tipo!=='guardia'&&!practicasCandidate;
+  const hasTeachingSession=!!session&&session.tipo!=='guardia';
   if(!nombre||!getProfesor(nombre)){
     return {available:false,reason:'profesor-desconocido',nombre};
   }
   if(!scheduledInCenter){
     return {available:false,reason:'no-trabaja-en-ese-tramo',nombre,scheduledHours};
   }
-  if(!baseGuardiaCandidate&&!practicasCandidate){
+  if(!baseGuardiaCandidate){
     return {available:false,reason:'sin-disponibilidad-real-en-ese-tramo',nombre};
   }
   if(blockedByAbsence||blockedAllDay){
@@ -1728,7 +1730,7 @@ function getProfesorDisponibilidadDetalle(profesor,dia,hora,options={}){
   }
   return {
     available:true,
-    reason:practicasCandidate?'practicas-habilitadas':'guardia-programada',
+    reason:'guardia-programada',
     nombre,
     sessionType:session?.tipo||'',
     scheduledHours
@@ -2938,8 +2940,7 @@ const tvPanelDomain=auxPanelsSuite?.createTvPanelDomain({
   getWeekOffset:()=>weekOffset,
   getRowsForWeekOffset,
   getVisibleTeacherName,
-  resolveAulaRegistro,
-  assignGuardiasForRows,
+  buildTvAbsenceAssignment,
   getBibliotecaAsignada,
   getBanosAsignado,
   getPatioCoverageSummary:(dia,hora)=>getPatioCoverageSummary(dia,hora,getCurrentSchoolWeekKey()),
@@ -4615,27 +4616,10 @@ function getUpcomingSchoolSlotsForToday(limit=2){
 }
 function getTvSlotAssignments(slot,rowsSource){
   if(!slot) return [];
-  const slotRows=(rowsSource||[])
+  const rows=(rowsSource||[])
     .filter(row=>row.dia===slot.dia&&row.hora===slot.hora)
     .sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
-  const fallbackAssignmentsById=new Map(
-    assignGuardiasForRows(rowsSource||[])
-      .filter(row=>row.dia===slot.dia&&row.hora===slot.hora)
-      .map(row=>[String(row.id||''),row])
-  );
-  const rows=slotRows
-    .map(row=>{
-      if(cleanText(row.guardia)) return row;
-      const fallback=fallbackAssignmentsById.get(String(row.id||''));
-      return fallback&&cleanText(fallback.guardia)?{...row,guardia:fallback.guardia}:row;
-    })
-    .sort((a,b)=>String(getVisibleTeacherName(a.guardia||'')).localeCompare(getVisibleTeacherName(b.guardia||''),'es'));
-  const assignments=rows.map(row=>({
-    teacher:getVisibleTeacherName(row.guardia||'')||'Sin cubrir',
-    location:resolveAulaRegistro(row)||'Sin ubicación',
-    meta:getVisibleTeacherName(row.ausente)?`Cubre a ${getVisibleTeacherName(row.ausente)}`:'',
-    tone:'general'
-  }));
+  const assignments=rows.map(buildTvAbsenceAssignment);
   const assignedTeachers=new Set(assignments.map(item=>cleanText(item.teacher)).filter(Boolean));
   const biblioteca=getBibliotecaAsignada(slot.dia,slot.hora,rowsSource);
   const banos=getBanosAsignado(slot.dia,slot.hora,rowsSource);
@@ -5611,13 +5595,43 @@ function setDay(i){day=i;renderPills();renderGuardiaBoard();renderTable();}
 function isMobileAbsenceLayout(){
   return window.innerWidth<=900;
 }
+function getAbsenceSessionDisplay(row){
+  const session=resolveTeacherSession(row.ausente,row.dia,row.hora);
+  return {
+    grupo:cleanText(session?.grupo),
+    aula:cleanText(session?.aula)||'Aula no indicada',
+    materia:cleanText(session?.materia)
+  };
+}
+function getAbsenceCoverageDisplay(row){
+  const session=getAbsenceSessionDisplay(row);
+  const guardia=getVisibleTeacherName(row.guardia||'');
+  return {
+    ...session,
+    ausente:getVisibleTeacherName(row.ausente||''),
+    guardia,
+    estado:guardia?'Cubierta':'Pendiente'
+  };
+}
+function buildTvAbsenceAssignment(row){
+  const display=getAbsenceCoverageDisplay(row);
+  return {
+    teacher:display.guardia||'Sin cubrir',
+    location:[display.grupo?`Grupo ${display.grupo}`:'Grupo no indicado',display.aula==='Aula no indicada'?display.aula:`Aula ${display.aula}`].join(' · '),
+    meta:[display.estado,display.ausente?`Ausente: ${display.ausente}`:'',display.materia].filter(Boolean).join(' · '),
+    tone:'general'
+  };
+}
+function renderAbsenceSessionDetails(model){
+  return `<div class="guardia-slot"><span class="aula-tag">${escapeHtml(model.grupo?`Grupo ${model.grupo}`:'Grupo no indicado')}</span><span class="aula-tag">${escapeHtml(model.aula==='Aula no indicada'?model.aula:`Aula ${model.aula}`)}</span></div>${model.materia?`<span class="cell-meta">${escapeHtml(model.materia)}</span>`:''}`;
+}
 function buildAbsenceDisplayModel(g,rowsSource){
   const h=HORA_MAP[g.hora]||{label:g.hora+'a',rango:''};
   const cub=g.guardia&&g.guardia.trim();
   const needsCoverage=rowNeedsCoverage(g);
   const sugerido=needsCoverage?(cub||getGuardiaSugerida(day,g.hora,1,rowsSource)):'';
   const faenaInfo=resolveFaena(g);
-  const aula=resolveAulaRegistro(g)||'-';
+  const {grupo,aula,materia}=getAbsenceCoverageDisplay(g);
   const ausenteNombre=getVisibleTeacherName(g.ausente);
   const guardiaNombre=sugerido?getVisibleTeacherName(sugerido):'';
   const ausenteMood=getTeacherMoodForToday(g.ausente);
@@ -5643,6 +5657,8 @@ function buildAbsenceDisplayModel(g,rowsSource){
     sugerido,
     faenaInfo,
     aula,
+    grupo,
+    materia,
     ausenteNombre,
     guardiaNombre,
     ausenteMood,
@@ -5719,8 +5735,8 @@ function renderMobileAbsenceGroups(filteredRows,rows,editableWeek){
             <span class="mobile-absence-detail-meta">${escapeHtml(model.guardiaEstado)}</span>
           </div>
           <div class="mobile-absence-detail">
-            <span class="mobile-absence-detail-label">Aula</span>
-            <span class="aula-tag">${escapeHtml(model.aula)}</span>
+            <span class="mobile-absence-detail-label">Grupo y aula</span>
+            ${renderAbsenceSessionDetails(model)}
           </div>
           <div class="mobile-absence-detail">
             <span class="mobile-absence-detail-label">Tarea</span>
@@ -6955,8 +6971,8 @@ function renderTable(){
         </td>
         <td>
           <div class="cell-stack cell-stack-compact">
-            <div class="cell-label">Aula</div>
-            <div class="guardia-slot"><span class="aula-tag">${escapeHtml(model.aula)}</span></div>
+            <div class="cell-label">Grupo y aula</div>
+            ${renderAbsenceSessionDetails(model)}
           </div>
         </td>
         <td>

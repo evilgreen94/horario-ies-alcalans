@@ -99,8 +99,7 @@ function renderUnallocatedPatioDuties() {
     dias: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'],
     getRowsForWeekOffset: () => [],
     getVisibleTeacherName: value => value,
-    resolveAulaRegistro: () => '',
-    assignGuardiasForRows: rows => rows,
+    buildTvAbsenceAssignment: () => ({ teacher: 'Sin cubrir', location: 'Grupo no indicado · Aula no indicada', meta: 'Pendiente', tone: 'general' }),
     getBibliotecaAsignada: () => '',
     getBanosAsignado: () => '',
     getPatioCoverageSummary: () => ({
@@ -213,11 +212,11 @@ async function testHttpEdgeCasesAndTwoClients() {
 
     const updated = await request(server.baseUrl, `/api/guardias/${created.id}`, {
       method: 'PUT',
-      body: { ...absencePayload, guardia: 'DOCENTE COBERTURA', obs: 'actualizada' }
+      body: { ...absencePayload, guardia: '', obs: 'actualizada' }
     }, clientA.jar);
     assert.strictEqual(updated.response.status, 200);
     const afterUpdate = await request(server.baseUrl, '/api/guardias', {}, clientB.jar);
-    assert.strictEqual(afterUpdate.body.find(row => row.id === created.id).guardia, 'DOCENTE COBERTURA');
+    assert.strictEqual(afterUpdate.body.find(row => row.id === created.id).obs, 'actualizada');
     const deleted = await request(server.baseUrl, `/api/guardias/${created.id}`, { method: 'DELETE' }, clientA.jar);
     assert.strictEqual(deleted.response.status, 204);
     const afterDelete = await request(server.baseUrl, '/api/guardias', {}, clientB.jar);

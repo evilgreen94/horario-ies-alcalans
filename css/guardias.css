@@ -3790,7 +3790,7 @@ tbody td:nth-child(7) {
   tbody tr:not(.row-support) td:nth-child(1)::before { content: 'Hora'; }
   tbody tr:not(.row-support) td:nth-child(2)::before { content: 'Ausente'; }
   tbody tr:not(.row-support) td:nth-child(3)::before { content: 'Guardia'; }
-  tbody tr:not(.row-support) td:nth-child(4)::before { content: 'Aula'; }
+  tbody tr:not(.row-support) td:nth-child(4)::before { content: 'Grupo y aula'; }
   tbody tr:not(.row-support) td:nth-child(5)::before { content: 'Faena'; }
   tbody tr:not(.row-support) td:nth-child(6)::before { content: 'Estado'; }
   tbody tr:not(.row-support) td:nth-child(7)::before { content: 'Acciones'; }

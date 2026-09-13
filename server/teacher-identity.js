@@ -3,11 +3,11 @@ function normalizeDateKey(value) {
     ? (Number.isNaN(value.getTime()) ? '' : value.toISOString().slice(0, 10))
     : String(value || '').trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
-    throw new Error('date must use YYYY-MM-DD format.');
+    throw Object.assign(new Error('date must use YYYY-MM-DD format.'), { status: 400 });
   }
   const parsed = new Date(`${dateKey}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== dateKey) {
-    throw new Error('date must be a valid calendar date.');
+    throw Object.assign(new Error('date must be a valid calendar date.'), { status: 400 });
   }
   return dateKey;
 }

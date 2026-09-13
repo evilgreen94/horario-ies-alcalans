@@ -15,12 +15,15 @@ module.exports = [{
       const db = await openDatabase(environment.dbPath);
       try {
         await importTeacherProfiles(db, {
-          academic_year: '2026/27', source_system: 'test', teacher_count: 1,
-          teachers: [{ source_code: 'T001', display_name: 'Test Teacher', active: true }]
-        }, { sourceFormat: 'test' });
+          academic_year: '2026/27', source_system: 'test', teacher_count: 2,
+          teachers: [
+            { source_code: 'T001', display_name: 'Test Teacher', active: true },
+            { source_code: 'T002', display_name: 'Replacement', active: true }
+          ]
+        }, { sourceFormat: 'test', expectedCount: 2 });
         const imported = await importScheduleDataset(db, {
           academic_year: '2026/27', label: 'Special coverage test',
-          source: { system: 'test', format: 'test' }, teacher_source_codes: ['T001'],
+          source: { system: 'test', format: 'test' }, teacher_source_codes: ['T001', 'T002'],
           periods: [
             { key: 'P1', position: 1, type: 'teaching', starts_at: '08:00', ends_at: '09:00' },
             { key: 'P2', position: 2, type: 'teaching', starts_at: '09:00', ends_at: '10:00' },
@@ -31,7 +34,8 @@ module.exports = [{
             { teacher_source_code: 'T001', weekday: 0, period_key: 'P1', type: 'class' },
             { teacher_source_code: 'T001', weekday: 0, period_key: 'P2', type: 'patio_inclusivo' },
             { teacher_source_code: 'T001', weekday: 0, period_key: 'B1', type: 'guardia_patio' },
-            { teacher_source_code: 'T001', weekday: 0, period_key: 'B2', type: 'biblioteca_patio' }
+            { teacher_source_code: 'T001', weekday: 0, period_key: 'B2', type: 'biblioteca_patio' },
+            { teacher_source_code: 'T002', weekday: 0, period_key: 'P1', type: 'guardia' }
           ]
         });
         await activateScheduleDataset(db, imported.datasetId);

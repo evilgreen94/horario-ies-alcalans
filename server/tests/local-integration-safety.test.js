@@ -130,16 +130,16 @@ async function testHttpLifecycle() {
 
     const assigned = await request(server.baseUrl, `/api/guardias/${absenceId}`, {
       method: 'PUT',
-      body: { dia: 0, hora: 1, ausente: SYNTHETIC, guardia: `${SYNTHETIC}_COVER`, aula: 'QA-01', faena: true, obs: 'fase-2c-assigned' }
+      body: { dia: 0, hora: 1, ausente: SYNTHETIC, guardia: '', aula: 'QA-01', faena: true, obs: 'fase-2c-assigned' }
     }, individualAdmin.jar);
     assert.strictEqual(assigned.response.status, 200);
-    assert.strictEqual(assigned.body.guardia, `${SYNTHETIC}_COVER`);
+    assert.strictEqual(assigned.body.obs, 'fase-2c-assigned');
 
     const listed = await request(server.baseUrl, '/api/guardias');
-    assert.ok(listed.body.some(row => row.id === absenceId && row.guardia === `${SYNTHETIC}_COVER`));
+    assert.ok(listed.body.some(row => row.id === absenceId && row.obs === 'fase-2c-assigned'));
     const db = await openDatabase(environment.dbPath);
     const stored = await db.get('SELECT * FROM ausencias WHERE id = ?', absenceId);
-    assert.strictEqual(stored.guardia, `${SYNTHETIC}_COVER`);
+    assert.strictEqual(stored.obs, 'fase-2c-assigned');
     await db.close();
 
     const changedPassword = await request(server.baseUrl, '/api/auth/change-password', {
@@ -169,7 +169,7 @@ async function testHttpLifecycle() {
     const persistedIndividualAdmin = await loginIndividual(server.baseUrl, 'lifecycle.admin', 'Lifecycle-admin-2026!');
     assert.strictEqual(persistedIndividualAdmin.response.status, 200);
     const persistedRows = await request(server.baseUrl, '/api/guardias');
-    assert.ok(persistedRows.body.some(row => row.id === absenceId && row.guardia === `${SYNTHETIC}_COVER`));
+    assert.ok(persistedRows.body.some(row => row.id === absenceId && row.obs === 'fase-2c-assigned'));
 
     const backupPath = path.join(environment.root, 'guardias-consistent-backup.sqlite');
     await createConsistentBackup(environment.dbPath, backupPath);
@@ -191,11 +191,11 @@ async function testHttpLifecycle() {
 
     const updateOne = request(server.baseUrl, `/api/guardias/${absenceId}`, {
       method: 'PUT',
-      body: { dia: 0, hora: 1, ausente: SYNTHETIC, guardia: `${SYNTHETIC}_WRITE_A`, aula: 'QA-01', faena: true, obs: 'parallel-a' }
+      body: { dia: 0, hora: 1, ausente: SYNTHETIC, guardia: '', aula: 'QA-01', faena: true, obs: 'parallel-a' }
     }, persistedIndividualAdmin.jar);
     const updateTwo = request(server.baseUrl, `/api/guardias/${second.body.id}`, {
       method: 'PUT',
-      body: { dia: 0, hora: 2, ausente: `${SYNTHETIC}_SECOND`, guardia: `${SYNTHETIC}_WRITE_B`, aula: 'QA-02', faena: false, obs: 'parallel-b' }
+      body: { dia: 0, hora: 2, ausente: `${SYNTHETIC}_SECOND`, guardia: '', aula: 'QA-02', faena: false, obs: 'parallel-b' }
     }, persistedIndividualAdmin.jar);
     const concurrentReads = [
       request(server.baseUrl, '/api/guardias'),
@@ -204,8 +204,8 @@ async function testHttpLifecycle() {
     const concurrentResults = await Promise.all([updateOne, updateTwo, ...concurrentReads]);
     assert.ok(concurrentResults.every(result => result.response.status === 200));
     const concurrentState = await request(server.baseUrl, '/api/guardias');
-    assert.strictEqual(concurrentState.body.find(row => row.id === absenceId).guardia, `${SYNTHETIC}_WRITE_A`);
-    assert.strictEqual(concurrentState.body.find(row => row.id === second.body.id).guardia, `${SYNTHETIC}_WRITE_B`);
+    assert.strictEqual(concurrentState.body.find(row => row.id === absenceId).obs, 'parallel-a');
+    assert.strictEqual(concurrentState.body.find(row => row.id === second.body.id).obs, 'parallel-b');
     assert.ok(!server.output.join('').includes('SQLITE_BUSY'));
     assert.ok(!server.output.join('').includes('SQLITE_LOCKED'));
 
@@ -221,7 +221,7 @@ async function testHttpLifecycle() {
     const restoredLogin = await login(restoredServer.baseUrl, 'admin', CHANGED_ADMIN_PASSWORD);
     assert.strictEqual(restoredLogin.response.status, 200);
     const restoredRows = await request(restoredServer.baseUrl, '/api/guardias');
-    assert.ok(restoredRows.body.some(row => row.id === absenceId && row.guardia === `${SYNTHETIC}_COVER`));
+    assert.ok(restoredRows.body.some(row => row.id === absenceId && row.obs === 'fase-2c-assigned'));
     assert.ok(!restoredRows.body.some(row => row.ausente === `${SYNTHETIC}_SECOND`));
     await assertQuickCheck(restoredPath);
     const restoredSnapshot = await readDatabaseSnapshot(restoredPath);
