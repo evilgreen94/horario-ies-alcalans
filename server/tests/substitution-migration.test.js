@@ -34,13 +34,16 @@ module.exports = [{
          VALUES ('legacy.audit', 'legacy', '1', '{"safe":true}')`
       );
 
-      assert.deepEqual(await applyMigrations(db), ['004_substitution_requests_and_traceability.sql']);
+      assert.deepEqual(await applyMigrations(db), [
+        '004_substitution_requests_and_traceability.sql',
+        '005_suggestions.sql'
+      ]);
       assert.deepEqual(await applyMigrations(db), []);
       assert.equal((await db.get("SELECT detail FROM historial WHERE id = 'legacy-history'")).detail, 'Dato previo');
       assert.equal((await db.get("SELECT action FROM audit_log WHERE action = 'legacy.audit'")).action, 'legacy.audit');
       assert.ok(await db.get("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'substitution_requests'"));
       assert.ok(await db.get("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'legacy_substitution_aliases'"));
-      assert.equal((await db.get('SELECT COUNT(*) total FROM schema_migrations')).total, 4);
+      assert.equal((await db.get('SELECT COUNT(*) total FROM schema_migrations')).total, 5);
     } finally {
       await db.close();
       fs.rmSync(root, { recursive: true, force: true });

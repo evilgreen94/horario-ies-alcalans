@@ -111,6 +111,7 @@
     </div>
     <div class="admin-actions admin-actions-secondary">
       <button class="btn-add btn-add-secondary" type="button" onclick="openSubstitutionModal()">Sustituciones</button>
+      <button class="btn-add btn-add-secondary" type="button" onclick="openSuggestionsModal()">Sugerencias</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="openPracticasGuardiasModal()">Pr&aacute;cticas y guardias</button>
       <button class="btn-add btn-add-secondary" type="button" onclick="openPrintableSchedule()">Imprimir horario</button>
       <button class="btn-add btn-add-secondary" id="btnInforme" onclick="printDailyReportPdf()" style="display:none">Informe diario</button>
@@ -212,6 +213,7 @@
           <button class="btn-add btn-add-secondary" type="button" onclick="triggerRestoreSnapshot()">Restaurar copia JSON</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="downloadDatabaseBackup()">Descargar copia SQLite</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="openSubstitutionModal()">Sustituciones</button>
+          <button class="btn-add btn-add-secondary" type="button" onclick="openSuggestionsModal()">Sugerencias</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('superadmin')">Cambiar contrase&ntilde;a</button>
           <button class="btn-add btn-add-ghost" type="button" onclick="toggleSuperAdmin()">Salir de administración técnica</button>
         </div>
@@ -409,6 +411,7 @@
         <div class="teacher-duty-alert" id="teacherDutyAlert" hidden></div>
         <div class="teacher-panel-actions">
           <button class="btn-teacher-panel" type="button" onclick="openTeacherFutureAbsenceModal()">Comunicar ausencia futura</button>
+          <button class="btn-teacher-panel" type="button" onclick="openSuggestionsModal()">Sugerencias para ARGOS</button>
         </div>
         <div class="teacher-mood-card" id="teacherMoodCard" hidden aria-hidden="true"></div>
       </div>
@@ -597,6 +600,75 @@
     <div class="substitution-list" id="futureAbsenceAdminList" style="margin-top:1rem"></div>
   </div>
 </div>
+<div class="overlay" id="suggestionsOverlay" onclick="bgSuggestionsClose(event)">
+  <div class="modal suggestions-modal">
+    <div class="modal-hd">
+      <span>Sugerencias para ARGOS</span>
+      <button class="modal-x" type="button" aria-label="Cerrar buz&oacute;n de sugerencias" onclick="closeSuggestionsModal()">x</button>
+    </div>
+    <p class="suggestions-intro">&iquest;Hay algo que podr&iacute;a mejorar vuestro trabajo diario?</p>
+    <div id="suggestionsAccessMessage" class="suggestions-access" hidden></div>
+
+    <section id="suggestionsTeacherSection" class="suggestions-section" hidden>
+      <div class="suggestions-section-head">
+        <div>
+          <div class="suggestions-section-title">Enviar sugerencia</div>
+          <div class="suggestions-section-copy">Describe una mejora concreta para el trabajo cotidiano.</div>
+        </div>
+      </div>
+      <form id="suggestionForm" class="suggestion-form">
+        <label for="suggestionTitle">T&iacute;tulo</label>
+        <input id="suggestionTitle" name="title" maxlength="120" required>
+        <label for="suggestionDescription">Descripci&oacute;n</label>
+        <textarea id="suggestionDescription" name="description" maxlength="3000" rows="5" required></textarea>
+        <label for="suggestionCategory">Categor&iacute;a</label>
+        <select id="suggestionCategory" name="category" required>
+          <option value="usabilidad">Usabilidad</option>
+          <option value="guardias">Guardias</option>
+          <option value="sustituciones">Sustituciones</option>
+          <option value="horarios">Horarios</option>
+          <option value="sala_profesorado">Sala del profesorado</option>
+          <option value="movil">M&oacute;vil</option>
+          <option value="rendimiento">Rendimiento</option>
+          <option value="otro">Otro</option>
+        </select>
+        <button id="submitSuggestion" class="btn-save" type="submit">Enviar sugerencia</button>
+      </form>
+      <div class="suggestions-list-head">
+        <div class="suggestions-section-title">Mis sugerencias</div>
+        <button id="refreshOwnSuggestions" class="btn-dialog btn-dialog-secondary" type="button">Actualizar</button>
+      </div>
+      <div id="ownSuggestionsList" class="suggestions-list"></div>
+    </section>
+
+    <section id="suggestionsReviewSection" class="suggestions-section" hidden>
+      <div class="suggestions-section-head">
+        <div>
+          <div class="suggestions-section-title">Bandeja de revisi&oacute;n</div>
+          <div class="suggestions-section-copy">Disponible para Jefatura y Superadmin en este dominio.</div>
+        </div>
+      </div>
+      <form id="suggestionsFilterForm" class="suggestions-filters">
+        <label for="suggestionsStatusFilter">Estado</label>
+        <select id="suggestionsStatusFilter">
+          <option value="">Todos</option>
+          <option value="new">Nueva</option>
+          <option value="reviewing">En revisi&oacute;n</option>
+          <option value="accepted">Aceptada</option>
+          <option value="planned">Planificada</option>
+          <option value="implemented">Implementada</option>
+          <option value="discarded">Descartada</option>
+          <option value="duplicate">Duplicada</option>
+        </select>
+        <label for="suggestionsSearch">T&iacute;tulo o autor</label>
+        <input id="suggestionsSearch" type="search" maxlength="120" placeholder="Buscar">
+        <button class="btn-dialog btn-dialog-secondary" type="submit">Buscar</button>
+      </form>
+      <div id="reviewSuggestionsList" class="suggestions-list"></div>
+    </section>
+    <p id="suggestionsMessage" class="suggestions-message" role="status" aria-live="polite"></p>
+  </div>
+</div>
 <footer class="site-footer">
   <a class="site-footer-link" href="https://portal.edu.gva.es/iesalcalans/es/" target="_blank" rel="noopener noreferrer">
     <img
@@ -659,6 +731,7 @@
 <script src="js/app/guardias-future-absences.js?v=20260908-unified-auth"></script>
 <script src="js/app/guardias-aux-panels.js?v=20260508-printstatic"></script>
 <script src="js/app/guardias-teacher.js?v=20260508-printstatic"></script>
+<script src="js/app/guardias-suggestions.js?v=20260914-suggestions"></script>
 <script src="js/app/guardias.js?v=20260909-argos-discovery"></script>
 </body>
 </html>

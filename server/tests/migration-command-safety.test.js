@@ -56,7 +56,8 @@ async function testInitDbDoesNotRunWeeklyMaintenance() {
           '001_individual_teacher_auth.sql',
           '002_academic_schedule_model.sql',
           '003_final_session_security_and_schedule_types.sql',
-          '004_substitution_requests_and_traceability.sql'
+          '004_substitution_requests_and_traceability.sql',
+          '005_suggestions.sql'
         ]
       );
     } finally {

@@ -124,19 +124,20 @@ module.exports = [
           '001_individual_teacher_auth.sql',
           '002_academic_schedule_model.sql',
           '003_final_session_security_and_schedule_types.sql',
-          '004_substitution_requests_and_traceability.sql'
+          '004_substitution_requests_and_traceability.sql',
+          '005_suggestions.sql'
         ]);
         assert.deepEqual(await applyMigrations(db), []);
 
         const tables = new Set((await db.all("SELECT name FROM sqlite_master WHERE type = 'table'")).map(row => row.name));
-        for (const table of ['users', 'roles', 'user_roles', 'teacher_profiles', 'teacher_assignments', 'substitution_requests', 'legacy_substitution_aliases', 'audit_log', 'schema_migrations']) {
+        for (const table of ['users', 'roles', 'user_roles', 'teacher_profiles', 'teacher_assignments', 'substitution_requests', 'legacy_substitution_aliases', 'suggestions', 'audit_log', 'schema_migrations']) {
           assert.ok(tables.has(table), `missing migrated table ${table}`);
         }
         assert.deepEqual(
           await db.get("SELECT password_hash, salt FROM auth_credentials WHERE role = 'legacy-test'"),
           { password_hash: 'preserved-hash', salt: 'preserved-salt' }
         );
-        assert.equal((await db.get('SELECT COUNT(*) AS total FROM schema_migrations')).total, 4);
+        assert.equal((await db.get('SELECT COUNT(*) AS total FROM schema_migrations')).total, 5);
         assert.equal(
           (await db.get("SELECT COUNT(*) AS total FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_teacher_assignments_%'")).total,
           2

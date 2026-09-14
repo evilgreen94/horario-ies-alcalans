@@ -3037,6 +3037,52 @@ tbody td:nth-child(7) {
 .teacher-panel-actions { display: flex; justify-content: flex-start; gap: .6rem; flex-wrap: wrap; }
 .btn-teacher-panel { background: transparent; color: var(--blue); border: 1px solid rgba(61,116,197,0.28); border-radius: 8px; padding: 8px 12px; font-weight: 800; cursor: pointer; }
 .btn-teacher-panel-danger { color: var(--red); border-color: rgba(217,83,79,0.28); }
+.suggestions-modal { width: min(900px, 96vw); }
+.suggestions-intro { color: var(--muted); margin: -.7rem 0 1.2rem; }
+.suggestions-access,
+.suggestions-empty { padding: 1rem; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); }
+.suggestions-section { display: grid; gap: 1rem; padding: 1rem 0; border-top: 1px solid var(--border); }
+.suggestions-section + .suggestions-section { margin-top: .5rem; }
+.suggestions-section-head,
+.suggestions-list-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.suggestions-section-title { font-family: var(--font-h); font-weight: 800; font-size: 1.05rem; }
+.suggestions-section-copy { color: var(--muted); font-size: .86rem; margin-top: .2rem; }
+.suggestion-form { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem 1rem; }
+.suggestion-form label { font-weight: 700; align-self: end; }
+.suggestion-form label[for="suggestionDescription"],
+.suggestion-form textarea,
+.suggestion-form .btn-save { grid-column: 1 / -1; }
+.suggestion-form input,
+.suggestion-form textarea,
+.suggestion-form select,
+.suggestions-filters input,
+.suggestions-filters select,
+.suggestion-review-form input,
+.suggestion-review-form textarea,
+.suggestion-review-form select { width: 100%; }
+.suggestion-form textarea,
+.suggestion-review-form textarea { resize: vertical; }
+.suggestions-list { display: grid; gap: .8rem; }
+.suggestion-card { padding: 1rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface2); }
+.suggestion-card h3 { margin: 0; font-family: var(--font-h); font-size: 1rem; }
+.suggestion-metadata { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .7rem; margin: .6rem 0; color: var(--muted); font-size: .78rem; }
+.suggestion-status { padding: .25rem .55rem; border-radius: 999px; background: rgba(60, 167, 114, .14); color: var(--green); font-weight: 800; text-transform: uppercase; }
+.suggestion-status[data-status="reviewing"],
+.suggestion-status[data-status="planned"] { background: rgba(61, 116, 197, .14); color: var(--blue); }
+.suggestion-status[data-status="discarded"],
+.suggestion-status[data-status="duplicate"] { background: rgba(217, 83, 79, .14); color: var(--red); }
+.suggestion-author { flex-basis: 100%; color: var(--text); font-weight: 700; }
+.suggestion-description { white-space: pre-wrap; overflow-wrap: anywhere; margin: .7rem 0; }
+.suggestion-implemented { color: var(--green); font-weight: 800; margin: .7rem 0 0; }
+.suggestions-filters { display: grid; grid-template-columns: auto minmax(140px, .5fr) auto minmax(180px, 1fr) auto; gap: .55rem; align-items: end; }
+.suggestion-review-form { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; padding-top: .8rem; margin-top: .8rem; border-top: 1px solid var(--border); }
+.suggestion-review-form label { display: grid; gap: .35rem; color: var(--muted); font-size: .8rem; font-weight: 800; }
+.suggestion-review-wide { grid-column: 1 / -1; }
+.suggestion-review-form button { justify-self: start; }
+.suggestions-message { min-height: 1.4rem; margin: .7rem 0 0; color: var(--green); font-weight: 700; }
+.suggestions-message[data-kind="error"] { color: var(--red); }
+.suggestion-form button:disabled,
+.suggestion-review-form button:disabled { opacity: .55; cursor: wait; }
 .teacher-overview {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4414,3 +4460,16 @@ tbody td:nth-child(7) {
   border-radius:14px;
 }
 .substitution-request-form>.btn-substitution{align-self:end;min-height:42px}
+@media(max-width:700px){
+  .suggestion-form,
+  .suggestions-filters,
+  .suggestion-review-form{grid-template-columns:1fr}
+  .suggestion-form label,
+  .suggestion-form input,
+  .suggestion-form textarea,
+  .suggestion-form select,
+  .suggestion-form .btn-save,
+  .suggestion-review-wide{grid-column:1}
+  .suggestions-section-head,
+  .suggestions-list-head{align-items:flex-start}
+}
