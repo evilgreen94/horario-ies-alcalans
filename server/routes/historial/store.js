@@ -1,14 +1,12 @@
 const { withImmediateTransaction = async (_db, callback) => callback() } = require('../../db');
+const { serializeHistoryRow } = require('../../operational-history');
 
 function serializeHistorialRow(row) {
-  return {
-    ...row,
-    undoState: row.undo_state ? JSON.parse(row.undo_state) : null
-  };
+  return serializeHistoryRow(row);
 }
 
 async function listHistorial(db) {
-  const rows = await db.all('SELECT * FROM historial ORDER BY ts DESC');
+  const rows = await db.all('SELECT * FROM historial WHERE archived_at IS NULL ORDER BY ts DESC, id DESC');
   return rows.map(serializeHistorialRow);
 }
 

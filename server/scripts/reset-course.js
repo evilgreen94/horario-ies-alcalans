@@ -10,7 +10,6 @@ const BACKUP_DIR = process.env.GUARDIAS_BACKUP_DIR
 const APP_STATE_KEYS_TO_CLEAR = [
   'school_week_key',
   'guardia_monthly_load',
-  'teacher_substitutions',
   'teacher_future_absences',
   'teacher_practicas_guardias',
   'teacher_practicas_guardias_tramos'
@@ -51,7 +50,7 @@ async function main() {
   try {
     await db.exec('DELETE FROM ausencias');
     await db.exec('DELETE FROM biblioteca_guardias');
-    await db.exec('DELETE FROM historial');
+    await db.exec("UPDATE historial SET archived_at = CURRENT_TIMESTAMP WHERE archived_at IS NULL");
     await db.exec('DELETE FROM tareas_profesorado');
     await db.exec('DELETE FROM session_overrides');
     await db.exec("UPDATE schedule_datasets SET status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE status = 'active'");

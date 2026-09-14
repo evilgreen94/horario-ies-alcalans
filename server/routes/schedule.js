@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDatabase, getMadridNow } = require('../db');
+const { getDatabase, getMadridNow, withImmediateTransaction } = require('../db');
 const { requireAuthenticated, requireRole } = require('../session');
 const { resolveActiveTeacherProfile, normalizeDateKey } = require('../teacher-identity');
 const {
@@ -8,6 +8,8 @@ const {
   loadCanonicalDataset
 } = require('../schedule-model');
 const { resolveScheduleState } = require('../session-semantics');
+const { getScheduleSubstitutionContext } = require('../substitution-service');
+const { appendAuditEvent } = require('../audit');
 
 const router = express.Router();
 
@@ -52,10 +54,11 @@ router.get('/me', requireAuthenticated, async (req, res, next) => {
       return res.status(400).json({ error: 'date must be a single YYYY-MM-DD value.' });
     }
     const dateKey = req.query.date !== undefined ? normalizeDateKey(req.query.date) : formatDateKey(now);
-    const identity = await resolveActiveTeacherProfile(await getDatabase(), req.sessionUser.userId, dateKey);
+    const db = await getDatabase();
+    const identity = await resolveActiveTeacherProfile(db, req.sessionUser.userId, dateKey);
     if (!identity) return res.status(404).json({ error: 'No hay un perfil docente activo asignado para esa fecha.' });
 
-    const canonical = await loadCanonicalDataset(await getDatabase());
+    const canonical = await loadCanonicalDataset(db);
     const teacher = canonical.teachers.find(item => item.profileId === identity.teacherProfile.id);
     if (!teacher) return res.status(409).json({ error: 'El perfil asignado no pertenece al dataset horario activo.' });
     const selected = new Date(`${dateKey}T12:00:00`);
@@ -74,15 +77,22 @@ router.get('/me', requireAuthenticated, async (req, res, next) => {
       ? periods.find(period => time >= period.startsAt && time < period.endsAt) || null
       : null;
     res.setHeader('Cache-Control', 'no-store');
+    const substitution = await getScheduleSubstitutionContext(db, identity, dateKey);
     return res.json({
       dataset: { id: canonical.datasetId, academicYear: canonical.academicYear, label: canonical.label },
       date: dateKey,
       weekday,
       teacher: {
+        user: {
+          id: req.sessionUser.userId,
+          username: req.sessionUser.username,
+          displayName: req.sessionUser.displayName
+        },
         profileId: teacher.profileId,
         sourceCode: teacher.sourceCode,
         displayName: teacher.displayName,
-        assignment: identity.assignment
+        assignment: identity.assignment,
+        substitution
       },
       currentPeriod,
       currentState: currentPeriod?.state || 'outside',
@@ -94,9 +104,26 @@ router.get('/me', requireAuthenticated, async (req, res, next) => {
 });
 
 router.post('/datasets/:id/activate', requireRole('superadmin'), async (req, res, next) => {
+  const db = await getDatabase();
   try {
-    res.json(await activateScheduleDataset(await getDatabase(), req.params.id));
+    const result = await withImmediateTransaction(db, async () => {
+      const activated = await activateScheduleDataset(db, req.params.id);
+      await appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: 'schedule.dataset_activated', targetType: 'schedule_dataset',
+        targetId: String(req.params.id), details: { warnings: activated.warnings || [] }
+      });
+      return activated;
+    }, { label: `schedule:http-activate:${req.params.id}` });
+    res.json(result);
   } catch (error) {
+    try {
+      await withImmediateTransaction(db, () => appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: 'schedule.dataset_activation_rejected', targetType: 'schedule_dataset',
+        targetId: String(req.params.id), outcome: 'failure', details: { reasonCode: error.code || 'VALIDATION_FAILED' }
+      }), { label: `schedule:http-rejected:${req.params.id}` });
+    } catch (_auditError) {}
     next(error);
   }
 });

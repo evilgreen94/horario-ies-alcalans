@@ -228,6 +228,19 @@ router.put('/:id/roles', requireSameOriginWrite, async (req, res, next) => {
       const before = await getUser(db, id);
       if (!before) throw httpError(404, 'Usuario no encontrado.');
       const oldRoles = publicUser(before).roles;
+      if (oldRoles.includes('teacher') && !roles.includes('teacher')) {
+        const activeSubstitution = await db.get(
+          `SELECT id FROM teacher_assignments
+           WHERE user_id = ? AND assignment_type = 'sustituto'
+             AND starts_on <= date('now') AND (ends_on IS NULL OR ends_on >= date('now'))
+           LIMIT 1`, [id]
+        );
+        if (activeSubstitution) {
+          const error = httpError(409, 'No se puede retirar teacher durante una sustitución activa.');
+          error.code = 'ACTIVE_SUBSTITUTION_REQUIRES_TEACHER_ROLE';
+          throw error;
+        }
+      }
       if (req.sessionUser.userId === id && oldRoles.includes('superadmin') && !roles.includes('superadmin')) {
         throw httpError(409, 'No puedes retirar tu propio rol Superadmin.');
       }
@@ -247,7 +260,18 @@ router.put('/:id/roles', requireSameOriginWrite, async (req, res, next) => {
       return getUser(db, id);
     }, { label: 'security:user-roles' });
     res.json({ user: publicUser(result) });
-  } catch (error) { next(error); }
+  } catch (error) {
+    try {
+      const db = await getDatabase();
+      await withImmediateTransaction(db, () => appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: 'security.user_roles_change_rejected', targetType: 'user',
+        targetId: String(req.params.id || ''), outcome: 'failure',
+        details: { reasonCode: error.code || 'ROLE_CHANGE_VALIDATION_FAILED' }
+      }), { label: `security:user-roles-rejected:${req.params.id}` });
+    } catch (_auditError) {}
+    next(error);
+  }
 });
 
 router.post('/:id/reset-password', requireSameOriginWrite, async (req, res, next) => {

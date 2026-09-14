@@ -50,6 +50,8 @@ async function readDatabaseSnapshot(dbPath) {
       'user_roles',
       'teacher_profiles',
       'teacher_assignments',
+      'substitution_requests',
+      'legacy_substitution_aliases',
       'academic_years',
       'teacher_external_identities',
       'schedule_datasets',
@@ -404,15 +406,17 @@ async function testWeeklyReset() {
     const preservedState = await afterDb.get("SELECT value FROM app_state WHERE key = 'qa_preserved'");
     await afterDb.close();
 
-    for (const table of ['ausencias', 'historial', 'biblioteca_guardias', 'tareas_profesorado', 'alumnos_fuera_aula', 'session_overrides']) {
+    for (const table of ['ausencias', 'biblioteca_guardias', 'tareas_profesorado', 'alumnos_fuera_aula', 'session_overrides']) {
       assert.strictEqual(before[table], 1);
       assert.strictEqual(after[table], 0, `${table} should be cleared by weekly maintenance`);
     }
+    assert.strictEqual(before.historial, 1);
+    assert.strictEqual(after.historial, 2, 'weekly maintenance must archive history and append its own event');
     assert.strictEqual(after.grupos_estado, 1);
     assert.strictEqual(after.auth_credentials, 2);
     assert.strictEqual(after.roles, 3);
-    assert.strictEqual(after.schema_migrations, 3);
-    for (const table of ['users', 'user_roles', 'teacher_profiles', 'teacher_assignments', 'audit_log']) {
+    assert.strictEqual(after.schema_migrations, 4);
+    for (const table of ['users', 'user_roles', 'teacher_profiles', 'teacher_assignments', 'substitution_requests', 'legacy_substitution_aliases', 'audit_log']) {
       assert.strictEqual(after[table], before[table], `${table} should survive weekly maintenance`);
     }
     assert.strictEqual(preservedState.value, 'yes');

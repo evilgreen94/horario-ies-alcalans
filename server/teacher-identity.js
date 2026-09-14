@@ -35,6 +35,10 @@ async function resolveActiveTeacherProfile(db, userId, date = new Date()) {
      JOIN teacher_profiles tp ON tp.id = ta.teacher_profile_id AND tp.is_active = 1
      JOIN academic_years ay ON ay.id = ta.academic_year_id
      WHERE ta.user_id = ?
+       AND EXISTS (
+         SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+         WHERE ur.user_id = ta.user_id AND r.key = 'teacher'
+       )
        AND ta.starts_on <= ?
        AND (ta.ends_on IS NULL OR ta.ends_on >= ?)
        AND ay.starts_on <= ?

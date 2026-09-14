@@ -913,7 +913,7 @@
       historyList.innerHTML=visibles.map(entry=>`<article class="history-item">
         <div class="history-item-head">
           <div class="history-item-title">${escapeHtml(entry.title||'Cambio')}</div>
-          <div class="history-item-time">${escapeHtml(formatTimestamp(entry.ts))}</div>
+          <div class="history-item-time">${escapeHtml(formatTimestamp(entry.timestamp||entry.ts))}</div>
         </div>
         <div class="history-item-body">${escapeHtml(entry.detail||'')}</div>
       </article>`).join('');
@@ -936,11 +936,16 @@
     }
     async function clear(){
       if(getValue(options.isAdmin,false)!==true) return;
-      if(!await shared.askConfirm('Borrar historial','Se eliminaran todas las entradas del historial de cambios.','Borrar')) return;
-      persist([]);
-      renderList();
-      shared.showToast('Historial borrado.','success');
-      if(isFn(options.syncAdminState)) options.syncAdminState();
+      if(!await shared.askConfirm('Archivar historial','Las entradas dejarán de mostrarse, pero se conservarán en la base de datos.','Archivar')) return;
+      try{
+        await storage.archiveHistorial();
+        const rows=await storage.fetchHistorial();
+        persist(Array.isArray(rows)?rows:[]);
+        renderList();
+        shared.showToast('Historial archivado.','success');
+      }catch(error){
+        shared.showToast(error&&error.message||'No se pudo archivar el historial.','error');
+      }
     }
     async function undoLastChange(){
       if(getValue(options.isAdmin,false)!==true) return;

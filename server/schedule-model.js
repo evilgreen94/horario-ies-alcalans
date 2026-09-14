@@ -410,7 +410,7 @@ async function importScheduleDataset(db, payload) {
   }, { label: `schedule-import:${dataset.academicYear}` });
 }
 
-async function activateScheduleDataset(db, datasetId) {
+async function activateScheduleDataset(db, datasetId, options = {}) {
   const id = Number(datasetId);
   if (!Number.isSafeInteger(id) || id <= 0) throw new Error('datasetId must be a positive integer.');
   return withImmediateTransaction(db, async () => {
@@ -438,16 +438,64 @@ async function activateScheduleDataset(db, datasetId) {
     if (!validationReport?.valid || !structure?.periods || !structure?.teaching_periods || !structure?.breaks || !structure?.sessions || !structure?.teachers) {
       throw new Error('Schedule dataset is not structurally valid for activation.');
     }
+    const activationDate = String(options.date || new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date()));
+    const missingActive = await db.all(
+      `SELECT substitute.id AS assignment_id, profile.id AS profile_id,
+              profile.display_name, substitute.starts_on, substitute.ends_on
+       FROM teacher_assignments substitute
+       JOIN teacher_profiles profile ON profile.id = substitute.teacher_profile_id
+       WHERE substitute.assignment_type = 'sustituto'
+         AND substitute.starts_on <= ?
+         AND (substitute.ends_on IS NULL OR substitute.ends_on >= ?)
+         AND NOT EXISTS (
+           SELECT 1 FROM schedule_dataset_teachers roster
+           WHERE roster.dataset_id = ? AND roster.teacher_profile_id = substitute.teacher_profile_id
+         )
+       ORDER BY profile.display_name COLLATE NOCASE, substitute.id`,
+      [activationDate, activationDate, id]
+    );
+    if (missingActive.length) {
+      const error = new Error('El dataset no incluye perfiles con sustituciones activas.');
+      error.status = 409;
+      error.code = 'ACTIVE_SUBSTITUTION_PROFILE_MISSING';
+      error.details = { assignments: missingActive.map(row => ({
+        assignmentId: row.assignment_id, profileId: row.profile_id,
+        displayName: row.display_name, startsOn: row.starts_on, endsOn: row.ends_on || null
+      })) };
+      throw error;
+    }
+    const historicalWarnings = await db.all(
+      `SELECT substitute.id AS assignment_id, profile.id AS profile_id, profile.display_name
+       FROM teacher_assignments substitute
+       JOIN teacher_profiles profile ON profile.id = substitute.teacher_profile_id
+       WHERE substitute.assignment_type = 'sustituto'
+         AND (substitute.ends_on < ? OR substitute.starts_on > ?)
+         AND NOT EXISTS (
+           SELECT 1 FROM schedule_dataset_teachers roster
+           WHERE roster.dataset_id = ? AND roster.teacher_profile_id = substitute.teacher_profile_id
+         )
+       ORDER BY substitute.id`,
+      [activationDate, activationDate, id]
+    );
     await db.run("UPDATE schedule_datasets SET status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE status = 'active' AND id <> ?", [id]);
     await db.run("UPDATE academic_years SET status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE status = 'active' AND id <> ?", [dataset.academic_year_id]);
     await db.run("UPDATE academic_years SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [dataset.academic_year_id]);
     await db.run("UPDATE schedule_datasets SET status = 'active', activated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
-    return db.get(
+    const activated = await db.get(
       `SELECT dataset.id, dataset.label, dataset.status, year.code AS academic_year
        FROM schedule_datasets dataset JOIN academic_years year ON year.id = dataset.academic_year_id
        WHERE dataset.id = ?`,
       [id]
     );
+    return {
+      ...activated,
+      warnings: historicalWarnings.map(row => ({
+        code: 'HISTORICAL_SUBSTITUTION_PROFILE_MISSING',
+        assignmentId: row.assignment_id, profileId: row.profile_id, displayName: row.display_name
+      }))
+    };
   }, { label: `schedule-activate:${id}` });
 }
 

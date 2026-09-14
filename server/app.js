@@ -17,6 +17,8 @@ const avisosRouter = require('./routes/avisos');
 const gruposRouter = require('./routes/grupos');
 const scheduleRouter = require('./routes/schedule');
 const { router: usersRouter } = require('./routes/users');
+const substitutionsRouter = require('./routes/substitutions');
+const auditLogRouter = require('./routes/audit-log');
 
 const app = express();
 const HOST = '127.0.0.1';
@@ -158,6 +160,8 @@ app.use('/api/avisos', avisosRouter);
 app.use('/api/grupos', gruposRouter);
 app.use('/api/schedule', scheduleRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/substitutions', substitutionsRouter);
+app.use('/api/audit', auditLogRouter);
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'guardias.html'));

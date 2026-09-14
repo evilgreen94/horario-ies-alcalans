@@ -1,4 +1,5 @@
 const path = require('path');
+const { listEffectiveSubstitutions, madridDateKey } = require('../../substitution-service');
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const HORA_MAP = {
@@ -15,7 +16,6 @@ const HORA_MAP = {
 
 const LOGO_IES_PATH = path.join(__dirname, '..', '..', '..', 'imagenes', 'logo-ies-alcalans.jpg');
 const LOGO_CONSELLERIA_PATH = path.join(__dirname, '..', '..', '..', 'imagenes', 'gv_conselleria_educacion_cmyk_cast-1024x505-2.png');
-const SUBSTITUTIONS_STATE_KEY = 'teacher_substitutions';
 
 function badRequest(message) {
   const error = new Error(message);
@@ -40,20 +40,14 @@ function formatReportDate() {
   }).format(new Date());
 }
 
-async function loadTeacherSubstitutionMap(db) {
-  const row = await db.get('SELECT value FROM app_state WHERE key = ?', [SUBSTITUTIONS_STATE_KEY]);
-  let parsed = [];
-  try {
-    parsed = row?.value ? JSON.parse(row.value) : [];
-  } catch (_error) {
-    parsed = [];
-  }
-  if (!Array.isArray(parsed)) return {};
-
+async function loadTeacherSubstitutionMap(db, dateKey = madridDateKey()) {
+  const parsed = await listEffectiveSubstitutions(db, dateKey);
   return Object.fromEntries(
     parsed
-      .filter(item => item && typeof item === 'object')
-      .map(item => [String(item.profesor || '').trim(), String(item.sustituto || '').trim()])
+      .map(item => [
+        String(item.titular?.displayName || '').trim(),
+        String(item.substitute?.displayName || '').trim()
+      ])
       .filter(([profesor, sustituto]) => profesor && sustituto)
   );
 }

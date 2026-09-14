@@ -123,68 +123,34 @@ module.exports = [
           detail: 'Detalle',
           type: 'edit',
           actor: 'Jefatura',
-          ts: '2026-04-30T10:00:00.000Z',
-          undo_state: '{"day":2}',
+          actorIdentity: { userId: null, username: '', displayName: 'Jefatura', sourceCode: null, roles: [] },
+          action: '',
+          target: { type: '', id: '' },
+          result: 'success',
+          timestamp: '2026-04-30T10:00:00.000Z',
+          before: null,
+          after: null,
+          archivedAt: null,
           undoState: { day: 2 }
         }
       ]);
     }
   },
   {
-    name: 'historial PUT /replace persists rows and returns normalized history list',
+    name: 'historial PUT /replace rejects destructive client replacement',
     async fn() {
-      const inserted = [];
       const db = {
-        async exec(sql) {
-          assert.equal(sql, 'DELETE FROM historial');
-        },
-        async run(_sql, params) {
-          inserted.push(params);
-        },
-        async all() {
-          return [
-            {
-              id: 'hist-2',
-              title: 'Alta',
-              detail: '',
-              type: 'create',
-              actor: 'Jefatura',
-              ts: '2026-04-30T10:10:00.000Z',
-              undo_state: null
-            }
-          ];
-        }
+        async run() { throw new Error('must not write'); },
+        async all() { throw new Error('must not read'); }
       };
       const router = loadHistorialRouter({ db });
       const handlers = findRouteHandlers(router, '/replace', 'put');
       const res = createJsonResponse();
 
-      await callHandlers(handlers, {
-        body: [
-          {
-            id: 'hist-2',
-            title: 'Alta',
-            detail: '',
-            type: 'create',
-            actor: 'Jefatura',
-            ts: '2026-04-30T10:10:00.000Z'
-          }
-        ]
-      }, res);
-
-      assert.equal(inserted.length, 1);
-      assert.deepEqual(res.body, [
-        {
-          id: 'hist-2',
-          title: 'Alta',
-          detail: '',
-          type: 'create',
-          actor: 'Jefatura',
-          ts: '2026-04-30T10:10:00.000Z',
-          undo_state: null,
-          undoState: null
-        }
-      ]);
+      await assert.rejects(
+        callHandlers(handlers, { body: [] }, res),
+        error => error.status === 410 && /destructivo/.test(error.message)
+      );
     }
   }
 ];

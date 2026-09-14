@@ -18,6 +18,7 @@ const {
 const projectRoot = path.join(__dirname, '..', '..');
 const source = fs.readFileSync(path.join(projectRoot, 'js', 'app', 'guardias-future-absences.js'), 'utf8');
 const auxPanelsSource = fs.readFileSync(path.join(projectRoot, 'js', 'app', 'guardias-aux-panels.js'), 'utf8');
+const guardiasSource = fs.readFileSync(path.join(projectRoot, 'js', 'app', 'guardias.js'), 'utf8');
 
 function createFutureAbsenceDomain(options = {}) {
   const writes = [];
@@ -144,11 +145,16 @@ async function testHttpEdgeCasesAndTwoClients() {
     assert.strictEqual(clientA.response.status, 200);
     assert.strictEqual(clientB.response.status, 200);
 
-    for (const route of ['/api/guardias', '/api/profesorado/tareas', '/api/profesorado/future-absences', '/api/historial']) {
+    for (const route of ['/api/guardias', '/api/profesorado/tareas', '/api/profesorado/future-absences']) {
       const empty = await request(server.baseUrl, route);
       assert.strictEqual(empty.response.status, 200);
       assert.deepStrictEqual(empty.body, []);
     }
+    const publicHistory = await request(server.baseUrl, '/api/historial');
+    assert.strictEqual(publicHistory.response.status, 401);
+    const authorizedHistory = await request(server.baseUrl, '/api/historial', {}, clientA.jar);
+    assert.strictEqual(authorizedHistory.response.status, 200);
+    assert.deepStrictEqual(authorizedHistory.body, []);
 
     for (const route of ['/', '/js/app/guardias.js', '/css/guardias.css']) {
       const response = await request(server.baseUrl, route);
@@ -279,6 +285,15 @@ async function testTemporaryConnectionLossAndRecovery() {
 }
 
 module.exports = [
+  {
+    name: 'legacy substitution entry points delegate to the structured request flow',
+    fn() {
+      assert.match(guardiasSource, /assignTeacherSubstitution=\(\)=>openStructuredSubstitutionModal\(\)/);
+      assert.match(guardiasSource, /clearTeacherSubstitution=\(\)=>openStructuredSubstitutionModal\(\)/);
+      assert.ok(!guardiasSource.includes('assignTeacherSubstitution=()=>{}'));
+      assert.ok(!guardiasSource.includes('clearTeacherSubstitution=()=>{}'));
+    }
+  },
   {
     name: 'active announcement rendering keeps controlled ids out of executable handlers',
     fn() {

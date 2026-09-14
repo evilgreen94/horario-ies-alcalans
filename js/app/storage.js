@@ -144,6 +144,9 @@
         body: JSON.stringify(rows)
       });
     },
+    archiveHistorial(){
+      return request('/historial/archive', { method: 'POST', body: '{}' });
+    },
     fetchTareasProfesorado(){
       return request('/profesorado/tareas');
     },
@@ -208,11 +211,38 @@
     fetchTeacherSubstitutions(){
       return request('/profesorado/substitutions');
     },
-    replaceTeacherSubstitutions(rows){
-      return request('/profesorado/substitutions/replace', {
-        method: 'PUT',
-        body: JSON.stringify(rows)
-      });
+    fetchSubstitutionRequests(){ return request('/substitutions'); },
+    fetchSubstitutionTitulars(){ return request('/substitutions/titulars'); },
+    fetchSubstitutionCandidates(query=''){
+      return request(`/substitutions/candidates${query?`?q=${encodeURIComponent(query)}`:''}`);
+    },
+    createSubstitutionRequest(payload){
+      return request('/substitutions', { method:'POST', body:JSON.stringify(payload) });
+    },
+    cancelSubstitutionRequest(id,payload={}){
+      return request(`/substitutions/${encodeURIComponent(id)}/cancel`, { method:'POST', body:JSON.stringify(payload) });
+    },
+    finishSubstitutionRequest(id,payload){
+      return request(`/substitutions/${encodeURIComponent(id)}/finish`, { method:'POST', body:JSON.stringify(payload) });
+    },
+    linkSubstitutionUser(id,userId){
+      return request(`/substitutions/${encodeURIComponent(id)}/link`, { method:'POST', body:JSON.stringify({userId}) });
+    },
+    provisionSubstitutionUser(id,payload){
+      return request(`/substitutions/${encodeURIComponent(id)}/provision`, { method:'POST', body:JSON.stringify(payload) });
+    },
+    activateSubstitutionRequest(id){
+      return request(`/substitutions/${encodeURIComponent(id)}/activate`, { method:'POST', body:'{}' });
+    },
+    rejectSubstitutionRequest(id,payload={}){
+      return request(`/substitutions/${encodeURIComponent(id)}/reject`, { method:'POST', body:JSON.stringify(payload) });
+    },
+    fetchLegacySubstitutionAliases(){ return request('/substitutions/legacy'); },
+    resolveLegacySubstitutionAlias(id,payload){
+      return request(`/substitutions/legacy/${encodeURIComponent(id)}/resolve`, { method:'POST', body:JSON.stringify(payload) });
+    },
+    markLegacySubstitutionAliasObsolete(id,payload={}){
+      return request(`/substitutions/legacy/${encodeURIComponent(id)}/obsolete`, { method:'POST', body:JSON.stringify(payload) });
     },
     fetchTeacherPracticasGuardias(){
       return request('/profesorado/practicas-guardias');

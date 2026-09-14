@@ -8,6 +8,8 @@ const { finishRestore, isRestoreInProgress, startRestore } = require('../mainten
 const { requireRole } = require('../session');
 const { createSqliteBackup, verifySqliteBackup } = require('../sqlite-backup');
 const { getTelemetrySnapshot } = require('../telemetry');
+const { appendAuditEvent } = require('../audit');
+const { listEffectiveSubstitutions, madridDateKey } = require('../substitution-service');
 const {
   FUTURE_ABSENCES_STATE_KEY,
   MONTHLY_GUARDIA_LOAD_STATE_KEY,
@@ -80,7 +82,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       sessionOverrides,
       gruposEstado,
       appStateRows,
-      substitutionsState,
+      effectiveSubstitutions,
       practicasGuardiasState,
       practicasGuardiasTramosState,
       patioGuardiasState,
@@ -94,10 +96,10 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       db.all('SELECT * FROM session_overrides ORDER BY profesor, dia, hora'),
       db.all('SELECT grupo, activo, updated_at FROM grupos_estado ORDER BY grupo COLLATE NOCASE'),
       db.all(
-        'SELECT key, value FROM app_state WHERE key IN (?, ?, ?, ?, ?, ?) ORDER BY key',
-        [SUBSTITUTIONS_STATE_KEY, FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY, MONTHLY_GUARDIA_LOAD_STATE_KEY, PATIO_GUARDIAS_STATE_KEY, PATIO_TEACHER_BLOCKS_STATE_KEY]
+        'SELECT key, value FROM app_state WHERE key IN (?, ?, ?, ?, ?) ORDER BY key',
+        [FUTURE_ABSENCES_STATE_KEY, WEEK_STATE_KEY, MONTHLY_GUARDIA_LOAD_STATE_KEY, PATIO_GUARDIAS_STATE_KEY, PATIO_TEACHER_BLOCKS_STATE_KEY]
       ),
-      db.get('SELECT value FROM app_state WHERE key = ?', [SUBSTITUTIONS_STATE_KEY]),
+      listEffectiveSubstitutions(db, madridDateKey()),
       db.get('SELECT value FROM app_state WHERE key = ?', [PRACTICAS_GUARDIAS_STATE_KEY]),
       db.get('SELECT value FROM app_state WHERE key = ?', [PRACTICAS_GUARDIAS_TRAMOS_STATE_KEY]),
       db.get('SELECT value FROM app_state WHERE key = ?', [PATIO_GUARDIAS_STATE_KEY]),
@@ -105,7 +107,16 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
     ]);
 
     const appState = Object.fromEntries(appStateRows.map(row => [row.key, row.value]));
-    const substitutions = appState[SUBSTITUTIONS_STATE_KEY] ? JSON.parse(appState[SUBSTITUTIONS_STATE_KEY]) : [];
+    const substitutions = effectiveSubstitutions.map(item => ({
+      profesor: item.titular.displayName,
+      sustituto: item.substitute.displayName,
+      assignmentId: item.assignmentId,
+      status: item.status,
+      startsOn: item.startsOn,
+      endsOn: item.endsOn,
+      titular: item.titular,
+      substitute: item.substitute
+    }));
     const futureAbsences = appState[FUTURE_ABSENCES_STATE_KEY] ? JSON.parse(appState[FUTURE_ABSENCES_STATE_KEY]) : [];
     const schoolWeekKey = appState[WEEK_STATE_KEY] || '';
     const monthlyGuardiaLoad = appState[MONTHLY_GUARDIA_LOAD_STATE_KEY] ? JSON.parse(appState[MONTHLY_GUARDIA_LOAD_STATE_KEY]) : null;
@@ -147,7 +158,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       futureAbsences: Array.isArray(futureAbsences) ? futureAbsences : [],
       schoolWeekKey,
       monthlyGuardiaLoad,
-      teacherSubstitutions: substitutionsState?.value ? JSON.parse(substitutionsState.value) : [],
+      teacherSubstitutions: substitutions,
       teacherPracticasGuardias: practicasGuardiasState?.value ? JSON.parse(practicasGuardiasState.value) : [],
       teacherPracticasGuardiasTramos: practicasGuardiasTramosState?.value ? JSON.parse(practicasGuardiasTramosState.value) : [],
       patioGuardias: patioGuardiasState?.value ? JSON.parse(patioGuardiasState.value) : [],
@@ -277,7 +288,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       patioGuardias,
       patioTeacherBlocks
     } = payload;
-    const effectiveSubstitutions = teacherSubstitutions.length ? teacherSubstitutions : substitutions;
+    const ignoredLegacySubstitutions = teacherSubstitutions.length ? teacherSubstitutions : substitutions;
 
     const db = await getDatabase();
     await withImmediateTransaction(db, async () => {
@@ -377,14 +388,6 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
         );
       }
 
-      if (effectiveSubstitutions.length) {
-        await db.run(
-          `INSERT INTO app_state (key, value, updated_at)
-           VALUES (?, ?, CURRENT_TIMESTAMP)`,
-          [SUBSTITUTIONS_STATE_KEY, JSON.stringify(effectiveSubstitutions)]
-        );
-      }
-
       if (futureAbsences.length) {
         await db.run(
           `INSERT INTO app_state (key, value, updated_at)
@@ -448,6 +451,16 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
           [PATIO_TEACHER_BLOCKS_STATE_KEY, JSON.stringify(patioTeacherBlocks)]
         );
       }
+      await appendAuditEvent(db, {
+        actorUserId: req.sessionUser.userId,
+        action: 'security.restore_completed', targetType: 'database', targetId: 'operational_state',
+        details: {
+          guardias: guardias.length,
+          historial: historial.length,
+          sessionOverrides: sessionOverrides.length,
+          ignoredLegacySubstitutions: ignoredLegacySubstitutions.length
+        }
+      });
     }, { label: 'export:restore' });
 
       res.json({
@@ -461,9 +474,10 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
           alumnosFueraAula: alumnosFueraAula.length,
         sessionOverrides: sessionOverrides.length,
         gruposEstado: gruposEstado.length,
-        substitutions: effectiveSubstitutions.length,
+        substitutions: 0,
           futureAbsences: futureAbsences.length,
-        teacherSubstitutions: effectiveSubstitutions.length,
+        teacherSubstitutions: 0,
+        ignoredLegacySubstitutions: ignoredLegacySubstitutions.length,
         monthlyGuardiaLoad: monthlyGuardiaLoad ? 1 : 0,
         teacherPracticasGuardias: teacherPracticasGuardias.length,
         teacherPracticasGuardiasTramos: teacherPracticasGuardiasTramos.length,
@@ -472,6 +486,16 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       }
     });
   } catch (error) {
+    if (req.sessionUser?.userId) {
+      try {
+        const db = await getDatabase();
+        await withImmediateTransaction(db, () => appendAuditEvent(db, {
+          actorUserId: req.sessionUser.userId,
+          action: 'security.restore_rejected', targetType: 'database', targetId: 'operational_state',
+          outcome: 'failure', details: { reasonCode: error.code || 'RESTORE_VALIDATION_FAILED' }
+        }), { label: 'export:restore-rejected' });
+      } catch (_auditError) {}
+    }
     next(error);
   } finally {
     if (restoreStarted) {

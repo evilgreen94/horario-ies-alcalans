@@ -211,6 +211,7 @@
           <button class="btn-add btn-add-secondary" type="button" onclick="downloadBackupJson()">Descargar copia JSON</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="triggerRestoreSnapshot()">Restaurar copia JSON</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="downloadDatabaseBackup()">Descargar copia SQLite</button>
+          <button class="btn-add btn-add-secondary" type="button" onclick="openSubstitutionModal()">Sustituciones</button>
           <button class="btn-add btn-add-secondary" type="button" onclick="changeRolePasswordFlow('superadmin')">Cambiar contrase&ntilde;a</button>
           <button class="btn-add btn-add-ghost" type="button" onclick="toggleSuperAdmin()">Salir de administración técnica</button>
         </div>
@@ -465,7 +466,7 @@
       <div class="history-copy">Registro reciente de cambios realizados desde Jefatura.</div>
       <div class="history-head-actions">
         <button class="btn-dialog btn-dialog-secondary" id="btnUndoHistory" type="button" onclick="undoLastHistoryChange()">Deshacer &uacute;ltimo</button>
-        <button class="btn-dialog btn-dialog-secondary" type="button" onclick="clearHistory()">Borrar historial</button>
+        <button class="btn-dialog btn-dialog-secondary" type="button" onclick="clearHistory()">Archivar historial</button>
       </div>
     </div>
     <div class="history-filters" id="historyFilters">
@@ -483,12 +484,43 @@
       <span>Sustituciones de profesorado</span>
       <button class="modal-x" type="button" aria-label="Cerrar sustituciones de profesorado" onclick="closeSubstitutionModal()">x</button>
     </div>
-    <div class="history-copy">Asigna un sustituto temporal sin modificar el horario, las guardias ni las aulas del docente titular.</div>
+    <div class="history-copy">Las solicitudes no cambian el horario hasta que Superadmin enlaza una identidad válida y activa la asignación.</div>
+    <section id="substitutionRequestForm" class="substitution-request-form">
+      <div class="fg">
+        <label for="substitutionTitular">Docente titular</label>
+        <select id="substitutionTitular"></select>
+      </div>
+      <div class="fg">
+        <label for="substitutionCandidate">Identidad existente (opcional)</label>
+        <select id="substitutionCandidate"><option value="">Persona aún no provisionada</option></select>
+      </div>
+      <div class="fg">
+        <label for="substitutionCandidateName">Nombre de la persona propuesta</label>
+        <input type="text" id="substitutionCandidateName" maxlength="160" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label for="substitutionCandidateUsername">Usuario propuesto (opcional)</label>
+        <input type="text" id="substitutionCandidateUsername" maxlength="64" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label for="substitutionStartsOn">Inicio</label>
+        <input type="date" id="substitutionStartsOn">
+      </div>
+      <div class="fg">
+        <label for="substitutionEndsOn">Fin previsto (incluido)</label>
+        <input type="date" id="substitutionEndsOn">
+      </div>
+      <button class="btn-substitution" type="button" onclick="createSubstitutionRequest()">Crear solicitud</button>
+    </section>
     <div class="fg" style="margin-top:1rem">
       <label>Buscar docente titular</label>
       <input type="text" id="substitutionSearch" placeholder="Filtra por titular o sustituto">
     </div>
     <div class="substitution-list" id="substitutionList"></div>
+    <section id="legacySubstitutionSection" hidden>
+      <h3>Aliases legacy pendientes</h3>
+      <div class="substitution-list" id="legacySubstitutionList"></div>
+    </section>
   </div>
 </div>
 <div class="overlay" id="practicasGuardiasOverlay" onclick="bgPracticasGuardiasClose(event)">

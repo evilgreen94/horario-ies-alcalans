@@ -6,6 +6,7 @@ const { requireRole } = require('../session');
 const { esHoraValida, getResolvedTeacherSession, getSesionesCubriblesProfesor } = require('../teacher-schedule');
 const { ensureCoverageAssignmentsAllowed } = require('../coverage-assignment');
 const { getInactiveGroupSet, isGroupInactive, logInactiveGroupSkip } = require('../group-state');
+const { appendOperationalHistory } = require('../operational-history');
 const {
   buildMonthlyGuardiaLoadResponse,
   ensureMonthlyGuardiaLoadState,
@@ -13,6 +14,38 @@ const {
 } = require('./guardias/monthly-load');
 
 const router = express.Router();
+
+function safeAbsenceSnapshot(row) {
+  if (!row) return null;
+  return {
+    id: row.id == null ? null : Number(row.id), dia: Number(row.dia), hora: Number(row.hora),
+    ausente: String(row.ausente || ''), guardia: String(row.guardia || ''),
+    aula: String(row.aula || ''), faena: !!row.faena, obs: String(row.obs || '')
+  };
+}
+
+async function recordAbsenceChange(db, actorUserId, before, after) {
+  const previous = safeAbsenceSnapshot(before);
+  const current = safeAbsenceSnapshot(after);
+  const targetId = String(current?.id || previous?.id || '');
+  const action = !previous ? 'absence.created' : !current ? 'absence.deleted' : 'absence.updated';
+  await appendOperationalHistory(db, {
+    actorUserId, action,
+    title: !previous ? 'Ausencia creada' : !current ? 'Ausencia eliminada' : 'Ausencia modificada',
+    type: !previous ? 'create' : !current ? 'delete' : 'edit',
+    targetType: 'absence', targetId, before: previous, after: current
+  });
+  const oldCoverage = previous?.guardia || '';
+  const newCoverage = current?.guardia || '';
+  if (oldCoverage === newCoverage) return;
+  const coverageAction = !oldCoverage ? 'coverage.assigned' : !newCoverage ? 'coverage.removed' : 'coverage.changed';
+  await appendOperationalHistory(db, {
+    actorUserId, action: coverageAction,
+    title: !oldCoverage ? 'Cobertura asignada' : !newCoverage ? 'Cobertura retirada' : 'Cobertura modificada',
+    type: 'coverage', targetType: 'absence', targetId,
+    before: { guardia: oldCoverage || null }, after: { guardia: newCoverage || null }
+  });
+}
 
 function notFound(message) {
   const error = new Error(message);
@@ -172,7 +205,9 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
         );
         if (payload.replaceIds.length) {
           for (const replaceId of payload.replaceIds) {
+            const removed = await db.get('SELECT * FROM ausencias WHERE id = ?', [replaceId]);
             await db.run('DELETE FROM ausencias WHERE id = ?', [replaceId]);
+            if (removed) await recordAbsenceChange(db, req.sessionUser.userId, removed, null);
           }
         }
         const saved = [];
@@ -190,6 +225,7 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
               [payload.profesor, session.aula || '', payload.faena ? 1 : 0, payload.obs || '', existing.id]
             );
             const row = await db.get('SELECT * FROM ausencias WHERE id = ?', [existing.id]);
+            await recordAbsenceChange(db, req.sessionUser.userId, existing, row);
             logAusenciasDayComplete('reutilizada', { profesor: payload.profesor, dia: payload.dia, hora: session.hora, aula: session.aula || '', grupo: session.grupo || '' });
             saved.push(row);
             continue;
@@ -200,7 +236,9 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
             [payload.dia, session.hora, payload.profesor, '', session.aula || '', payload.faena ? 1 : 0, payload.obs || '']
           );
           logAusenciasDayComplete('creada', { profesor: payload.profesor, dia: payload.dia, hora: session.hora, aula: session.aula || '', grupo: session.grupo || '' });
-          saved.push(await db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]));
+          const row = await db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]);
+          await recordAbsenceChange(db, req.sessionUser.userId, null, row);
+          saved.push(row);
         }
         await ensureCoverageAssignmentsAllowed(db, await db.all('SELECT * FROM ausencias WHERE dia = ?', [payload.dia]));
         await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
@@ -234,7 +272,9 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
         [dia, hora, ausente, guardia, aula, faena ? 1 : 0, obs]
       );
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
-      return db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]);
+      const persisted = await db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]);
+      await recordAbsenceChange(db, req.sessionUser.userId, null, persisted);
+      return persisted;
     }, { label: `guardias:create:${dia}:${hora}:${ausente_key || normalizeText(ausente)}` });
     logGuardiasSave('save-single:success', { id: row?.id, dia, hora, ausente });
     res.status(201).json({ ...row, ausente_key, guardia_key });
@@ -287,7 +327,26 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
       }
 
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
-      return db.all('SELECT * FROM ausencias ORDER BY dia, hora, id');
+      const nextRows = await db.all('SELECT * FROM ausencias ORDER BY dia, hora, id');
+      const logicKey = row => `${Number(row.dia)}|${Number(row.hora)}|${normalizeText(row.ausente)}`;
+      const beforeByKey = new Map(currentRows.map(row => [logicKey(row), row]));
+      const afterByKey = new Map(nextRows.map(row => [logicKey(row), row]));
+      for (const [key, before] of beforeByKey) {
+        const after = afterByKey.get(key) || null;
+        if (!after || buildReplacePayloadHash([before]) !== buildReplacePayloadHash([after])) {
+          await recordAbsenceChange(db, req.sessionUser.userId, before, after);
+        }
+      }
+      for (const [key, after] of afterByKey) {
+        if (!beforeByKey.has(key)) await recordAbsenceChange(db, req.sessionUser.userId, null, after);
+      }
+      await appendOperationalHistory(db, {
+        actorUserId: req.sessionUser.userId, action: 'absence.bulk_replaced',
+        title: 'Ausencias sincronizadas', type: 'edit', targetType: 'absence_collection',
+        targetId: 'all', before: { count: currentRows.length, hash: buildReplacePayloadHash(currentRows) },
+        after: { count: nextRows.length, hash: buildReplacePayloadHash(nextRows) }
+      });
+      return nextRows;
     }, { label: `guardias:replace:${rows.length}` });
     logGuardiasSave('replace:success', {
       requested: rows.length,
@@ -312,6 +371,7 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
     let guardia_key = '';
     logGuardiasSave('save-update:start', { id, dia, hora, ausente });
     const row = await withImmediateTransaction(db, async () => {
+      const before = await db.get('SELECT * FROM ausencias WHERE id = ?', [id]);
       await validateCoverageAtSlot(db, { dia, hora, ausente, guardia }, id);
       const keys = await ensureNoDuplicateAbsence(db, { dia, hora, ausente, guardia }, id);
       ausente_key = keys.ausente_key;
@@ -326,7 +386,9 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
         throw notFound('No existe una ausencia con ese id.');
       }
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
-      return db.get('SELECT * FROM ausencias WHERE id = ?', [id]);
+      const persisted = await db.get('SELECT * FROM ausencias WHERE id = ?', [id]);
+      await recordAbsenceChange(db, req.sessionUser.userId, before, persisted);
+      return persisted;
     }, { label: `guardias:update:${id}` });
     logGuardiasSave('save-update:success', { id, dia, hora, ausente });
     res.json({ ...row, ausente_key, guardia_key });
@@ -340,10 +402,12 @@ router.delete('/:id', requireRole('admin'), async (req, res, next) => {
     const db = await getDatabase();
     logGuardiasSave('delete:start', { id: req.params.id });
     await withImmediateTransaction(db, async () => {
+      const before = await db.get('SELECT * FROM ausencias WHERE id = ?', [req.params.id]);
       const result = await db.run('DELETE FROM ausencias WHERE id = ?', [req.params.id]);
       if (!result.changes) {
         throw notFound('No existe una ausencia con ese id.');
       }
+      await recordAbsenceChange(db, req.sessionUser.userId, before, null);
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
     }, { label: `guardias:delete:${req.params.id}` });
     logGuardiasSave('delete:success', { id: req.params.id });

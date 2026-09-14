@@ -251,7 +251,16 @@ async function ensureWeeklyResetIfNeeded(dbInstance) {
   await withImmediateTransaction(db, async () => {
     await db.exec('DELETE FROM ausencias');
     await db.exec('DELETE FROM biblioteca_guardias');
-    await db.exec('DELETE FROM historial');
+    await db.run(
+      `UPDATE historial SET archived_at = CURRENT_TIMESTAMP
+       WHERE archived_at IS NULL`
+    );
+    const { appendOperationalHistory } = require('./operational-history');
+    await appendOperationalHistory(db, {
+      action: 'history.week_archived', title: 'Historial semanal archivado', type: 'history',
+      targetType: 'operational_history', targetId: storedState.value,
+      after: { nextWeekKey: currentWeekKey }
+    });
     await db.exec('DELETE FROM tareas_profesorado');
     await db.exec('DELETE FROM alumnos_fuera_aula');
     await db.exec('DELETE FROM session_overrides');

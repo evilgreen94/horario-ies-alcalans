@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { listEffectiveSubstitutions, madridDateKey } = require('../../substitution-service');
 
 const SUBSTITUTIONS_STATE_KEY = 'teacher_substitutions';
 const PRACTICAS_GUARDIAS_STATE_KEY = 'teacher_practicas_guardias';
@@ -72,10 +73,22 @@ function registerStateCollectionRoutes(router, deps) {
     throw error;
   }
 
-  router.get('/substitutions', async (_req, res, next) => {
+  router.get('/substitutions', async (req, res, next) => {
     try {
       const db = await getDatabase();
-      res.json(await getStateRows(db, SUBSTITUTIONS_STATE_KEY));
+      const date = typeof req.query.date === 'string' ? req.query.date : madridDateKey();
+      const rows = await listEffectiveSubstitutions(db, date);
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(rows.map(row => ({
+        profesor: row.titular.displayName,
+        sustituto: row.substitute.displayName,
+        assignmentId: row.assignmentId,
+        status: row.status,
+        startsOn: row.startsOn,
+        endsOn: row.endsOn,
+        titular: row.titular,
+        substitute: row.substitute
+      })));
     } catch (error) {
       next(error);
     }
@@ -83,10 +96,10 @@ function registerStateCollectionRoutes(router, deps) {
 
   router.put('/substitutions/replace', requireRole('admin'), async (req, res, next) => {
     try {
-      const rows = ensureArray(req.body, 'Las sustituciones de profesorado').map(sanitizeTeacherSubstitution);
-      const db = await getDatabase();
-      await replaceStateRows(db, SUBSTITUTIONS_STATE_KEY, rows);
-      res.json({ ok: true });
+      const error = new Error('La escritura legacy de sustituciones está retirada. Usa solicitudes estructuradas.');
+      error.status = 410;
+      error.code = 'LEGACY_SUBSTITUTION_WRITE_RETIRED';
+      throw error;
     } catch (error) {
       next(error);
     }

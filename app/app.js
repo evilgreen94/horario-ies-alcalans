@@ -21,7 +21,18 @@ function render(data){
   $('#message').textContent='';
   $('#datasetLabel').textContent=`${data.dataset.academicYear} · ${data.dataset.label}`;
   $('#teacherCode').textContent=data.teacher.sourceCode||'';
-  $('#teacherName').textContent=data.teacher.displayName;
+  $('#teacherName').textContent=data.teacher.substitution?.role==='substitute'
+    ? (data.teacher.user?.displayName||data.teacher.user?.username||data.teacher.displayName)
+    : data.teacher.displayName;
+  const substitution=$('#substitutionBanner');
+  if(data.teacher.substitution){
+    const item=data.teacher.substitution;
+    const period=`${item.startsOn} – ${item.endsOn||'sin fecha final'}`;
+    substitution.hidden=false;
+    substitution.textContent=item.role==='substitute'
+      ? `Sustituyendo a ${item.titular.displayName} · ${period}`
+      : `Sustitución activa · ${item.substitute.displayName} · ${period}`;
+  }else substitution.hidden=true;
   $('#dateLabel').textContent=new Intl.DateTimeFormat('es-ES',{weekday:'long',day:'numeric',month:'long'}).format(new Date(`${data.date}T12:00:00`));
   $('#currentState').textContent=labels[data.currentState]||data.currentState;
   $('#periodList').innerHTML=data.periods.map(period=>`<li class="period${data.currentPeriod?.key===period.key?' current':''}" data-state="${period.state}">

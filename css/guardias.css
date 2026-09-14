@@ -4404,3 +4404,13 @@ tbody td:nth-child(7) {
   .superadmin-provisioning-summary { grid-template-columns: 1fr 1fr; }
   .superadmin-provisioning-row, .superadmin-credential-row { grid-template-columns: 1fr; gap: .2rem; }
 }
+.substitution-request-form{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:.75rem;
+  margin:1rem 0;
+  padding:1rem;
+  border:1px solid var(--line,#d8dee8);
+  border-radius:14px;
+}
+.substitution-request-form>.btn-substitution{align-self:end;min-height:42px}

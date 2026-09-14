@@ -29,17 +29,65 @@ async function appendAuditEvent(db, event) {
   if (!action) throw new Error('Audit action is required.');
   if (!/^[a-z0-9._-]{1,128}$/i.test(action)) throw new Error('Audit action is invalid.');
 
+  const actorUserId = Number(event.actorUserId);
+  let actor = null;
+  if (Number.isSafeInteger(actorUserId) && actorUserId > 0) {
+    actor = await db.get(
+      `SELECT u.username,
+              GROUP_CONCAT(DISTINCT r.key) AS role_keys,
+              (
+                SELECT external.external_key
+                FROM teacher_assignments assignment
+                JOIN teacher_external_identities external
+                  ON external.teacher_profile_id = assignment.teacher_profile_id
+                JOIN schedule_datasets dataset
+                  ON dataset.academic_year_id = assignment.academic_year_id
+                 AND dataset.status = 'active'
+                 AND dataset.source_system = external.source_system
+                JOIN schedule_dataset_teachers roster
+                  ON roster.dataset_id = dataset.id
+                 AND roster.teacher_profile_id = assignment.teacher_profile_id
+                 AND roster.teacher_external_identity_id = external.id
+                WHERE assignment.user_id = u.id
+                  AND assignment.assignment_type = 'titular'
+                  AND assignment.starts_on <= date('now')
+                  AND (assignment.ends_on IS NULL OR assignment.ends_on >= date('now'))
+                ORDER BY assignment.starts_on DESC, assignment.id DESC
+                LIMIT 1
+              ) AS source_code
+       FROM users u
+       LEFT JOIN user_roles ur ON ur.user_id = u.id
+       LEFT JOIN roles r ON r.id = ur.role_id
+       WHERE u.id = ?
+       GROUP BY u.id`,
+      [actorUserId]
+    );
+  }
+  const roles = String(actor?.role_keys || '').split(',').map(value => value.trim()).filter(Boolean).sort();
+  const details = redactAuditDetails({
+    ...(event.details || {}),
+    actor: actor ? {
+      userId: actorUserId,
+      username: actor.username,
+      sourceCode: actor.source_code || null,
+      roles
+    } : null
+  });
   await db.run(
     `INSERT INTO audit_log
-      (actor_user_id, action, target_type, target_id, outcome, details_json)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+      (actor_user_id, actor_username, actor_source_code, actor_roles_json,
+       action, target_type, target_id, outcome, details_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      event.actorUserId || null,
+      actor ? actorUserId : null,
+      actor?.username || '',
+      actor?.source_code || null,
+      JSON.stringify(roles),
       action,
       redactAuditString(String(event.targetType || '').trim()),
       redactAuditString(String(event.targetId || '').trim()),
       event.outcome === 'failure' ? 'failure' : 'success',
-      JSON.stringify(redactAuditDetails(event.details || {}))
+      JSON.stringify(details)
     ]
   );
 }

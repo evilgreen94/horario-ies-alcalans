@@ -289,15 +289,21 @@ perfil operativo del titular
 horario del titular durante el intervalo
 ```
 
-`resolveActiveTeacherProfile` filtra usuario y perfil activos, curso y fechas.
+`resolveActiveTeacherProfile` filtra usuario y perfil activos, rol `teacher`, curso y fechas.
 Prioriza una sustitución vigente sobre una titularidad, después inicio más
 reciente e ID, de forma determinista. El último día es inclusivo; al expirar deja
 de resolver. Las restricciones evitan solapamientos ambiguos nuevos.
 
-Hay una deuda operativa: la sustitución individual usa `teacher_assignments`,
-mientras la sustitución mostrada por `guardias.html` usa
-`app_state.teacher_substitutions`. Hasta unificarlas, el procedimiento debe
-actualizar ambas de forma consciente.
+`substitution_requests` conserva la necesidad operativa y su estado. Solo
+Superadmin puede convertir una solicitud preparada en un `teacher_assignment`;
+la creación de la asignación, el cambio de estado y sus eventos de historial y
+auditoría comparten transacción. Jefatura puede crear, cancelar y finalizar
+solicitudes, pero no provisiona cuentas ni concede roles.
+
+`teacher_assignments` es la única fuente de verdad efectiva. La lectura legacy
+de `guardias.html` es una proyección sanitizada de las asignaciones vigentes.
+Los antiguos nombres libres se importan a `legacy_substitution_aliases` como
+`unresolved` y no producen efectos hasta una reconciliación manual.
 
 ## 11. Persistencia SQLite
 
@@ -307,8 +313,8 @@ Categorías conceptuales:
   `tareas_profesorado`, `alumnos_fuera_aula`, `session_overrides`,
   `grupos_estado`, `app_state`;
 - autenticación: `auth_credentials`, `users`, `roles`, `user_roles`;
-- identidad: `teacher_profiles`, `teacher_assignments`,
-  `teacher_external_identities`, `academic_years`;
+- identidad: `teacher_profiles`, `teacher_assignments`, `substitution_requests`,
+  `legacy_substitution_aliases`, `teacher_external_identities`, `academic_years`;
 - horario: `schedule_datasets`, `schedule_dataset_teachers`,
   `schedule_periods`, `teacher_schedule_sessions`;
 - control: `audit_log`, `schema_migrations`.

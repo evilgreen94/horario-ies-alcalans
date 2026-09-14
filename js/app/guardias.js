@@ -387,6 +387,7 @@ let teacherMoodEntries={};
 let absenceMatches=[];
 let absenceActiveIndex=-1;
 let teacherSubstitutions={};
+let teacherSubstitutionDetails={};
 let teacherPracticasGuardias=[];
 let teacherPracticasGuardiasTramos=[];
 let patioGuardias=[];
@@ -648,6 +649,16 @@ function loadTeacherSubstitutions(){
 }
 function persistTeacherSubstitutions(map){
   storage.writeJson(KEY_TEACHER_SUBSTITUTIONS,Object.entries(map||{}).map(([profesor,sustituto])=>({profesor,sustituto})));
+}
+function applyTeacherSubstitutionRows(rows){
+  const normalized=Array.isArray(rows)?rows:[];
+  teacherSubstitutions=Object.fromEntries(normalized.map(row=>[resolveTeacherCanonicalName(row.profesor),cleanText(row.sustituto)]).filter(([profesor,sustituto])=>getProfesor(profesor)&&cleanText(sustituto)));
+  teacherSubstitutionDetails=Object.fromEntries(normalized.map(row=>{
+    const profesor=resolveTeacherCanonicalName(row.profesor);
+    return [profesor,{assignmentId:row.assignmentId||null,status:row.status||'active',startsOn:row.startsOn||'',endsOn:row.endsOn||'',titular:row.titular||{displayName:profesor},substitute:row.substitute||{displayName:cleanText(row.sustituto)}}];
+  }).filter(([profesor,item])=>getProfesor(profesor)&&cleanText(item.substitute?.displayName)));
+  persistTeacherSubstitutions(teacherSubstitutions);
+  return teacherSubstitutions;
 }
 function loadTeacherPracticasGuardias(){
   return [...new Set(storage.readJson(KEY_TEACHER_PRACTICAS_GUARDIAS,[]).map(row=>resolveTeacherCanonicalName(typeof row==='string'?row:row?.profesor)).filter(nombre=>getProfesor(nombre)))].sort((a,b)=>a.localeCompare(b,'es'));
@@ -3930,10 +3941,8 @@ async function runAdminStateSync(){
     const persistedGuardias=await storage.replaceGuardias(payload.guardias);
     const auxiliaryResults=await Promise.allSettled([
       storage.replaceBiblioteca(payload.biblioteca),
-      storage.replaceHistorial(payload.historial),
       storage.replacePatioGuardias(payload.patioGuardias),
       storage.replacePatioTeacherBlocks(payload.patioTeacherBlocks),
-      storage.replaceTeacherSubstitutions(payload.substitutions),
       storage.replaceTeacherPracticasGuardias(payload.practicasGuardias),
       storage.replaceTeacherPracticasGuardiasTramos(payload.practicasGuardiasTramos)
     ]);
@@ -3941,7 +3950,7 @@ async function runAdminStateSync(){
       .map((result,index)=>({result,index}))
       .filter(item=>item.result.status==='rejected')
       .map(item=>({
-        domain:['biblioteca','historial','patio-guardias','patio-bloqueos','sustituciones','practicas-guardias','practicas-tramos'][item.index]||`domain-${item.index}`,
+        domain:['biblioteca','patio-guardias','patio-bloqueos','practicas-guardias','practicas-tramos'][item.index]||`domain-${item.index}`,
         error:item.result.reason
       }));
     if(Array.isArray(persistedGuardias)){
@@ -4198,8 +4207,7 @@ async function hydrateTeacherSubstitutions(){
   try{
     const rows=await storage.fetchTeacherSubstitutions();
     if(!Array.isArray(rows)) return;
-    teacherSubstitutions=Object.fromEntries(rows.map(row=>[resolveTeacherCanonicalName(row.profesor),cleanText(row.sustituto)]).filter(([profesor,sustituto])=>getProfesor(profesor)&&cleanText(sustituto)));
-    persistTeacherSubstitutions(teacherSubstitutions);
+    applyTeacherSubstitutionRows(rows);
     syncTeacherIdentity();
     renderGuardiaBoard();
     renderTable();
@@ -4933,7 +4941,7 @@ async function hydrateFromBackend(){
     try{
     const backendReadResults=await Promise.allSettled([
       storage.fetchGuardias(),
-      storage.fetchHistorial(),
+      isAdmin?storage.fetchHistorial():Promise.resolve(null),
       storage.fetchTareasProfesorado(),
       storage.fetchSessionOverrides(),
       storage.fetchAlumnosFueraAula(),
@@ -5028,8 +5036,7 @@ async function hydrateFromBackend(){
       }
     }
     if(Array.isArray(substitutionsRows)){
-      teacherSubstitutions=Object.fromEntries(substitutionsRows.map(row=>[resolveTeacherCanonicalName(row.profesor),cleanText(row.sustituto)]).filter(([profesor,sustituto])=>getProfesor(profesor)&&cleanText(sustituto)));
-      persistTeacherSubstitutions(teacherSubstitutions);
+      applyTeacherSubstitutionRows(substitutionsRows);
     }
     if(Array.isArray(practicasGuardiasRows)){
       teacherPracticasGuardias=[...new Set(practicasGuardiasRows.map(row=>resolveTeacherCanonicalName(row?.profesor)).filter(nombre=>getProfesor(nombre)))].sort((a,b)=>a.localeCompare(b,'es'));
@@ -5174,7 +5181,7 @@ async function pollBackendState(force=false){
     const previousSnapshot=makeBackendSnapshot();
     const backendReadResults=await Promise.allSettled([
       storage.fetchGuardias(),
-      storage.fetchHistorial(),
+      isAdmin?storage.fetchHistorial():Promise.resolve(null),
       storage.fetchTareasProfesorado(),
       storage.fetchSessionOverrides(),
       storage.fetchAlumnosFueraAula(),
@@ -5254,8 +5261,7 @@ async function pollBackendState(force=false){
       }
     }
     if(Array.isArray(substitutionsRows)){
-      teacherSubstitutions=Object.fromEntries(substitutionsRows.map(row=>[resolveTeacherCanonicalName(row.profesor),cleanText(row.sustituto)]).filter(([profesor,sustituto])=>getProfesor(profesor)&&cleanText(sustituto)));
-      persistTeacherSubstitutions(teacherSubstitutions);
+      applyTeacherSubstitutionRows(substitutionsRows);
     }
     if(Array.isArray(practicasGuardiasRows)){
       teacherPracticasGuardias=[...new Set(practicasGuardiasRows.map(row=>resolveTeacherCanonicalName(row?.profesor)).filter(nombre=>getProfesor(nombre)))].sort((a,b)=>a.localeCompare(b,'es'));
@@ -5606,9 +5612,13 @@ function getAbsenceSessionDisplay(row){
 function getAbsenceCoverageDisplay(row){
   const session=getAbsenceSessionDisplay(row);
   const guardia=getVisibleTeacherName(row.guardia||'');
+  const canonicalAbsent=typeof resolveTeacherCanonicalName==='function'?resolveTeacherCanonicalName(row.ausente||''):String(row.ausente||'');
+  const substitution=typeof teacherSubstitutionDetails!=='undefined'?(teacherSubstitutionDetails[canonicalAbsent]||null):null;
   return {
     ...session,
-    ausente:getVisibleTeacherName(row.ausente||''),
+    ausente:substitution?.substitute?.displayName||getVisibleTeacherName(row.ausente||''),
+    titular:substitution?.titular?.displayName||'',
+    substitution,
     guardia,
     estado:guardia?'Cubierta':'Pendiente'
   };
@@ -5618,12 +5628,13 @@ function buildTvAbsenceAssignment(row){
   return {
     teacher:display.guardia||'Sin cubrir',
     location:[display.grupo?`Grupo ${display.grupo}`:'Grupo no indicado',display.aula==='Aula no indicada'?display.aula:`Aula ${display.aula}`].join(' · '),
-    meta:[display.estado,display.ausente?`Ausente: ${display.ausente}`:'',display.materia].filter(Boolean).join(' · '),
+    meta:[display.estado,display.ausente?`Ausente: ${display.ausente}`:'',display.titular?`Titular: ${display.titular}`:'',display.materia].filter(Boolean).join(' · '),
     tone:'general'
   };
 }
 function renderAbsenceSessionDetails(model){
-  return `<div class="guardia-slot"><span class="aula-tag">${escapeHtml(model.grupo?`Grupo ${model.grupo}`:'Grupo no indicado')}</span><span class="aula-tag">${escapeHtml(model.aula==='Aula no indicada'?model.aula:`Aula ${model.aula}`)}</span></div>${model.materia?`<span class="cell-meta">${escapeHtml(model.materia)}</span>`:''}`;
+  const substitution=model.substitution?`<span class="cell-meta">Sustitución activa: ${escapeHtml(model.substitution.substitute?.displayName||'')} por ${escapeHtml(model.substitution.titular?.displayName||'titular')}</span>`:'';
+  return `<div class="guardia-slot"><span class="aula-tag">${escapeHtml(model.grupo?`Grupo ${model.grupo}`:'Grupo no indicado')}</span><span class="aula-tag">${escapeHtml(model.aula==='Aula no indicada'?model.aula:`Aula ${model.aula}`)}</span></div>${model.materia?`<span class="cell-meta">${escapeHtml(model.materia)}</span>`:''}${substitution}`;
 }
 function buildAbsenceDisplayModel(g,rowsSource){
   const h=HORA_MAP[g.hora]||{label:g.hora+'a',rango:''};
@@ -5631,8 +5642,8 @@ function buildAbsenceDisplayModel(g,rowsSource){
   const needsCoverage=rowNeedsCoverage(g);
   const sugerido=needsCoverage?(cub||getGuardiaSugerida(day,g.hora,1,rowsSource)):'';
   const faenaInfo=resolveFaena(g);
-  const {grupo,aula,materia}=getAbsenceCoverageDisplay(g);
-  const ausenteNombre=getVisibleTeacherName(g.ausente);
+  const {grupo,aula,materia,substitution}=getAbsenceCoverageDisplay(g);
+  const ausenteNombre=substitution?.substitute?.displayName||getVisibleTeacherName(g.ausente);
   const guardiaNombre=sugerido?getVisibleTeacherName(sugerido):'';
   const ausenteMood=getTeacherMoodForToday(g.ausente);
   const guardiaMood=sugerido?getTeacherMoodForToday(sugerido):null;
@@ -5659,6 +5670,7 @@ function buildAbsenceDisplayModel(g,rowsSource){
     aula,
     grupo,
     materia,
+    substitution,
     ausenteNombre,
     guardiaNombre,
     ausenteMood,
@@ -6720,40 +6732,10 @@ async function reviewTeacherFutureAbsence(id,status){
   }
 }
 async function assignTeacherSubstitution(nombre){
-  if(!isAdmin||!getProfesor(nombre)) return;
-  const current=teacherSubstitutions[nombre]||'';
-  const value=cleanText(await askText('Asignar sustituto',`Introduce el nombre del sustituto para ${getVisibleTeacherName(nombre)===nombre?nombre:getVisibleTeacherName(nombre)}.`,current,'Nombre del sustituto','Guardar'));
-  if(!value) return;
-  const validationError=validateTeacherSubstitutionName(nombre,value);
-  if(validationError){
-    showToast(validationError,'error');
-    return;
-  }
-  teacherSubstitutions={...teacherSubstitutions,[nombre]:value};
-  persistTeacherSubstitutions(teacherSubstitutions);
-  if(sameNormalizedText(teacherName,nombre)) persistTeacherUser(getVisibleTeacherName(nombre));
-  renderSubstitutionList();
-  syncTeacherIdentity();
-  renderGuardiaBoard();
-  renderTable();
-  if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
-  showToast('Sustituto asignado correctamente.','success');
-  syncAdminState({manual:true,origin:'teacher-substitution',reason:'assign-substitution'});
+  await openStructuredSubstitutionModal();
 }
 async function clearTeacherSubstitution(nombre){
-  if(!isAdmin||!teacherSubstitutions[nombre]) return;
-  if(!await askConfirm('Restaurar titular',`Se restaurar\u00e1 el nombre original de ${nombre}.`,'Restaurar')) return;
-  delete teacherSubstitutions[nombre];
-  teacherSubstitutions={...teacherSubstitutions};
-  persistTeacherSubstitutions(teacherSubstitutions);
-  if(sameNormalizedText(teacherName,nombre)) persistTeacherUser(nombre);
-  renderSubstitutionList();
-  syncTeacherIdentity();
-  renderGuardiaBoard();
-  renderTable();
-  if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
-  showToast('Titular restaurado.','success');
-  syncAdminState({manual:true,origin:'teacher-substitution',reason:'clear-substitution'});
+  await openStructuredSubstitutionModal();
 }
 async function toggleTeacherPracticasGuardias(nombre){
   if(!isAdmin||!getProfesor(nombre)) return;
@@ -8166,13 +8148,7 @@ async function saveAbsence(){
       }else{
         addHistoryEntry('Ausencia de día completo',`${DIAS[dia]} · ${ausente} · ${savedRows.map(row=>formatHoraLabel(row.hora)).join(', ')}`,'create',{undoState});
       }
-      try{
-        await storage.replaceHistorial(historialCambios);
-        showToast(`Ausencia de día completo registrada en ${savedRows.length} horas.`,'success');
-      }catch(historySyncError){
-        console.error('Full day absence saved but history sync failed',historySyncError);
-        showToast('La ausencia de día completo se ha guardado, pero no se ha podido sincronizar el historial.','error');
-      }
+      showToast(`Ausencia de día completo registrada en ${savedRows.length} horas.`,'success');
       return;
     }
     const horaNum=Number(hora);
@@ -8338,22 +8314,152 @@ if(tvPanelDomain){
   renderTvPanel=()=>tvPanelDomain.renderTvPanel();
   renderPrintSchedule=()=>tvPanelDomain.renderPrintSchedule();
 }
+let structuredSubstitutionRequests=[];
+let structuredSubstitutionTitulars=[];
+let structuredSubstitutionCandidates=[];
+let structuredLegacyAliases=[];
+
+function substitutionStatusLabel(status){
+  return ({pending:'Pendiente de activación',pending_provisioning:'Pendiente de provisión',active:'Activa',finished:'Finalizada',cancelled:'Cancelada',rejected:'Rechazada'})[status]||status||'—';
+}
+function formatSubstitutionDate(value){
+  if(!value) return 'sin fecha';
+  const parts=String(value).split('-');
+  return parts.length===3?`${parts[2]}/${parts[1]}/${parts[0]}`:String(value);
+}
+async function loadStructuredSubstitutions(){
+  const reads=[storage.fetchSubstitutionRequests(),storage.fetchSubstitutionTitulars(),storage.fetchSubstitutionCandidates()];
+  if(isSuperAdmin) reads.push(storage.fetchLegacySubstitutionAliases());
+  const [requests,titulars,candidates,legacy]=await Promise.all(reads);
+  structuredSubstitutionRequests=Array.isArray(requests?.requests)?requests.requests:[];
+  structuredSubstitutionTitulars=Array.isArray(titulars?.titulars)?titulars.titulars:[];
+  structuredSubstitutionCandidates=Array.isArray(candidates?.users)?candidates.users:[];
+  structuredLegacyAliases=Array.isArray(legacy?.aliases)?legacy.aliases:[];
+  const titularSelect=document.getElementById('substitutionTitular');
+  if(titularSelect) titularSelect.innerHTML=structuredSubstitutionTitulars.map(item=>`<option value="${Number(item.assignmentId)}">${escapeHtml(item.displayName)} · ${escapeHtml(item.sourceCode||'sin código')}</option>`).join('');
+  const candidateSelect=document.getElementById('substitutionCandidate');
+  if(candidateSelect) candidateSelect.innerHTML=`<option value="">Persona aún no provisionada</option>${structuredSubstitutionCandidates.map(item=>`<option value="${Number(item.id)}">${escapeHtml(item.displayName||item.username)} · ${escapeHtml(item.username)}${item.active?'':' · inactiva'}</option>`).join('')}`;
+  renderStructuredSubstitutionList();
+}
+function renderStructuredSubstitutionList(){
+  const list=document.getElementById('substitutionList');
+  if(!list) return;
+  const query=normalizeText(document.getElementById('substitutionSearch')?.value||'');
+  const rows=structuredSubstitutionRequests.filter(item=>!query||normalizeText(`${item.titular?.displayName||''} ${item.candidate?.displayName||''} ${item.candidate?.username||''} ${item.status||''}`).includes(query));
+  list.innerHTML=rows.length?rows.map(item=>{
+    const pending=['pending','pending_provisioning'].includes(item.status);
+    const adminActions=isAdmin?`${pending?`<button class="btn-substitution btn-substitution-danger" type="button" onclick="cancelStructuredSubstitution(${Number(item.id)})">Cancelar</button>`:''}${item.status==='active'?`<button class="btn-substitution" type="button" onclick="finishStructuredSubstitution(${Number(item.id)})">Finalizar</button>`:''}`:'';
+    const superActions=isSuperAdmin?`${pending?`<button class="btn-substitution" type="button" onclick="linkStructuredSubstitution(${Number(item.id)})">Enlazar cuenta</button>`:''}${item.status==='pending_provisioning'?`<button class="btn-substitution" type="button" onclick="provisionStructuredSubstitution(${Number(item.id)})">Provisionar</button>`:''}${item.status==='pending'?`<button class="btn-substitution" type="button" onclick="activateStructuredSubstitution(${Number(item.id)})">Activar</button>`:''}${pending?`<button class="btn-substitution btn-substitution-danger" type="button" onclick="rejectStructuredSubstitution(${Number(item.id)})">Rechazar</button>`:''}`:'';
+    return `<article class="substitution-item">
+      <div><div class="substitution-item-title">${escapeHtml(item.titular?.displayName||'Titular desconocido')} → ${escapeHtml(item.candidate?.displayName||item.candidate?.username||'Sin identidad')}</div>
+      <div class="substitution-item-meta">${escapeHtml(substitutionStatusLabel(item.status))} · ${escapeHtml(formatSubstitutionDate(item.startsOn))} – ${escapeHtml(formatSubstitutionDate(item.plannedEndsOn))}</div></div>
+      <div class="substitution-item-actions">${adminActions}${superActions}</div>
+    </article>`;
+  }).join(''):'<div class="history-empty">No hay solicitudes que coincidan.</div>';
+  const legacySection=document.getElementById('legacySubstitutionSection');
+  const legacyList=document.getElementById('legacySubstitutionList');
+  if(legacySection) legacySection.hidden=!isSuperAdmin;
+  if(legacyList&&isSuperAdmin){
+    const unresolved=structuredLegacyAliases.filter(item=>item.status==='unresolved');
+    legacyList.innerHTML=unresolved.length?unresolved.map(item=>`<article class="substitution-item"><div><div class="substitution-item-title">${escapeHtml(item.titularName)} → ${escapeHtml(item.substituteName)}</div><div class="substitution-item-meta">Alias legacy sin efecto operativo</div></div><div class="substitution-item-actions"><button class="btn-substitution" type="button" onclick="resolveStructuredLegacyAlias(${Number(item.id)})">Reconciliar</button><button class="btn-substitution btn-substitution-danger" type="button" onclick="obsoleteStructuredLegacyAlias(${Number(item.id)})">Obsoleto</button></div></article>`).join(''):'<div class="history-empty">No hay aliases legacy pendientes.</div>';
+  }
+}
+async function openStructuredSubstitutionModal(){
+  if(!isAdmin&&!isSuperAdmin) return;
+  const form=document.getElementById('substitutionRequestForm');
+  if(form) form.hidden=!isAdmin;
+  const start=document.getElementById('substitutionStartsOn');
+  const end=document.getElementById('substitutionEndsOn');
+  const today=new Date().toISOString().slice(0,10);
+  if(start&&!start.value) start.value=today;
+  if(end&&!end.value){const date=new Date(`${today}T12:00:00`);date.setDate(date.getDate()+14);end.value=date.toISOString().slice(0,10);}
+  document.getElementById('substitutionOverlay')?.classList.add('open');
+  try{await loadStructuredSubstitutions();}catch(error){showToast(error.message||'No se pudieron cargar las sustituciones.','error');}
+}
+async function createSubstitutionRequest(){
+  if(!isAdmin) return;
+  const payload={
+    titularAssignmentId:Number(document.getElementById('substitutionTitular')?.value),
+    substituteUserId:document.getElementById('substitutionCandidate')?.value||null,
+    proposedDisplayName:cleanText(document.getElementById('substitutionCandidateName')?.value),
+    proposedUsername:cleanText(document.getElementById('substitutionCandidateUsername')?.value),
+    startsOn:document.getElementById('substitutionStartsOn')?.value,
+    plannedEndsOn:document.getElementById('substitutionEndsOn')?.value
+  };
+  try{await storage.createSubstitutionRequest(payload);await loadStructuredSubstitutions();showToast('Solicitud de sustitución creada.','success');}catch(error){showToast(error.message||'No se pudo crear la solicitud.','error');}
+}
+async function cancelStructuredSubstitution(id){
+  if(!isAdmin||!await askConfirm('Cancelar solicitud','La solicitud quedará conservada como cancelada.','Cancelar')) return;
+  try{await storage.cancelSubstitutionRequest(id,{});await loadStructuredSubstitutions();showToast('Solicitud cancelada.','success');}catch(error){showToast(error.message,'error');}
+}
+async function finishStructuredSubstitution(id){
+  if(!isAdmin) return;
+  const request=structuredSubstitutionRequests.find(item=>Number(item.id)===Number(id));
+  const lastEffectiveOn=cleanText(await askText('Finalizar sustitución','Indica el último día efectivo, que permanece incluido.',request?.plannedEndsOn||'','AAAA-MM-DD','Finalizar'));
+  if(!lastEffectiveOn) return;
+  try{await storage.finishSubstitutionRequest(id,{lastEffectiveOn});await loadStructuredSubstitutions();showToast('Sustitución finalizada.','success');}catch(error){showToast(error.message,'error');}
+}
+async function linkStructuredSubstitution(id){
+  if(!isSuperAdmin) return;
+  const userId=Number(cleanText(await askText('Enlazar cuenta','Indica el ID de una cuenta existente. Se garantizará únicamente el rol teacher.','','ID de usuario','Enlazar')));
+  if(!Number.isInteger(userId)||userId<=0) return showToast('ID de usuario no válido.','error');
+  try{await storage.linkSubstitutionUser(id,userId);await loadStructuredSubstitutions();showToast('Identidad enlazada.','success');}catch(error){showToast(error.message,'error');}
+}
+async function provisionStructuredSubstitution(id){
+  if(!isSuperAdmin) return;
+  const request=structuredSubstitutionRequests.find(item=>Number(item.id)===Number(id));
+  const username=cleanText(await askText('Provisionar sustituto','Indica el nombre de usuario. Solo se concederá teacher.',request?.candidate?.username||'','Usuario','Continuar'));
+  if(!username) return;
+  const displayName=cleanText(await askText('Nombre visible','Indica el nombre completo de la persona.',request?.candidate?.displayName||'','Nombre visible','Provisionar'));
+  if(!displayName) return;
+  try{const result=await storage.provisionSubstitutionUser(id,{username,displayName});await loadStructuredSubstitutions();window.alert(`Credencial temporal (se muestra una sola vez)\nUsuario: ${result.user.username}\nContraseña: ${result.temporaryPassword}`);}catch(error){showToast(error.message,'error');}
+}
+async function activateStructuredSubstitution(id){
+  if(!isSuperAdmin||!await askConfirm('Activar sustitución','Se creará la asignación docente efectiva dentro del intervalo indicado.','Activar')) return;
+  try{await storage.activateSubstitutionRequest(id);await loadStructuredSubstitutions();await pollBackendState(true);showToast('Sustitución activada.','success');}catch(error){showToast(error.message,'error');}
+}
+async function rejectStructuredSubstitution(id){
+  if(!isSuperAdmin||!await askConfirm('Rechazar solicitud','La solicitud quedará conservada como rechazada.','Rechazar')) return;
+  try{await storage.rejectSubstitutionRequest(id,{});await loadStructuredSubstitutions();showToast('Solicitud rechazada.','success');}catch(error){showToast(error.message,'error');}
+}
+async function resolveStructuredLegacyAlias(id){
+  if(!isSuperAdmin) return;
+  const titularAssignmentId=Number(cleanText(await askText('Reconciliar alias','Indica el ID de la asignación titular. No se inferirá por nombre.','','ID titular','Continuar')));
+  if(!Number.isInteger(titularAssignmentId)||titularAssignmentId<=0) return;
+  const substituteUserIdText=cleanText(await askText('Identidad sustituta','ID de usuario existente, o deja vacío para provisionar después.','','ID opcional','Continuar'));
+  const startsOn=cleanText(await askText('Inicio','Fecha de inicio real.','','AAAA-MM-DD','Continuar'));
+  const plannedEndsOn=cleanText(await askText('Fin previsto','Último día incluido.','','AAAA-MM-DD','Reconciliar'));
+  try{await storage.resolveLegacySubstitutionAlias(id,{titularAssignmentId,substituteUserId:substituteUserIdText?Number(substituteUserIdText):null,startsOn,plannedEndsOn});await loadStructuredSubstitutions();showToast('Alias reconciliado como solicitud pendiente.','success');}catch(error){showToast(error.message,'error');}
+}
+async function obsoleteStructuredLegacyAlias(id){
+  if(!isSuperAdmin||!await askConfirm('Marcar obsoleto','El alias se conservará sin efecto operativo.','Marcar')) return;
+  try{await storage.markLegacySubstitutionAliasObsolete(id,{});await loadStructuredSubstitutions();showToast('Alias marcado como obsoleto.','success');}catch(error){showToast(error.message,'error');}
+}
+
 if(historyDomain){
   renderHistoryList=()=>{historyDomain.setFilter(historyFilter);return historyDomain.renderList();};
   setHistoryFilter=filter=>{historyFilter=filter||'all';historyDomain.setFilter(historyFilter);};
-  openHistoryModal=()=>historyDomain.openModal();
+  openHistoryModal=async()=>{
+    try{
+      const rows=await storage.fetchHistorial();
+      historialCambios=Array.isArray(rows)?rows:[];
+      historyDomain.setEntries(historialCambios);
+      persistHistorial(historialCambios);
+    }catch(error){console.warn('Operational history refresh failed',error);}
+    historyDomain.openModal();
+  };
   closeHistoryModal=()=>historyDomain.closeModal();
   bgHistoryClose=e=>historyDomain.bgClose(e);
   clearHistory=()=>historyDomain.clear();
   undoLastHistoryChange=()=>historyDomain.undoLastChange();
 }
 if(substitutionsDomain){
-  renderSubstitutionList=()=>{substitutionsDomain.setFilter(substitutionFilter);return substitutionsDomain.renderList();};
-  openSubstitutionModal=()=>substitutionsDomain.openModal();
+  renderSubstitutionList=()=>renderStructuredSubstitutionList();
+  openSubstitutionModal=()=>openStructuredSubstitutionModal();
   closeSubstitutionModal=()=>substitutionsDomain.closeModal();
   bgSubstitutionClose=e=>substitutionsDomain.bgClose(e);
-  assignTeacherSubstitution=nombre=>substitutionsDomain.assign(nombre);
-  clearTeacherSubstitution=nombre=>substitutionsDomain.clear(nombre);
+  assignTeacherSubstitution=()=>openStructuredSubstitutionModal();
+  clearTeacherSubstitution=()=>openStructuredSubstitutionModal();
 }
 if(practicasGuardiasDomain){
   renderPracticasGuardiasList=()=>{practicasGuardiasDomain.setFilter(practicasGuardiasFilter);return practicasGuardiasDomain.renderList();};
