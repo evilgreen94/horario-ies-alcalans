@@ -129,6 +129,12 @@
     fetchBiblioteca(){
       return request('/biblioteca');
     },
+    saveBiblioteca(row){
+      return request('/biblioteca', {
+        method: 'PUT',
+        body: JSON.stringify(row)
+      });
+    },
     replaceBiblioteca(rows){
       return request('/biblioteca/replace', {
         method: 'PUT',

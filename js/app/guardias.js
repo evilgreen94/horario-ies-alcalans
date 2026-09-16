@@ -392,6 +392,7 @@ let teacherPracticasGuardias=[];
 let teacherPracticasGuardiasTramos=[];
 let patioGuardias=[];
 let patioTeacherBlocks=[];
+let bibliotecaGuardias=[];
 let practicasGuardiasFilter='';
 let practicasGuardiasConfigTeacher='';
 let substitutionFilter='';
@@ -1256,8 +1257,36 @@ function getSpecialAssignments(dia,hora,rowsSource=data){
     banos: uncoveredIfReserved?'':banos
   };
 }
-function getBibliotecaAsignada(dia,hora,rowsSource=data){return getSpecialAssignments(dia,hora,rowsSource).biblioteca||'';}
-function getBanosAsignado(dia,hora,rowsSource=data){return getSpecialAssignments(dia,hora,rowsSource).banos||'';}
+function normalizeBibliotecaRow(row){
+  const dia=Number(row?.dia);
+  const hora=Number(row?.hora);
+  const profesor=resolveTeacherCanonicalName(row?.profesor)||cleanText(row?.profesor);
+  if(!Number.isInteger(dia)||dia<0||dia>4||!esHoraValida(hora)||HORAS_PATIO.has(hora)||!profesor) return null;
+  return {dia,hora,profesor};
+}
+function setBibliotecaGuardias(rows){
+  bibliotecaGuardias=[...new Map(
+    (Array.isArray(rows)?rows:[])
+      .map(normalizeBibliotecaRow)
+      .filter(Boolean)
+      .map(row=>[`${row.dia}|${row.hora}`,row])
+  ).values()].sort((a,b)=>a.dia-b.dia||a.hora-b.hora||a.profesor.localeCompare(b.profesor,'es'));
+}
+function getBibliotecaAsignada(dia,hora,rowsSource=data){
+  const targetDia=Number(dia);
+  const targetHora=Number(hora);
+  const persisted=bibliotecaGuardias.find(row=>row.dia===targetDia&&row.hora===targetHora);
+  if(persisted) return persisted.profesor;
+  if(!storage.hasBackend()) return getSpecialAssignments(targetDia,targetHora,rowsSource).biblioteca||'';
+  return '';
+}
+function getBanosAsignado(dia,hora,rowsSource=data){
+  const biblioteca=getBibliotecaAsignada(dia,hora,rowsSource);
+  const proposal=getSpecialAssignments(dia,hora,rowsSource);
+  if(proposal.banos&&proposal.banos!==biblioteca) return proposal.banos;
+  if(proposal.biblioteca&&proposal.biblioteca!==biblioteca) return proposal.biblioteca;
+  return '';
+}
 function buildGuardiaCoverageCounter(options={}){
   const {excludeDia=null,excludeHora=null,dayOnly=null}=options;
   const rowsSource=Array.isArray(options.rowsSource)?options.rowsSource:data;
@@ -3075,15 +3104,11 @@ const practicasGuardiasDomain=auxPanelsSuite?.createPracticasGuardiasDomain({
   }
 })||null;
 function serializeBibliotecaAssignments(){
-  const rows=[];
-  for(let dia=0;dia<5;dia++){
-    for(const hora of ALL_HORAS){
-      if(HORAS_PATIO.has(hora)) continue;
-      const profesor=getBibliotecaAsignada(dia,hora)||'';
-      if(profesor) rows.push({dia,hora,profesor});
-    }
-  }
-  return rows;
+  return bibliotecaGuardias.map(row=>({
+    dia:Number(row.dia),
+    hora:Number(row.hora),
+    profesor:String(row.profesor||'').trim()
+  }));
 }
 function serializeTeacherTasks(){
   return Object.entries(tareasProfesorado).map(([id,row])=>({
@@ -3881,7 +3906,6 @@ function serializeGuardiasForReplace(rows=data){
 function buildAdminSyncPayload(){
   return {
     guardias:serializeGuardiasForReplace(data),
-    biblioteca:serializeBibliotecaAssignments(),
     historial:historialCambios.map(entry=>({
       id:entry.id,
       title:entry.title,
@@ -3989,7 +4013,6 @@ async function runAdminStateSync(){
     const syncStartedAt=performance.now();
     const persistedGuardias=await storage.replaceGuardias(payload.guardias);
     const auxiliaryResults=await Promise.allSettled([
-      storage.replaceBiblioteca(payload.biblioteca),
       storage.replacePatioGuardias(payload.patioGuardias),
       storage.replacePatioTeacherBlocks(payload.patioTeacherBlocks),
       storage.replaceTeacherPracticasGuardias(payload.practicasGuardias),
@@ -3999,7 +4022,7 @@ async function runAdminStateSync(){
       .map((result,index)=>({result,index}))
       .filter(item=>item.result.status==='rejected')
       .map(item=>({
-        domain:['biblioteca','patio-guardias','patio-bloqueos','practicas-guardias','practicas-tramos'][item.index]||`domain-${item.index}`,
+        domain:['patio-guardias','patio-bloqueos','practicas-guardias','practicas-tramos'][item.index]||`domain-${item.index}`,
         error:item.result.reason
       }));
     if(Array.isArray(persistedGuardias)){
@@ -4033,7 +4056,7 @@ async function runAdminStateSync(){
       auxiliaryFailures: auxiliaryFailures.length
     });
     if(!auxiliaryFailures.length){
-      pushSuperAdminEvent('Sincronización de Jefatura','Guardias, biblioteca, historial, sustituciones y ajustes de prácticas sincronizados con el servidor.');
+      pushSuperAdminEvent('Sincronización de Jefatura','Guardias, historial, sustituciones y ajustes de prácticas sincronizados con el servidor.');
     }
     notifyRealtimeSync('admin-sync');
     pendingAdminSyncRequest=null;
@@ -4748,6 +4771,7 @@ async function hydrateFromBackend(){
     try{
     const backendReadResults=await Promise.allSettled([
       storage.fetchGuardias(),
+      storage.fetchBiblioteca(),
       isAdmin?storage.fetchHistorial():Promise.resolve(null),
       storage.fetchTareasProfesorado(),
       storage.fetchSessionOverrides(),
@@ -4762,8 +4786,9 @@ async function hydrateFromBackend(){
       storage.fetchGroups()
     ]);
     if(!hasSuccessfulBackendRead(backendReadResults)) throw new Error('No se pudo completar ninguna lectura del backend.');
-    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult,groupStatesResult]=backendReadResults;
+    const [guardiasResult,bibliotecaResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult,groupStatesResult]=backendReadResults;
     const guardiasRows=guardiasResult.status==='fulfilled'?guardiasResult.value:null;
+    const bibliotecaRows=bibliotecaResult.status==='fulfilled'?bibliotecaResult.value:null;
     const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
     const tareasRows=tareasResult.status==='fulfilled'?tareasResult.value:null;
     const overridesRows=overridesResult.status==='fulfilled'?overridesResult.value:null;
@@ -4779,6 +4804,7 @@ async function hydrateFromBackend(){
 
     const backendHasData=
       (Array.isArray(guardiasRows)&&guardiasRows.length)||
+      (Array.isArray(bibliotecaRows)&&bibliotecaRows.length)||
       (Array.isArray(historialRows)&&historialRows.length)||
       (Array.isArray(tareasRows)&&tareasRows.length)||
       (Array.isArray(overridesRows)&&overridesRows.length)||
@@ -4796,6 +4822,10 @@ async function hydrateFromBackend(){
       data=normalizeStoredRows(guardiasRows.map(row=>({...row,faena:!!row.faena})));
       nid=computeNextId(data);
       persist(data);
+    }
+
+    if(Array.isArray(bibliotecaRows)){
+      setBibliotecaGuardias(bibliotecaRows);
     }
 
     if(Array.isArray(historialRows)){
@@ -4953,6 +4983,7 @@ function makeGuardiasUiSnapshot(){
     adminTableFilter,
     teacherWeekOffset,
     teacherDay,
+    biblioteca:serializeBibliotecaAssignments(),
     rows:filteredRows.map(row=>({
       id:row.id,
       dia:row.dia,
@@ -4986,6 +5017,7 @@ async function pollBackendState(force=false){
     const previousSnapshot=makeBackendSnapshot();
     const backendReadResults=await Promise.allSettled([
       storage.fetchGuardias(),
+      storage.fetchBiblioteca(),
       isAdmin?storage.fetchHistorial():Promise.resolve(null),
       storage.fetchTareasProfesorado(),
       storage.fetchSessionOverrides(),
@@ -5000,8 +5032,9 @@ async function pollBackendState(force=false){
       storage.fetchGroups()
     ]);
     if(!hasSuccessfulBackendRead(backendReadResults)) throw new Error('No se pudo completar ninguna lectura del backend.');
-    const [guardiasResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult,groupStatesResult]=backendReadResults;
+    const [guardiasResult,bibliotecaResult,historialResult,tareasResult,overridesResult,alumnosFueraResult,substitutionsResult,practicasGuardiasResult,practicasGuardiasTramosResult,patioGuardiasResult,patioTeacherBlocksResult,tvAnnouncementResult,guardiaMonthlyLoadResult,groupStatesResult]=backendReadResults;
     const guardiasRows=guardiasResult.status==='fulfilled'?guardiasResult.value:null;
+    const bibliotecaRows=bibliotecaResult.status==='fulfilled'?bibliotecaResult.value:null;
     const historialRows=historialResult.status==='fulfilled'?historialResult.value:null;
     const tareasRows=tareasResult.status==='fulfilled'?tareasResult.value:null;
     const overridesRows=overridesResult.status==='fulfilled'?overridesResult.value:null;
@@ -5019,6 +5052,10 @@ async function pollBackendState(force=false){
       data=normalizeStoredRows(guardiasRows.map(row=>({...row,faena:!!row.faena})));
       nid=computeNextId(data);
       persist(data);
+    }
+
+    if(Array.isArray(bibliotecaRows)){
+      setBibliotecaGuardias(bibliotecaRows);
     }
 
     if(Array.isArray(historialRows)){
