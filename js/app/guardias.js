@@ -1517,15 +1517,6 @@ function reassignAllGuardias(){
     }
   }
 }
-function materializeMissingGuardiaAssignments(){
-  console.info('[autoassign triggered]',{origin:'materializeMissingGuardiaAssignments'});
-  const before=JSON.stringify(data.map(row=>({id:row.id,dia:row.dia,hora:row.hora,ausente:row.ausente,guardia:row.guardia||''})));
-  reassignAllGuardias();
-  const after=JSON.stringify(data.map(row=>({id:row.id,dia:row.dia,hora:row.hora,ausente:row.ausente,guardia:row.guardia||''})));
-  if(before===after) return false;
-  persist(data);
-  return true;
-}
 function makeAbsenceSyncKey(row){
   return `${Number(row?.dia)}|${Number(row?.hora)}|${normalizeText(row?.ausente)}`;
 }
@@ -4274,8 +4265,6 @@ async function hydrateTeacherPracticasGuardias(){
     persistTeacherPracticasGuardias(teacherPracticasGuardias);
     persistTeacherPracticasGuardiasTramos(teacherPracticasGuardiasTramos);
     refreshOrdenGuardias();
-    reassignAllGuardias();
-    persist(data);
     renderGuardiaBoard();
     renderTable();
     renderPracticasGuardiasList();
@@ -4969,7 +4958,6 @@ async function hydrateFromBackend(){
     const tvAnnouncementRow=tvAnnouncementResult.status==='fulfilled'?tvAnnouncementResult.value:null;
     const guardiaMonthlyLoadRow=guardiaMonthlyLoadResult.status==='fulfilled'?guardiaMonthlyLoadResult.value:null;
     const groupStateRows=groupStatesResult.status==='fulfilled'?groupStatesResult.value:null;
-    let guardiaAssignmentsChanged=false;
 
     const backendHasData=
       (Array.isArray(guardiasRows)&&guardiasRows.length)||
@@ -4990,7 +4978,6 @@ async function hydrateFromBackend(){
       data=normalizeStoredRows(guardiasRows.map(row=>({...row,faena:!!row.faena})));
       nid=computeNextId(data);
       persist(data);
-      guardiaAssignmentsChanged=materializeMissingGuardiaAssignments();
     }
 
     if(Array.isArray(historialRows)){
@@ -5072,7 +5059,7 @@ async function hydrateFromBackend(){
     const needsBootstrapSync=!backendHasData&&!storage.isBackendOnly()&&(data.length||historialCambios.length);
     refreshOrdenGuardias();
     lastBackendSnapshot=makeBackendSnapshot();
-    if(!guardiaAssignmentsChanged&&!needsBootstrapSync) markAdminStatePersisted();
+    if(!needsBootstrapSync) markAdminStatePersisted();
     else lastAdminPersistedHash='';
     backendHydrated=true;
     superAdminStatus.lastHydrateAt=new Date().toISOString();
@@ -5088,8 +5075,8 @@ async function hydrateFromBackend(){
     renderTvAnnouncement();
     if(document.getElementById('teacherOverlay')?.classList.contains('open')) renderTeacherPanel();
 
-    if(guardiaAssignmentsChanged||needsBootstrapSync){
-      syncAdminState({origin:'hydrate',reason:'autoassign-after-hydrate'});
+    if(needsBootstrapSync){
+      syncAdminState({origin:'hydrate',reason:'bootstrap-sync'});
     }
     }catch(error){
       backendHydrated=false;
@@ -5209,13 +5196,11 @@ async function pollBackendState(force=false){
     const tvAnnouncementRow=tvAnnouncementResult.status==='fulfilled'?tvAnnouncementResult.value:null;
     const guardiaMonthlyLoadRow=guardiaMonthlyLoadResult.status==='fulfilled'?guardiaMonthlyLoadResult.value:null;
     const groupStateRows=groupStatesResult.status==='fulfilled'?groupStatesResult.value:null;
-    let guardiaAssignmentsChanged=false;
 
     if(Array.isArray(guardiasRows)){
       data=normalizeStoredRows(guardiasRows.map(row=>({...row,faena:!!row.faena})));
       nid=computeNextId(data);
       persist(data);
-      guardiaAssignmentsChanged=materializeMissingGuardiaAssignments();
     }
 
     if(Array.isArray(historialRows)){
@@ -5296,8 +5281,7 @@ async function pollBackendState(force=false){
     }
     refreshOrdenGuardias();
     lastBackendSnapshot=makeBackendSnapshot();
-    if(!guardiaAssignmentsChanged) markAdminStatePersisted();
-    else lastAdminPersistedHash='';
+    markAdminStatePersisted();
     superAdminStatus.lastPollAt=new Date().toISOString();
     clearSuperAdminError();
     if(previousSnapshot!==makeBackendSnapshot()){
@@ -5313,7 +5297,6 @@ async function pollBackendState(force=false){
     }else{
       pushSuperAdminEvent('Consulta','Comprobación remota sin cambios.');
     }
-    if(guardiaAssignmentsChanged) syncAdminState({origin:'polling',reason:'autoassign-after-poll'});
   }catch(error){
     console.warn('Backend polling failed',error);
     setSuperAdminError('Fallo en la comprobación periódica del backend.');
@@ -6241,7 +6224,6 @@ function restoreUndoState(state){
     ordenGuardias=ensureOrden(cloneJson(state.orden));
     persistOrden(ordenGuardias);
   }
-  reassignAllGuardias();
   persist(data);
   nid=computeNextId(data);
   day=typeof state.day==='number'?state.day:day;
@@ -8702,9 +8684,6 @@ function safeInitStep(fn,name){
 safeInitStep(populateProfesoresAusencias,'populateProfesoresAusencias');
 safeInitStep(populateProfesoresGuardia,'populateProfesoresGuardia');
 safeInitStep(syncGuardiaPreview,'syncGuardiaPreview');
-if(!storage.isBackendOnly()){
-  safeInitStep(()=>{reassignAllGuardias();persist(data);},'reassignAllGuardias');
-}
 safeInitStep(renderPills,'renderPills');
 safeInitStep(()=>{renderGuardiasUiIfChanged(true);},'renderGuardiasUi');
 safeInitStep(renderTvAnnouncement,'renderTvAnnouncement');

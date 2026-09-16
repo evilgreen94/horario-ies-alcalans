@@ -308,5 +308,97 @@ module.exports = [
       assert.ok(pollGuard < pollSource.indexOf('clearSuperAdminError()'));
       assert.ok(pollGuard < pollSource.indexOf("pushSuperAdminEvent('Consulta','Comprobación remota sin cambios.')"));
     }
+  },
+  {
+    name: 'backend refresh paths preserve persisted guardia assignments',
+    fn() {
+      const section = (startMarker, endMarker) => {
+        const start = appSource.indexOf(startMarker);
+        const end = appSource.indexOf(endMarker, start);
+        assert.ok(start >= 0, `Missing start marker: ${startMarker}`);
+        assert.ok(end > start, `Missing end marker after: ${startMarker}`);
+        return appSource.slice(start, end);
+      };
+
+      const hydrateSource = section(
+        'async function hydrateFromBackend()',
+        'function isAnyOverlayOpen()'
+      );
+      const pollSource = section(
+        'async function pollBackendState(',
+        'function isReportAvailable()'
+      );
+      const practicasHydrateSource = section(
+        'async function hydrateTeacherPracticasGuardias()',
+        'function sortTeacherFutureAbsences('
+      );
+      const undoSource = section(
+        'function restoreUndoState(',
+        'function updateClockUi('
+      );
+
+      for (const [label, source] of [
+        ['hydrateFromBackend', hydrateSource],
+        ['pollBackendState', pollSource],
+        ['hydrateTeacherPracticasGuardias', practicasHydrateSource],
+        ['restoreUndoState', undoSource]
+      ]) {
+        assert.equal(
+          source.includes('reassignAllGuardias()'),
+          false,
+          `${label} must not recalculate all guardia assignments`
+        );
+        assert.equal(
+          source.includes('reassignGuardiasForDayHours('),
+          false,
+          `${label} must not recalculate guardia assignments while reading/restoring state`
+        );
+        assert.equal(
+          source.includes('materializeMissingGuardiaAssignments'),
+          false,
+          `${label} must not materialize assignments implicitly`
+        );
+      }
+
+      assert.equal(
+        hydrateSource.includes('autoassign-after-hydrate'),
+        false,
+        'hydrate must never write autoassigned guardias back to the backend'
+      );
+      assert.equal(
+        pollSource.includes('autoassign-after-poll'),
+        false,
+        'polling must never write autoassigned guardias back to the backend'
+      );
+      assert.equal(
+        pollSource.includes('syncAdminState('),
+        false,
+        'polling must remain a read-only synchronization path'
+      );
+
+      assert.equal(
+        appSource.includes("safeInitStep(()=>{reassignAllGuardias();persist(data);},'reassignAllGuardias')"),
+        false,
+        'application startup must not recalculate persisted guardias'
+      );
+      assert.equal(
+        appSource.includes('function materializeMissingGuardiaAssignments('),
+        false,
+        'implicit whole-week assignment materialization must stay removed'
+      );
+
+      assert.ok(
+        appSource.includes('function reassignGuardiasForDayHours('),
+        'explicit targeted guardia reassignment must remain available'
+      );
+
+      const targetedReassignments =
+        appSource.match(/reassignGuardiasForDayHours\(diaKey,\[\.\.\.hours\]\)/g) || [];
+
+      assert.ok(
+        targetedReassignments.length >= 3,
+        'absence create/edit/delete flows must keep targeted slot reassignment'
+      );
+    }
   }
 ];
