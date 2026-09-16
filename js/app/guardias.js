@@ -2911,6 +2911,10 @@ if(futureAbsencesDomain){
     status:futureAbsenceAdminStatusFilter,
     teacher:futureAbsenceAdminTeacherFilter
   });
+
+  // Critical bindings must be active before the first render/updateClockUi().
+  buildProjectedRowsForWeek=weekKey=>futureAbsencesDomain.buildProjectedRowsForWeek(weekKey);
+  applyApprovedFutureAbsencesForCurrentWeek=()=>futureAbsencesDomain.applyApprovedForCurrentWeek();
 }
 const auxPanelsSuite=window.GuardiasAuxPanels?.createSuite({
   core:window.GuardiasCore,
@@ -8468,7 +8472,6 @@ if(futureAbsencesDomain){
   getFutureAbsenceHoursForEntry=item=>futureAbsencesDomain.getFutureAbsenceHoursForEntry(item);
   findOverlappingFutureAbsence=(entry,options={})=>futureAbsencesDomain.findOverlapping(entry,options);
   formatHourListLabel=hours=>futureAbsencesDomain.formatHourListLabel(hours);
-  buildProjectedRowsForWeek=weekKey=>futureAbsencesDomain.buildProjectedRowsForWeek(weekKey);
   renderFutureAbsenceAdminList=()=>futureAbsencesDomain.setAdminFilters({
     status:futureAbsenceAdminStatusFilter,
     teacher:futureAbsenceAdminTeacherFilter
@@ -8485,7 +8488,6 @@ if(futureAbsencesDomain){
   handleFutureAbsenceAdminDelete=id=>futureAbsencesDomain.handleAdminDelete(id);
   reviewTeacherFutureAbsence=(id,status)=>futureAbsencesDomain.reviewEntry(id,status);
   updateTeacherFutureAbsenceEntry=entry=>futureAbsencesDomain.updateEntry(entry);
-  applyApprovedFutureAbsencesForCurrentWeek=()=>futureAbsencesDomain.applyApprovedForCurrentWeek();
   createTeacherFutureAbsenceEntry=entry=>futureAbsencesDomain.createEntry(entry);
   deleteTeacherFutureAbsenceEntry=id=>futureAbsencesDomain.deleteEntry(id);
   getTeacherFutureAbsenceStats=nombre=>futureAbsencesDomain.getTeacherStats(nombre);

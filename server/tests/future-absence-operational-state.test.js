@@ -814,6 +814,48 @@ module.exports = [
         source,
         /callHost\(['"]syncAdminState/
       );
+
+      const appSource = fs.readFileSync(
+        path.join(__dirname, '../../js/app/guardias.js'),
+        'utf8'
+      );
+
+      const earlyProjectionBinding = appSource.indexOf(
+        'buildProjectedRowsForWeek=weekKey=>futureAbsencesDomain.buildProjectedRowsForWeek(weekKey)'
+      );
+
+      const earlyApplyBinding = appSource.indexOf(
+        'applyApprovedFutureAbsencesForCurrentWeek=()=>futureAbsencesDomain.applyApprovedForCurrentWeek()'
+      );
+
+      const initialClockRun = appSource.indexOf(
+        'updateClockUi();'
+      );
+
+      assert.ok(
+        earlyProjectionBinding >= 0,
+        'El dominio de futuras debe enlazar la proyección explícitamente'
+      );
+
+      assert.ok(
+        earlyApplyBinding >= 0,
+        'El dominio de futuras debe enlazar la aplicación explícitamente'
+      );
+
+      assert.ok(
+        initialClockRun >= 0,
+        'Debe existir la ejecución inicial de updateClockUi'
+      );
+
+      assert.ok(
+        earlyProjectionBinding < initialClockRun,
+        'La proyección de futuras debe enlazarse antes del primer render'
+      );
+
+      assert.ok(
+        earlyApplyBinding < initialClockRun,
+        'La aplicación de futuras debe enlazarse antes de la primera ejecución del reloj'
+      );
     }
   }
 ];
