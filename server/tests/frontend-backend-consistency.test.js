@@ -330,7 +330,7 @@ module.exports = [
       );
       const practicasHydrateSource = section(
         'async function hydrateTeacherPracticasGuardias()',
-        'function sortTeacherFutureAbsences('
+        'function getCurrentDateIso()'
       );
       const undoSource = section(
         'function restoreUndoState(',

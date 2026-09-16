@@ -2853,6 +2853,35 @@ applyTeacherStatePatch({
   teacherDay
 });
 initRealtimeSync();
+// Future-absence runtime adapters.
+// Business logic lives exclusively in guardias-future-absences.js.
+let hydrateTeacherFutureAbsences;
+let normalizeTeacherFutureAbsence;
+let sortTeacherFutureAbsences;
+let getFutureAbsenceStatusLabel;
+let getFutureAbsenceStatusClass;
+let getFutureAbsenceHoursForEntry;
+let findOverlappingFutureAbsence;
+let formatHourListLabel;
+let buildProjectedRowsForWeek;
+let renderFutureAbsenceAdminList;
+let renderTeacherFutureAbsenceOwnList;
+let handleTeacherFutureAbsenceDateChange;
+let openTeacherFutureAbsenceModal;
+let closeTeacherFutureAbsenceModal;
+let bgTeacherFutureAbsenceClose;
+let submitTeacherFutureAbsence;
+let openFutureAbsenceAdminModal;
+let closeFutureAbsenceAdminModal;
+let bgFutureAbsenceAdminClose;
+let handleFutureAbsenceAdminDelete;
+let reviewTeacherFutureAbsence;
+let updateTeacherFutureAbsenceEntry;
+let applyApprovedFutureAbsencesForCurrentWeek;
+let createTeacherFutureAbsenceEntry;
+let deleteTeacherFutureAbsenceEntry;
+let getTeacherFutureAbsenceStats;
+
 const futureAbsencesDomain=window.GuardiasFutureAbsences?.init({
   storage,
   DIAS,
@@ -2877,15 +2906,12 @@ const futureAbsencesDomain=window.GuardiasFutureAbsences?.init({
   getCurrentDay:()=>day,
   buildUndoState,
   normalizeStoredRows,
-  reassignAllGuardias,
-  persistGuardias:rows=>persist(rows),
   renderGuardiaBoard:()=>renderGuardiaBoard(),
   renderTable:()=>renderTable(),
   getHistoryRows:()=>historialCambios,
   setHistoryRows:rows=>{historialCambios=rows;},
   persistHistorial:rows=>persistHistorial(rows),
   renderHistoryList:()=>renderHistoryList(),
-  syncAdminState:()=>syncAdminState(),
   getAulaProfesor,
   assignGuardiasForRows,
   clearSuperAdminError,
@@ -2906,15 +2932,43 @@ const futureAbsencesDomain=window.GuardiasFutureAbsences?.init({
   bindDom:false
 })||null;
 if(futureAbsencesDomain){
+  // The extracted domain is the sole runtime implementation of future absences.
+  // Bind it before any initial render, clock tick or backend hydration can run.
+  hydrateTeacherFutureAbsences=()=>futureAbsencesDomain.hydrateFromBackend();
+  normalizeTeacherFutureAbsence=row=>futureAbsencesDomain.normalizeTeacherFutureAbsence(row);
+  sortTeacherFutureAbsences=rows=>futureAbsencesDomain.sortTeacherFutureAbsences(rows);
+  getFutureAbsenceStatusLabel=status=>futureAbsencesDomain.getFutureAbsenceStatusLabel(status);
+  getFutureAbsenceStatusClass=status=>futureAbsencesDomain.getFutureAbsenceStatusClass(status);
+  getFutureAbsenceHoursForEntry=item=>futureAbsencesDomain.getFutureAbsenceHoursForEntry(item);
+  findOverlappingFutureAbsence=(entry,options={})=>futureAbsencesDomain.findOverlapping(entry,options);
+  formatHourListLabel=hours=>futureAbsencesDomain.formatHourListLabel(hours);
+  buildProjectedRowsForWeek=weekKey=>futureAbsencesDomain.buildProjectedRowsForWeek(weekKey);
+  renderFutureAbsenceAdminList=()=>futureAbsencesDomain.setAdminFilters({
+    status:futureAbsenceAdminStatusFilter,
+    teacher:futureAbsenceAdminTeacherFilter
+  });
+  renderTeacherFutureAbsenceOwnList=()=>futureAbsencesDomain.renderTeacherOwnList();
+  handleTeacherFutureAbsenceDateChange=()=>futureAbsencesDomain.handleTeacherDateChange();
+  openTeacherFutureAbsenceModal=()=>futureAbsencesDomain.openTeacherModal();
+  closeTeacherFutureAbsenceModal=()=>futureAbsencesDomain.closeTeacherModal();
+  bgTeacherFutureAbsenceClose=e=>futureAbsencesDomain.handleTeacherOverlayBackgroundClick(e);
+  submitTeacherFutureAbsence=()=>futureAbsencesDomain.submitTeacherAbsence();
+  openFutureAbsenceAdminModal=()=>futureAbsencesDomain.openAdminModal();
+  closeFutureAbsenceAdminModal=()=>futureAbsencesDomain.closeAdminModal();
+  bgFutureAbsenceAdminClose=e=>futureAbsencesDomain.handleAdminOverlayBackgroundClick(e);
+  handleFutureAbsenceAdminDelete=id=>futureAbsencesDomain.handleAdminDelete(id);
+  reviewTeacherFutureAbsence=(id,status)=>futureAbsencesDomain.reviewEntry(id,status);
+  updateTeacherFutureAbsenceEntry=entry=>futureAbsencesDomain.updateEntry(entry);
+  applyApprovedFutureAbsencesForCurrentWeek=()=>futureAbsencesDomain.applyApprovedForCurrentWeek();
+  createTeacherFutureAbsenceEntry=entry=>futureAbsencesDomain.createEntry(entry);
+  deleteTeacherFutureAbsenceEntry=id=>futureAbsencesDomain.deleteEntry(id);
+  getTeacherFutureAbsenceStats=nombre=>futureAbsencesDomain.getTeacherStats(nombre);
+
   futureAbsencesDomain.setRows(teacherFutureAbsences,{render:false});
   futureAbsencesDomain.setAdminFilters({
     status:futureAbsenceAdminStatusFilter,
     teacher:futureAbsenceAdminTeacherFilter
   });
-
-  // Critical bindings must be active before the first render/updateClockUi().
-  buildProjectedRowsForWeek=weekKey=>futureAbsencesDomain.buildProjectedRowsForWeek(weekKey);
-  applyApprovedFutureAbsencesForCurrentWeek=()=>futureAbsencesDomain.applyApprovedForCurrentWeek();
 }
 const auxPanelsSuite=window.GuardiasAuxPanels?.createSuite({
   core:window.GuardiasCore,
@@ -4237,24 +4291,6 @@ async function hydrateGroupStates(){
     setSuperAdminError('Fallo al hidratar grupos activos/inactivos.');
   }
 }
-async function hydrateTeacherFutureAbsences(){
-  if(!storage.hasBackend()) return;
-  try{
-    const rows=await storage.fetchTeacherFutureAbsences();
-    if(!Array.isArray(rows)) return;
-    teacherFutureAbsences=rows.map(normalizeTeacherFutureAbsence).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.profesor||'').localeCompare(String(b.profesor||''),'es'));
-    persistTeacherFutureAbsences(teacherFutureAbsences);
-    futureAbsenceSyncFlags.clear();
-    renderFutureAbsenceAdminList();
-    renderTeacherFutureAbsenceOwnList();
-    superAdminStatus.lastHydrateAt=new Date().toISOString();
-    clearSuperAdminError();
-    pushSuperAdminEvent('Actualización','Ausencias futuras recargadas desde el servidor.');
-  }catch(error){
-    console.warn('Teacher future absences hydration failed',error);
-    setSuperAdminError('No se pudieron cargar las ausencias futuras.');
-  }
-}
 async function hydrateTeacherPracticasGuardias(){
   if(!storage.hasBackend()||!isAdmin) return;
   try{
@@ -4276,30 +4312,6 @@ async function hydrateTeacherPracticasGuardias(){
   }catch(error){
     console.warn('Teacher practicas guardias hydration failed',error);
   }
-}
-function sortTeacherFutureAbsences(rows){
-  return (rows||[]).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.profesor||'').localeCompare(String(b.profesor||''),'es'));
-}
-function normalizeTeacherFutureAbsence(row){
-  return {
-    id:cleanText(row?.id),
-    profesor:resolveTeacherCanonicalName(row?.profesor)||cleanText(row?.profesor),
-    sourceCode:cleanText(row?.sourceCode||row?.source_code).toUpperCase(),
-    date:cleanText(row?.date),
-    note:cleanText(row?.note),
-    hours:Array.isArray(row?.hours)?[...new Set(row.hours.map(Number).filter(esHoraValida).filter(hora=>!HORAS_PATIO.has(hora)))].sort((a,b)=>a-b):[],
-    status:cleanText(row?.status||'pending')||'pending',
-    reviewedAt:cleanText(row?.reviewedAt),
-    reviewerNote:cleanText(row?.reviewerNote),
-    appliedAt:cleanText(row?.appliedAt),
-    createdAt:cleanText(row?.createdAt)||new Date().toISOString()
-  };
-}
-function getFutureAbsenceStatusLabel(status){
-  return status==='approved'?'Validada':status==='rejected'?'Rechazada':status==='applied'?'Aplicada':'Pendiente';
-}
-function getFutureAbsenceStatusClass(status){
-  return status==='approved'?'future-absence-status-approved':status==='rejected'?'future-absence-status-rejected':status==='applied'?'future-absence-status-applied':'future-absence-status-pending';
 }
 function getCurrentDateIso(){
   return new Date().toISOString().slice(0,10);
@@ -4328,67 +4340,6 @@ function getSchoolWeekInfoFromDate(dateValue){
     weekKey:formatDateKey(monday),
     dayIndex:dayOfWeek>=1&&dayOfWeek<=5?dayOfWeek-1:null
   };
-}
-function getFutureAbsenceHoursForEntry(item){
-  if(Array.isArray(item?.hours)&&item.hours.length){
-    return [...new Set(item.hours.map(Number).filter(esHoraValida).filter(hora=>!HORAS_PATIO.has(hora)))].sort((a,b)=>a-b);
-  }
-  const weekInfo=getSchoolWeekInfoFromDate(item?.date);
-  if(!weekInfo||weekInfo.dayIndex==null) return [];
-  return getHorasLectivasProfesorDia(item.profesor,weekInfo.dayIndex);
-}
-function isFutureAbsenceProjected(item){
-  const status=cleanText(item?.status||'pending')||'pending';
-  return status==='approved'||status==='applied';
-}
-function findOverlappingFutureAbsence(entry,options={}){
-  const excludeId=cleanText(options.excludeId);
-  const profesor=cleanText(entry?.profesor);
-  const date=cleanText(entry?.date);
-  const hours=new Set(getFutureAbsenceHoursForEntry(entry));
-  if(!profesor||!date||!hours.size) return null;
-  return teacherFutureAbsences.find(item=>{
-    if(cleanText(item?.id)===excludeId) return false;
-    if(cleanText(item?.status)==='rejected') return false;
-    if(cleanText(item?.profesor)!==profesor||cleanText(item?.date)!==date) return false;
-    return getFutureAbsenceHoursForEntry(item).some(hora=>hours.has(hora));
-  })||null;
-}
-function formatHourListLabel(hours){
-  const rows=(hours||[]).map(hora=>formatHoraLabel(hora));
-  return rows.length?rows.join(', '):'Sin horas lectivas';
-}
-function buildProjectedRowsForWeek(weekKey){
-  const rows=[];
-  const seen=new Set();
-  teacherFutureAbsences
-    .filter(item=>isFutureAbsenceProjected(item))
-    .forEach(item=>{
-      const weekInfo=getSchoolWeekInfoFromDate(item.date);
-      if(!weekInfo||weekInfo.weekKey!==weekKey||weekInfo.dayIndex==null) return;
-      const horasLectivas=getFutureAbsenceHoursForEntry(item);
-      horasLectivas.forEach(hora=>{
-        const key=`${item.id}|${hora}`;
-        if(seen.has(key)) return;
-        seen.add(key);
-        rows.push({
-          id:key,
-          dia:weekInfo.dayIndex,
-          hora,
-          ausente:item.profesor,
-          guardia:'',
-          aula:getAulaProfesor(item.profesor,weekInfo.dayIndex,hora)||'',
-          faena:false,
-          obs:'',
-          futurePlanned:true,
-          futureStatus:item.status,
-          futureDate:item.date,
-          futureSourceId:item.id,
-          reviewerNote:item.reviewerNote||''
-        });
-      });
-    });
-  return assignGuardiasForRows(rows);
 }
 function mergeActualAndProjectedRows(actualRows,projectedRows){
   const merged=Array.isArray(actualRows)?actualRows.slice():[];
@@ -4785,143 +4736,6 @@ function renderPrintSchedule(){
       <footer class="print-sheet-note">El profesorado que no t&eacute; tasca assignada ha de controlar els banys i els corredors.</footer>
     </section>
   `;
-}
-async function updateTeacherFutureAbsenceEntry(entry){
-  const normalized=normalizeTeacherFutureAbsence(entry);
-  teacherFutureAbsences=sortTeacherFutureAbsences([normalized,...teacherFutureAbsences.filter(item=>item.id!==normalized.id)]);
-  persistTeacherFutureAbsences(teacherFutureAbsences);
-  renderFutureAbsenceAdminList();
-  renderTeacherFutureAbsenceOwnList();
-  if(!storage.hasBackend()) return {ok:true,localOnly:true};
-  try{
-    const result=await storage.updateTeacherFutureAbsence(normalized.id,normalized);
-    const saved=normalizeTeacherFutureAbsence(result?.entry||normalized);
-    futureAbsenceSyncFlags.delete(`upsert:${saved.id}`);
-    teacherFutureAbsences=sortTeacherFutureAbsences([saved,...teacherFutureAbsences.filter(item=>item.id!==saved.id)]);
-    persistTeacherFutureAbsences(teacherFutureAbsences);
-    renderFutureAbsenceAdminList();
-    renderTeacherFutureAbsenceOwnList();
-    clearSuperAdminError();
-    pushSuperAdminEvent('Ausencia futura',`Aviso futuro actualizado para ${saved.profesor}.`);
-    return result||{ok:true,entry:saved};
-  }catch(error){
-    console.warn('Teacher future absence update backend sync failed; keeping local state',error);
-    futureAbsenceSyncFlags.add(`upsert:${normalized.id}`);
-    setSuperAdminError('Hay avisos futuros pendientes de sincronizar.');
-    pushSuperAdminEvent('Sincronización pendiente',`Aviso futuro de ${normalized.profesor} guardado temporalmente en este dispositivo.`);
-    renderSuperAdminMonitor();
-    return {ok:true,localOnly:true,syncError:true,entry:normalized};
-  }
-}
-async function applyApprovedFutureAbsencesForCurrentWeek(){
-  const currentWeekKey=getCurrentSchoolWeekKey();
-  const approvedRows=teacherFutureAbsences.filter(item=>item.status==='approved'&&!item.appliedAt);
-  if(!approvedRows.length) return false;
-  let stateChanged=false;
-  let approvalsChanged=false;
-  const appliedSummaries=[];
-  const undoState=buildUndoState(day);
-  for(const item of approvedRows){
-    const weekInfo=getSchoolWeekInfoFromDate(item.date);
-    if(!weekInfo||weekInfo.weekKey!==currentWeekKey||weekInfo.dayIndex==null) continue;
-    const horasLectivas=getFutureAbsenceHoursForEntry(item);
-    if(!horasLectivas.length) continue;
-    horasLectivas.forEach(horaItem=>{
-      if(!esHoraValida(horaItem)){
-        logInvalidAbsenceHour('skip hora inválida',{profesor:item.profesor,hora:horaItem});
-        return;
-      }
-      if(data.some(row=>row.dia===weekInfo.dayIndex&&row.hora===horaItem&&sameNormalizedText(row.ausente,item.profesor))) return;
-      data.push({dia:weekInfo.dayIndex,hora:horaItem,ausente:item.profesor,guardia:'',aula:getAulaProfesor(item.profesor,weekInfo.dayIndex,horaItem)||'',faena:false,obs:'',id:nid++});
-      stateChanged=true;
-    });
-    appliedSummaries.push(`${getVisibleTeacherName(item.profesor)||item.profesor} · ${item.date} · ${horasLectivas.map(formatHoraLabel).join(', ')}`);
-    item.status='applied';
-    item.appliedAt=new Date().toISOString();
-    approvalsChanged=true;
-  }
-  if(stateChanged){
-    data=normalizeStoredRows(data);
-    reassignAllGuardias();
-    persist(data);
-    renderGuardiaBoard();
-    renderTable();
-  }
-  if(appliedSummaries.length){
-    historialCambios.unshift({
-      id:`hist-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-      title:appliedSummaries.length===1?'Ausencia futura aplicada':'Ausencias futuras aplicadas',
-      detail:appliedSummaries.join(' · '),
-      type:'create',
-      undoState,
-      actor:'Jefatura',
-      ts:new Date().toISOString()
-    });
-    historialCambios=historialCambios.slice(0,200);
-    persistHistorial(historialCambios);
-    renderHistoryList();
-  }
-  if(approvalsChanged){
-    persistTeacherFutureAbsences(teacherFutureAbsences);
-    renderFutureAbsenceAdminList();
-    renderTeacherFutureAbsenceOwnList();
-    if(storage.hasBackend()&&isAdmin){
-      await Promise.allSettled(teacherFutureAbsences.filter(item=>item.appliedAt).map(item=>storage.updateTeacherFutureAbsence(item.id,normalizeTeacherFutureAbsence(item))));
-    }
-  }
-  if(appliedSummaries.length){
-      await syncAdminState({manual:true,immediate:true,origin:'future-absence',reason:'apply-approved-current-week'});
-  }
-  return stateChanged||approvalsChanged;
-}
-async function createTeacherFutureAbsenceEntry(entry){
-  const normalized=normalizeTeacherFutureAbsence(entry);
-  teacherFutureAbsences=sortTeacherFutureAbsences([normalized,...teacherFutureAbsences.filter(item=>item.id!==normalized.id)]);
-  persistTeacherFutureAbsences(teacherFutureAbsences);
-  renderFutureAbsenceAdminList();
-  renderTeacherFutureAbsenceOwnList();
-  if(!storage.hasBackend()) return {ok:true,localOnly:true};
-  try{
-    const result=await storage.createTeacherFutureAbsence(normalized);
-    const saved=normalizeTeacherFutureAbsence(result?.entry||normalized);
-    futureAbsenceSyncFlags.delete(`upsert:${saved.id}`);
-    teacherFutureAbsences=sortTeacherFutureAbsences([saved,...teacherFutureAbsences.filter(item=>item.id!==saved.id)]);
-    persistTeacherFutureAbsences(teacherFutureAbsences);
-    renderFutureAbsenceAdminList();
-    renderTeacherFutureAbsenceOwnList();
-    clearSuperAdminError();
-    pushSuperAdminEvent('Ausencia futura',`Nuevo aviso futuro registrado para ${saved.profesor}.`);
-    return result||{ok:true,entry:saved};
-  }catch(error){
-    console.warn('Teacher future absence create backend sync failed; keeping local state',error);
-    futureAbsenceSyncFlags.add(`upsert:${normalized.id}`);
-    setSuperAdminError('Hay avisos futuros pendientes de sincronizar.');
-    pushSuperAdminEvent('Sincronización pendiente',`Nuevo aviso futuro de ${normalized.profesor} guardado temporalmente en este dispositivo.`);
-    renderSuperAdminMonitor();
-    return {ok:true,localOnly:true,syncError:true,entry:normalized};
-  }
-}
-async function deleteTeacherFutureAbsenceEntry(id){
-  teacherFutureAbsences=teacherFutureAbsences.filter(item=>item.id!==id);
-  persistTeacherFutureAbsences(teacherFutureAbsences);
-  renderFutureAbsenceAdminList();
-  renderTeacherFutureAbsenceOwnList();
-  if(!storage.hasBackend()) return {ok:true,localOnly:true};
-  try{
-    futureAbsenceSyncFlags.delete(`upsert:${id}`);
-    futureAbsenceSyncFlags.delete(`delete:${id}`);
-    const result=await storage.deleteTeacherFutureAbsence(id);
-    clearSuperAdminError();
-    pushSuperAdminEvent('Ausencia futura','Aviso futuro eliminado en el servidor.');
-    return result;
-  }catch(error){
-    console.warn('Teacher future absence delete backend sync failed; keeping local state',error);
-    futureAbsenceSyncFlags.add(`delete:${id}`);
-    setSuperAdminError('Hay eliminaciones pendientes de sincronizar.');
-    pushSuperAdminEvent('Sincronización pendiente','La eliminación del aviso está pendiente de sincronización.');
-    renderSuperAdminMonitor();
-    return {ok:true,localOnly:true,syncError:true};
-  }
 }
 function hasSuccessfulBackendRead(results){
   return Array.isArray(results)&&results.some(result=>result?.status==='fulfilled');
@@ -6473,250 +6287,6 @@ function sortFutureAbsenceRowsForDisplay(rows){
       String(a.profesor||'').localeCompare(String(b.profesor||''),'es');
   });
 }
-function getFutureAbsenceTemporalMeta(item){
-  const today=getCurrentDateIso();
-  const dateValue=cleanText(item?.date);
-  if(!dateValue) return '';
-  if(dateValue===today) return 'Hoy';
-  const todayDate=new Date(`${today}T00:00:00`);
-  const targetDate=new Date(`${dateValue}T00:00:00`);
-  if(Number.isNaN(todayDate.getTime())||Number.isNaN(targetDate.getTime())) return '';
-  const diffDays=Math.round((targetDate.getTime()-todayDate.getTime())/86400000);
-  if(diffDays===1) return 'Mañana';
-  if(diffDays>1&&diffDays<=7) return 'Esta semana';
-  if(diffDays<0) return 'Pasada';
-  return '';
-}
-function getFutureAbsenceStatusGroupLabel(status){
-  return status==='pending'?'Pendientes':status==='approved'?'Validadas':status==='applied'?'Aplicadas':status==='rejected'?'Rechazadas':'Otros avisos';
-}
-function groupFutureAbsenceRowsByStatus(rows){
-  const statusOrder=['pending','approved','applied','rejected'];
-  return statusOrder.map(status=>({
-    status,
-    label:getFutureAbsenceStatusGroupLabel(status),
-    rows:sortFutureAbsenceRowsForDisplay(rows.filter(item=>(item.status||'pending')===status))
-  })).filter(group=>group.rows.length);
-}
-function renderFutureAbsenceCard(item,options={}){
-  const temporalMeta=getFutureAbsenceTemporalMeta(item);
-  const temporalBadge=temporalMeta?`<span class="future-absence-time-badge">${escapeHtml(temporalMeta)}</span>`:'';
-  const reviewedAtLabel=item.reviewedAt?new Date(item.reviewedAt).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-  const actionsMarkup=options.showAdminActions?`<div class="substitution-item-actions">
-      ${item.status==='pending'?`<button class="btn-substitution" type="button" data-future-absence-approve="${escapeHtml(item.id)}">Validar</button><button class="btn-substitution btn-substitution-danger" type="button" data-future-absence-reject="${escapeHtml(item.id)}">Rechazar</button>`:''}
-      <button class="btn-substitution btn-substitution-danger" type="button" data-future-absence-delete="${escapeHtml(item.id)}">Eliminar aviso</button>
-    </div>`:'';
-  return `<article class="future-absence-item">
-    <div class="future-absence-item-head">
-      <div>
-        <div class="future-absence-item-title">${escapeHtml(options.showTeacherName?(getVisibleTeacherName(item.profesor)||item.profesor):formatFutureAbsenceDateLabel(item.date))}</div>
-        <div class="future-absence-item-date">${escapeHtml(options.showTeacherName?formatFutureAbsenceDateLabel(item.date):formatHourListLabel(getFutureAbsenceHoursForEntry(item)))}</div>
-      </div>
-      <div class="future-absence-item-meta">
-        ${temporalBadge}
-        <span class="future-absence-status ${getFutureAbsenceStatusClass(item.status)}">${escapeHtml(getFutureAbsenceStatusLabel(item.status))}</span>
-      </div>
-    </div>
-    <div class="future-absence-item-note"><strong>Horas:</strong> ${escapeHtml(formatHourListLabel(getFutureAbsenceHoursForEntry(item)))}</div>
-    ${options.showTeacherName?`<div class="future-absence-item-note"><strong>Docente:</strong> ${escapeHtml(getVisibleTeacherName(item.profesor)||item.profesor)}</div>`:''}
-    <div class="future-absence-item-note"><strong>Observaciones:</strong> ${escapeHtml(item.note||'Sin observaciones adicionales.')}</div>
-    ${item.reviewerNote?`<div class="future-absence-item-note"><strong>Respuesta de Jefatura:</strong> ${escapeHtml(item.reviewerNote)}</div>`:''}
-    ${reviewedAtLabel?`<div class="future-absence-item-note"><strong>Revisada:</strong> ${escapeHtml(reviewedAtLabel)}</div>`:''}
-    ${actionsMarkup}
-  </article>`;
-}
-function formatFutureAbsenceAdminSummary(rows){
-  const counts=rows.reduce((acc,item)=>{
-    const status=item.status||'pending';
-    acc.total+=1;
-    acc[status]=(acc[status]||0)+1;
-    return acc;
-  },{total:0,pending:0,approved:0,rejected:0,applied:0});
-  return `
-    <span class="future-absence-chip"><strong>${counts.total}</strong> avisos</span>
-    <span class="future-absence-chip"><strong>${counts.pending}</strong> pendientes</span>
-    <span class="future-absence-chip"><strong>${counts.approved}</strong> validadas</span>
-    <span class="future-absence-chip"><strong>${counts.rejected}</strong> rechazadas</span>
-    <span class="future-absence-chip"><strong>${counts.applied}</strong> aplicadas</span>
-  `;
-}
-function renderFutureAbsenceAdminList(){
-  const list=document.getElementById('futureAbsenceAdminList');
-  const summary=document.getElementById('futureAbsenceAdminSummary');
-  if(!list) return;
-  const rows=sortFutureAbsenceRowsForDisplay(teacherFutureAbsences);
-  if(summary) summary.innerHTML=rows.length?formatFutureAbsenceAdminSummary(rows):'';
-  if(!rows.length){
-    list.innerHTML='<div class="future-absence-empty">No hay ausencias futuras comunicadas.</div>';
-    return;
-  }
-  const teacherFilter=normalizeTeacherSearch(futureAbsenceAdminTeacherFilter);
-  const filtered=rows.filter(item=>{
-    if(futureAbsenceAdminStatusFilter!=='all'&&item.status!==futureAbsenceAdminStatusFilter) return false;
-    if(teacherFilter){
-      const visible=getVisibleTeacherName(item.profesor)||item.profesor;
-      const haystack=[item.profesor,visible,makeTeacherUsername(visible)].map(normalizeTeacherSearch);
-      if(!haystack.some(value=>value.includes(teacherFilter))) return false;
-    }
-    return true;
-  });
-  if(!filtered.length){
-    list.innerHTML='<div class="future-absence-empty">No hay avisos que coincidan con el filtro actual.</div>';
-    return;
-  }
-  const groups=groupFutureAbsenceRowsByStatus(filtered);
-  list.innerHTML=groups.map(group=>`<section class="future-absence-group">
-    <div class="future-absence-group-head">
-      <h3>${escapeHtml(group.label)}</h3>
-      <span class="future-absence-group-count">${group.rows.length}</span>
-    </div>
-    <div class="future-absence-group-list">${group.rows.map(item=>renderFutureAbsenceCard(item,{showTeacherName:true,showAdminActions:isAdmin})).join('')}</div>
-  </section>`).join('');
-}
-function renderTeacherFutureAbsenceOwnList(){
-  const list=document.getElementById('teacherFutureAbsenceOwnList');
-  if(!list) return;
-  const rows=sortFutureAbsenceRowsForDisplay(teacherFutureAbsences.filter(item=>sameNormalizedText(item.profesor,teacherName)));
-  if(!rows.length){
-    list.innerHTML='<div class="future-absence-empty">Todavía no has enviado avisos de ausencia futura.</div>';
-    return;
-  }
-  const groups=groupFutureAbsenceRowsByStatus(rows);
-  list.innerHTML=groups.map(group=>`<section class="future-absence-group">
-    <div class="future-absence-group-head">
-      <h3>${escapeHtml(group.label)}</h3>
-      <span class="future-absence-group-count">${group.rows.length}</span>
-    </div>
-    <div class="future-absence-group-list">${group.rows.map(item=>renderFutureAbsenceCard(item,{showTeacherName:false,showAdminActions:false})).join('')}</div>
-  </section>`).join('');
-}
-function getTeacherFutureAbsenceDaySelection(){
-  const input=document.getElementById('teacherFutureAbsenceDate');
-  const dateValue=cleanText(input?.value);
-  if(!dateValue) return null;
-  return getSchoolWeekInfoFromDate(dateValue);
-}
-function handleTeacherFutureAbsenceDateChange(){
-  const hoursWrap=document.getElementById('teacherFutureAbsenceHours');
-  const meta=document.getElementById('teacherFutureAbsenceDayMeta');
-  if(!hoursWrap||!meta) return;
-  const selection=getTeacherFutureAbsenceDaySelection();
-  if(!selection||selection.dayIndex==null){
-    meta.textContent='Selecciona una fecha lectiva para ver tus horas de clase.';
-    hoursWrap.innerHTML='<div class="teacher-future-hours-empty">No hay horas para seleccionar.</div>';
-    return;
-  }
-  const hours=getHorasLectivasProfesorDia(teacherName,selection.dayIndex);
-  if(!hours.length){
-    meta.textContent=`${DIAS[selection.dayIndex]} · Sin clases lectivas registradas.`;
-    hoursWrap.innerHTML='<div class="teacher-future-hours-empty">Ese día no tienes clases lectivas en el horario cargado.</div>';
-    return;
-  }
-  meta.textContent=`${DIAS[selection.dayIndex]} · Selecciona las horas que quieres comunicar.`;
-  hoursWrap.innerHTML=hours.map(hora=>{
-    const sesion=resolveTeacherSession(teacherName,selection.dayIndex,hora);
-    const detalle=[sesion?.materia||'Clase',sesion?.grupo||'',sesion?.aula||'Sin aula'].filter(Boolean).join(' · ');
-    return `<label class="teacher-future-hour-option"><input type="checkbox" data-future-hour value="${hora}" checked><span class="teacher-future-hour-copy"><span class="teacher-future-hour-title">${escapeHtml(formatHoraLabel(hora))}</span><span class="teacher-future-hour-meta">${escapeHtml(detalle)}</span></span></label>`;
-  }).join('');
-}
-function openTeacherFutureAbsenceModal(){
-  if(!teacherName) return;
-  const nameInput=document.getElementById('teacherFutureAbsenceName');
-  const dateInput=document.getElementById('teacherFutureAbsenceDate');
-  const noteInput=document.getElementById('teacherFutureAbsenceNote');
-  if(nameInput) nameInput.value=getVisibleTeacherName(teacherName);
-  if(dateInput){ dateInput.min=getCurrentDateIso(); dateInput.value=''; }
-  if(noteInput) noteInput.value='';
-  handleTeacherFutureAbsenceDateChange();
-  renderTeacherFutureAbsenceOwnList();
-  document.getElementById('teacherFutureAbsenceOverlay')?.classList.add('open');
-}
-function closeTeacherFutureAbsenceModal(){
-  document.getElementById('teacherFutureAbsenceOverlay')?.classList.remove('open');
-}
-function bgTeacherFutureAbsenceClose(e){if(e.target.id==='teacherFutureAbsenceOverlay') closeTeacherFutureAbsenceModal();}
-async function submitTeacherFutureAbsence(){
-  if(!teacherName) return;
-  if(!await ensureTeacherIdentityConfirmed('enviar una ausencia futura')) return;
-  const dateInput=document.getElementById('teacherFutureAbsenceDate');
-  const noteInput=document.getElementById('teacherFutureAbsenceNote');
-  const dateValue=cleanText(dateInput?.value);
-  const noteValue=cleanText(noteInput?.value);
-  const selectedHours=[...document.querySelectorAll('#teacherFutureAbsenceHours [data-future-hour]:checked')].map(input=>Number(input.value)).filter(Number.isInteger);
-  if(!dateValue){
-    showToast('Indica la fecha de la falta prevista.','error');
-    dateInput?.focus();
-    return;
-  }
-  if(!selectedHours.length){
-    showToast('Selecciona al menos una hora lectiva para ese día.','error');
-    return;
-  }
-  const entry={
-    id:`future-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-    profesor:teacherName,
-    date:dateValue,
-    note:noteValue,
-    hours:selectedHours,
-    status:'pending',
-    reviewerNote:'',
-    reviewedAt:'',
-    appliedAt:'',
-    createdAt:new Date().toISOString()
-  };
-  const overlap=findOverlappingFutureAbsence(entry);
-  if(overlap){
-    showToast(`Ya existe un aviso para ${formatFutureAbsenceDateLabel(dateValue)} en las horas ${formatHourListLabel(getFutureAbsenceHoursForEntry(overlap))}.`, 'error');
-    return;
-  }
-  try{
-    const result=await createTeacherFutureAbsenceEntry(entry);
-    closeTeacherFutureAbsenceModal();
-    showToast(result?.syncError?'Aviso guardado en local. Pendiente de sincronizar con el servidor.':'Aviso de ausencia futura enviado.','success');
-  }catch(error){
-    console.warn('Teacher future absence create failed',error);
-    showToast('No se pudo enviar el aviso.','error');
-  }
-}
-function openFutureAbsenceAdminModal(){
-  if(!isAdmin) return;
-  const statusFilter=document.getElementById('futureAbsenceAdminStatusFilter');
-  const teacherFilterInput=document.getElementById('futureAbsenceAdminTeacherFilter');
-  if(statusFilter) statusFilter.value=futureAbsenceAdminStatusFilter;
-  if(teacherFilterInput) teacherFilterInput.value=futureAbsenceAdminTeacherFilter;
-  renderFutureAbsenceAdminList();
-  document.getElementById('futureAbsenceAdminOverlay')?.classList.add('open');
-}
-function closeFutureAbsenceAdminModal(){
-  document.getElementById('futureAbsenceAdminOverlay')?.classList.remove('open');
-}
-function bgFutureAbsenceAdminClose(e){if(e.target.id==='futureAbsenceAdminOverlay') closeFutureAbsenceAdminModal();}
-async function handleFutureAbsenceAdminDelete(id){
-  if(!isAdmin||!id) return;
-  if(!await askConfirm('Eliminar aviso','Se eliminará este aviso de ausencia futura.','Eliminar')) return;
-  try{
-    const result=await deleteTeacherFutureAbsenceEntry(id);
-    showToast(result?.syncError?'Aviso eliminado en local. Pendiente de sincronizar con el servidor.':'Aviso eliminado.','success');
-  }catch(error){
-    console.warn('Teacher future absence delete failed',error);
-    showToast('No se pudo eliminar el aviso.','error');
-  }
-}
-async function reviewTeacherFutureAbsence(id,status){
-  if(!isAdmin||!id) return;
-  const current=teacherFutureAbsences.find(item=>item.id===id);
-  if(!current) return;
-  const reviewerNote=cleanText(await askText(status==='approved'?'Validar ausencia futura':'Rechazar ausencia futura',`Puedes dejar una respuesta breve para ${getVisibleTeacherName(current.profesor)||current.profesor}.`,current.reviewerNote||'','Respuesta opcional',status==='approved'?'Validar':'Rechazar'));
-  const nextEntry={...current,status,reviewerNote,reviewedAt:new Date().toISOString()};
-  try{
-    const result=await updateTeacherFutureAbsenceEntry(nextEntry);
-    if(status==='approved') await applyApprovedFutureAbsencesForCurrentWeek();
-    showToast(result?.syncError?(status==='approved'?'Ausencia futura validada en local. Pendiente de sincronizar.':'Ausencia futura rechazada en local. Pendiente de sincronizar.'):(status==='approved'?'Ausencia futura validada.':'Ausencia futura rechazada.'),'success');
-  }catch(error){
-    console.warn('Teacher future absence review failed',error);
-    showToast('No se pudo actualizar el aviso.','error');
-  }
-}
 async function assignTeacherSubstitution(nombre){
   await openStructuredSubstitutionModal();
 }
@@ -7732,14 +7302,6 @@ function getTeacherCurrentMonthGuardiaCount(nombre){
 function getTeacherCurrentWeekAbsenceRows(nombre){
   return data.filter(row=>sameNormalizedText(row.ausente,nombre));
 }
-function getTeacherFutureAbsenceStats(nombre){
-  const rows=teacherFutureAbsences.filter(item=>sameNormalizedText(item.profesor,nombre));
-  return {
-    total: rows.length,
-    pending: rows.filter(item=>item.status==='pending').length,
-    approved: rows.filter(item=>item.status==='approved'||item.status==='applied').length
-  };
-}
 function renderTeacherAdminStats(nombre,dia){
   const container=document.getElementById('teacherAdminStats');
   if(!container) return;
@@ -8463,35 +8025,7 @@ if(practicasGuardiasDomain){
   toggleTeacherPracticasGuardias=nombre=>practicasGuardiasDomain.toggleTeacher(nombre);
   toggleTeacherPracticasGuardiasSlot=(nombre,dia,hora)=>practicasGuardiasDomain.toggleSlot(nombre,dia,hora);
 }
-if(futureAbsencesDomain){
-  hydrateTeacherFutureAbsences=()=>futureAbsencesDomain.hydrateFromBackend();
-  normalizeTeacherFutureAbsence=row=>futureAbsencesDomain.normalizeTeacherFutureAbsence(row);
-  sortTeacherFutureAbsences=rows=>futureAbsencesDomain.sortTeacherFutureAbsences(rows);
-  getFutureAbsenceStatusLabel=status=>futureAbsencesDomain.getFutureAbsenceStatusLabel(status);
-  getFutureAbsenceStatusClass=status=>futureAbsencesDomain.getFutureAbsenceStatusClass(status);
-  getFutureAbsenceHoursForEntry=item=>futureAbsencesDomain.getFutureAbsenceHoursForEntry(item);
-  findOverlappingFutureAbsence=(entry,options={})=>futureAbsencesDomain.findOverlapping(entry,options);
-  formatHourListLabel=hours=>futureAbsencesDomain.formatHourListLabel(hours);
-  renderFutureAbsenceAdminList=()=>futureAbsencesDomain.setAdminFilters({
-    status:futureAbsenceAdminStatusFilter,
-    teacher:futureAbsenceAdminTeacherFilter
-  });
-  renderTeacherFutureAbsenceOwnList=()=>futureAbsencesDomain.renderTeacherOwnList();
-  handleTeacherFutureAbsenceDateChange=()=>futureAbsencesDomain.handleTeacherDateChange();
-  openTeacherFutureAbsenceModal=()=>futureAbsencesDomain.openTeacherModal();
-  closeTeacherFutureAbsenceModal=()=>futureAbsencesDomain.closeTeacherModal();
-  bgTeacherFutureAbsenceClose=e=>futureAbsencesDomain.handleTeacherOverlayBackgroundClick(e);
-  submitTeacherFutureAbsence=()=>futureAbsencesDomain.submitTeacherAbsence();
-  openFutureAbsenceAdminModal=()=>futureAbsencesDomain.openAdminModal();
-  closeFutureAbsenceAdminModal=()=>futureAbsencesDomain.closeAdminModal();
-  bgFutureAbsenceAdminClose=e=>futureAbsencesDomain.handleAdminOverlayBackgroundClick(e);
-  handleFutureAbsenceAdminDelete=id=>futureAbsencesDomain.handleAdminDelete(id);
-  reviewTeacherFutureAbsence=(id,status)=>futureAbsencesDomain.reviewEntry(id,status);
-  updateTeacherFutureAbsenceEntry=entry=>futureAbsencesDomain.updateEntry(entry);
-  createTeacherFutureAbsenceEntry=entry=>futureAbsencesDomain.createEntry(entry);
-  deleteTeacherFutureAbsenceEntry=id=>futureAbsencesDomain.deleteEntry(id);
-  getTeacherFutureAbsenceStats=nombre=>futureAbsencesDomain.getTeacherStats(nombre);
-}
+
 document.getElementById('fDia').addEventListener('change',()=>{renderAbsenceHourChoices();populateProfesoresGuardia();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();renderAusenteSuggestions(true);setFieldError('fDia','');});
 document.getElementById('fHora').addEventListener('change',()=>{
   const rawHour=Number(document.getElementById('fHora').value);
