@@ -856,6 +856,26 @@ module.exports = [
         earlyApplyBinding < initialClockRun,
         'La aplicación de futuras debe enlazarse antes de la primera ejecución del reloj'
       );
+
+      const forbiddenLegacyFutureImplementations = [
+        /function\s+buildProjectedRowsForWeek\s*\(/,
+        /function\s+isFutureAbsenceProjected\s*\(/,
+        /async\s+function\s+applyApprovedFutureAbsencesForCurrentWeek\s*\(/,
+        /async\s+function\s+updateTeacherFutureAbsenceEntry\s*\(/,
+        /async\s+function\s+createTeacherFutureAbsenceEntry\s*\(/,
+        /async\s+function\s+deleteTeacherFutureAbsenceEntry\s*\(/,
+        /function\s+renderFutureAbsenceAdminList\s*\(/,
+        /function\s+renderTeacherFutureAbsenceOwnList\s*\(/,
+        /function\s+getTeacherFutureAbsenceStats\s*\(/
+      ];
+
+      forbiddenLegacyFutureImplementations.forEach(pattern => {
+        assert.doesNotMatch(
+          appSource,
+          pattern,
+          `guardias.js must not reintroduce legacy future-absence implementation: ${pattern}`
+        );
+      });
     }
   }
 ];
