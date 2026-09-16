@@ -57,15 +57,12 @@
       'getCurrentDay()',
       'buildUndoState(day)',
       'normalizeStoredRows(rows)',
-      'reassignAllGuardias()',
-      'persistGuardias(rows)',
       'renderGuardiaBoard()',
       'renderTable()',
       'getHistoryRows()',
       'setHistoryRows(rows)',
       'persistHistorial(rows)',
       'renderHistoryList()',
-      'syncAdminState()',
       'getAulaProfesor(profesor, dayIndex, hora)',
       'assignGuardiasForRows(rows)'
     ],
@@ -401,7 +398,7 @@
 
   function isFutureAbsenceProjected(item){
     const status = normalizeStatus(item && item.status);
-    return status === 'pending' || status === 'approved' || status === 'applied';
+    return status === 'pending' || status === 'approved';
   }
 
   function findOverlapping(entry, options){
@@ -922,101 +919,162 @@
     requireHostFunction('getCurrentSchoolWeekKey', 'future absence apply');
     requireHostFunction('getAbsenceRows', 'future absence apply');
     requireHostFunction('setAbsenceRows', 'future absence apply');
-    requireHostFunction('claimNextAbsenceRowId', 'future absence apply');
-    requireHostFunction('getCurrentDay', 'future absence apply');
-    requireHostFunction('buildUndoState', 'future absence apply');
     requireHostFunction('normalizeStoredRows', 'future absence apply');
-    requireHostFunction('reassignAllGuardias', 'future absence apply');
-    requireHostFunction('persistGuardias', 'future absence apply');
     requireHostFunction('renderGuardiaBoard', 'future absence apply');
     requireHostFunction('renderTable', 'future absence apply');
-    requireHostFunction('getHistoryRows', 'future absence apply');
-    requireHostFunction('setHistoryRows', 'future absence apply');
-    requireHostFunction('persistHistorial', 'future absence apply');
-    requireHostFunction('renderHistoryList', 'future absence apply');
-    requireHostFunction('syncAdminState', 'future absence apply');
     requireHostFunction('getAulaProfesor', 'future absence apply');
+    requireHostFunction('assignGuardiasForRows', 'future absence apply');
+
+    const storage = readHostValue('storage');
+
+    if(
+      !storage ||
+      typeof storage.applyTeacherFutureAbsence !== 'function'
+    ){
+      throw new Error(
+        'No existe la operación backend para aplicar ausencias futuras.'
+      );
+    }
+
     const currentWeekKey = callHost('getCurrentSchoolWeekKey');
-    const approvedRows = state.rows.filter(item => item.status === 'approved' && !item.appliedAt);
+
+    const approvedRows = state.rows.filter(
+      item => item.status === 'approved' && !item.appliedAt
+    );
+
     if(!approvedRows.length) return false;
-    let stateChanged = false;
-    let approvalsChanged = false;
-    const appliedSummaries = [];
-    const undoState = callHost('buildUndoState', callHost('getCurrentDay'));
+
+    let anyApplied = false;
     let data = (callHost('getAbsenceRows') || []).slice();
+    const failures = [];
+
     for(const item of approvedRows){
       const weekInfo = getSchoolWeekInfoFromDate(item.date);
-      if(!weekInfo || weekInfo.weekKey !== currentWeekKey || weekInfo.dayIndex == null) continue;
+
+      if(
+        !weekInfo ||
+        weekInfo.weekKey !== currentWeekKey ||
+        weekInfo.dayIndex == null
+      ){
+        continue;
+      }
+
       const horasLectivas = getFutureAbsenceHoursForEntry(item);
       if(!horasLectivas.length) continue;
-      horasLectivas.forEach(horaItem => {
-        if(data.some(row => row.dia === weekInfo.dayIndex && row.hora === horaItem && sameNormalizedText(row.ausente, item.profesor))) return;
-        data.push({
+
+      const proposalRows = callHost(
+        'assignGuardiasForRows',
+        horasLectivas.map(hora => ({
           dia: weekInfo.dayIndex,
-          hora: horaItem,
+          hora,
           ausente: item.profesor,
           guardia: '',
-          aula: callHost('getAulaProfesor', item.profesor, weekInfo.dayIndex, horaItem) || '',
+          aula:
+            callHost(
+              'getAulaProfesor',
+              item.profesor,
+              weekInfo.dayIndex,
+              hora
+            ) || '',
           faena: false,
-          obs: '',
-          id: callHost('claimNextAbsenceRowId')
+          obs: ''
+        }))
+      ).map(row => ({
+        dia: Number(row.dia),
+        hora: Number(row.hora),
+        ausente: row.ausente,
+        guardia: row.guardia || '',
+        aula: row.aula || '',
+        faena: !!row.faena,
+        obs: row.obs || ''
+      }));
+
+      try{
+        const result =
+          await storage.applyTeacherFutureAbsence(
+            item.id,
+            proposalRows
+          );
+
+        if(
+          !result ||
+          result.ok === false ||
+          !result.entry ||
+          !Array.isArray(result.rows)
+        ){
+          throw new Error(
+            'El backend no confirmó la materialización de la ausencia futura.'
+          );
+        }
+
+        Object.assign(
+          item,
+          normalizeTeacherFutureAbsence(result.entry)
+        );
+
+        for(const persisted of result.rows){
+          const existingIndex = data.findIndex(row =>
+            Number(row.dia) === Number(persisted.dia) &&
+            Number(row.hora) === Number(persisted.hora) &&
+            sameNormalizedText(
+              row.ausente,
+              persisted.ausente
+            )
+          );
+
+          if(existingIndex >= 0){
+            data[existingIndex] = {
+              ...data[existingIndex],
+              ...persisted
+            };
+          }else{
+            data.push(persisted);
+          }
+        }
+
+        anyApplied = true;
+      }catch(error){
+        failures.push({
+          id: item.id,
+          profesor: item.profesor,
+          error
         });
-        stateChanged = true;
-      });
-      appliedSummaries.push(`${getVisibleTeacherName(item.profesor) || item.profesor} · ${item.date} · ${horasLectivas.map(formatHoraLabel).join(', ')}`);
-      item.status = 'applied';
-      item.appliedAt = new Date().toISOString();
-      approvalsChanged = true;
+
+        console.warn(
+          'Future absence apply failed',
+          {
+            id: item.id,
+            profesor: item.profesor,
+            error
+          }
+        );
+      }
     }
-    if(stateChanged){
+
+    if(anyApplied){
       data = callHost('normalizeStoredRows', data);
       callHost('setAbsenceRows', data);
-      callHost('reassignAllGuardias');
-      callHost('persistGuardias', data);
+
+      persistRows();
+      renderAll();
       callHost('renderGuardiaBoard');
       callHost('renderTable');
     }
-    if(appliedSummaries.length){
-      let historyRows = (callHost('getHistoryRows') || []).slice();
-      historyRows.unshift({
-        id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        title: appliedSummaries.length === 1 ? 'Ausencia futura aplicada' : 'Ausencias futuras aplicadas',
-        detail: appliedSummaries.join(' · '),
-        type: 'create',
-        undoState,
-        actor: 'Jefatura',
-        ts: new Date().toISOString()
-      });
-      historyRows = historyRows.slice(0, 200);
-      callHost('setHistoryRows', historyRows);
-      callHost('persistHistorial', historyRows);
-      callHost('renderHistoryList');
+
+    if(failures.length){
+      setSuperAdminError(
+        failures.length === 1
+          ? 'Una ausencia validada no pudo aplicarse y permanece pendiente de materialización.'
+          : `${failures.length} ausencias validadas no pudieron aplicarse y permanecen pendientes de materialización.`
+      );
+
+      renderSuperAdminMonitor();
+    }else if(anyApplied){
+      clearSuperAdminError();
     }
-    if(approvalsChanged){
-      persistRows();
-      renderAll();
-      if(readHostValue('storage') && typeof readHostValue('storage').hasBackend === 'function' && readHostValue('storage').hasBackend() && isAdmin()){
-        const appliedRows = state.rows.filter(item => item.appliedAt);
-        const syncResults = await Promise.allSettled(appliedRows.map(item => requireStorageMethod('updateTeacherFutureAbsence', 'future absence apply sync')(item.id, normalizeTeacherFutureAbsence(item))));
-        syncResults.forEach((result, index) => {
-          const item = appliedRows[index];
-          if(result.status === 'rejected' && item?.id){
-            state.syncFlags.add(`upsert:${item.id}`);
-          }else if(item?.id){
-            state.syncFlags.delete(`upsert:${item.id}`);
-          }
-        });
-        if(syncResults.some(result => result.status === 'rejected')){
-          setSuperAdminError('Hay ausencias futuras aplicadas pendientes de sincronizar.');
-          renderSuperAdminMonitor();
-        }
-      }
-    }
-    if(appliedSummaries.length){
-      await callHost('syncAdminState');
-    }
+
     notifyStateChange();
-    return stateChanged || approvalsChanged;
+    return anyApplied;
   }
 
   async function handleAdminDelete(id){

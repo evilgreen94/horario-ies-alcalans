@@ -8,16 +8,22 @@ const {
   ensureRequiredString,
   sanitizeSessionOverride,
   sanitizeAlumnosFueraAula,
+  sanitizeAusencia,
   sanitizeTeacherFutureAbsence,
   sanitizePatioGuardia,
   sanitizePatioTeacherBlock,
   sanitizeTeacherPracticeGuardia,
   sanitizeTeacherPracticeGuardiaSlot,
   sanitizeTeacherSubstitution,
-  sanitizeTareaProfesorado
+  sanitizeTareaProfesorado,
+  normalizeText
 } = require('./validation');
 const { requireAuthenticated, requireRole } = require('../session');
 const { appendAuditEvent } = require('../audit');
+const { appendOperationalHistory } = require('../operational-history');
+const { ensureCoverageAssignmentsAllowed } = require('../coverage-assignment');
+const { shouldSkipAbsenceRowByInactiveGroup } = require('../absence-policy');
+const { rebuildMonthlyGuardiaLoadForCurrentWeek } = require('./guardias/monthly-load');
 const { resolveActiveTeacherContext } = require('../teacher-identity');
 const {
   badRequest,
@@ -71,9 +77,15 @@ registerStateCollectionRoutes(router, {
   sanitizeTeacherPracticeGuardia,
   sanitizeTeacherPracticeGuardiaSlot,
   sanitizeTeacherFutureAbsence,
+  sanitizeAusencia,
+  normalizeText,
   sanitizePatioGuardia,
   sanitizePatioTeacherBlock,
   appendAuditEvent,
+  appendOperationalHistory,
+  ensureCoverageAssignmentsAllowed,
+  shouldSkipAbsenceRowByInactiveGroup,
+  rebuildMonthlyGuardiaLoadForCurrentWeek,
   requireAuthenticated,
   requireRole,
   resolveActiveTeacherContext,

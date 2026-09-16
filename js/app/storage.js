@@ -310,6 +310,12 @@
         body: JSON.stringify(row)
       });
     },
+    applyTeacherFutureAbsence(id, rows){
+      return request(`/profesorado/future-absences/${encodeURIComponent(id)}/apply`, {
+        method: 'POST',
+        body: JSON.stringify({ rows })
+      });
+    },
     deleteTeacherFutureAbsence(id){
       return request(`/profesorado/future-absences/${encodeURIComponent(id)}`, {
         method: 'DELETE'

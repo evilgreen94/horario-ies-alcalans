@@ -3,9 +3,10 @@ const crypto = require('crypto');
 const { getDatabase, withImmediateTransaction } = require('../db');
 const { ensureArray, ensureObject, ensureOptionalId, ensureRequiredString, normalizeBoolean, normalizeInteger, normalizeText, normalizeString, sanitizeAusencia } = require('./validation');
 const { requireRole } = require('../session');
-const { esHoraValida, getResolvedTeacherSession, getSesionesCubriblesProfesor } = require('../teacher-schedule');
+const { esHoraValida, getSesionesCubriblesProfesor } = require('../teacher-schedule');
 const { ensureCoverageAssignmentsAllowed } = require('../coverage-assignment');
-const { getInactiveGroupSet, isGroupInactive, logInactiveGroupSkip } = require('../group-state');
+const { getInactiveGroupSet } = require('../group-state');
+const { shouldSkipAbsenceRowByInactiveGroup } = require('../absence-policy');
 const { appendOperationalHistory } = require('../operational-history');
 const {
   buildMonthlyGuardiaLoadResponse,
@@ -116,19 +117,6 @@ function buildReplacePayloadHash(rows) {
       a.obs.localeCompare(b.obs, 'es')
     );
   return crypto.createHash('sha1').update(JSON.stringify(normalized)).digest('hex');
-}
-
-async function shouldSkipAbsenceRowByInactiveGroup(db, row, inactiveGroups = null) {
-  const inactiveGroupSet = inactiveGroups || await getInactiveGroupSet(db);
-  const session = await getResolvedTeacherSession(db, row.ausente, row.dia, row.hora);
-  if (!isGroupInactive(session?.grupo, inactiveGroupSet)) return false;
-  logInactiveGroupSkip({
-    grupo: normalizeString(session?.grupo),
-    profesor: normalizeString(row?.ausente),
-    dia: Number(row?.dia),
-    hora: Number(row?.hora)
-  });
-  return true;
 }
 
 async function filterVisibleAbsenceRows(db, rows) {
