@@ -120,5 +120,6 @@ async function rebuildMonthlyGuardiaLoadForCurrentWeek(db) {
 module.exports = {
   buildMonthlyGuardiaLoadResponse,
   ensureMonthlyGuardiaLoadState,
+  loadMonthlyGuardiaLoadState,
   rebuildMonthlyGuardiaLoadForCurrentWeek
 };

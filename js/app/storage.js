@@ -102,6 +102,9 @@
     fetchGuardias(){
       return request('/guardias');
     },
+    fetchEffectiveGuardiaSlots(date){
+      return request(`/guardias/effective-slots?date=${encodeURIComponent(date)}`);
+    },
     fetchGuardiaMonthlyLoad(){
       return request('/guardias/monthly-load');
     },

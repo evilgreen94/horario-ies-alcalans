@@ -13,6 +13,10 @@ const {
   ensureMonthlyGuardiaLoadState,
   rebuildMonthlyGuardiaLoadForCurrentWeek
 } = require('./guardias/monthly-load');
+const { buildEffectiveGuardiaDayState } = require('../guardia-slot-state');
+const {
+  materializeCoverageAssignments
+} = require('../coverage-materialization');
 
 const router = express.Router();
 
@@ -45,6 +49,43 @@ async function recordAbsenceChange(db, actorUserId, before, after) {
     title: !oldCoverage ? 'Cobertura asignada' : !newCoverage ? 'Cobertura retirada' : 'Cobertura modificada',
     type: 'coverage', targetType: 'absence', targetId,
     before: { guardia: oldCoverage || null }, after: { guardia: newCoverage || null }
+  });
+}
+
+async function recordMaterializedCoverageChange(
+  db,
+  actorUserId,
+  before,
+  after
+) {
+  const oldCoverage = String(before?.guardia || '');
+  const newCoverage = String(after?.guardia || '');
+
+  if (oldCoverage === newCoverage) return;
+
+  const action = !oldCoverage
+    ? 'coverage.assigned'
+    : !newCoverage
+      ? 'coverage.removed'
+      : 'coverage.changed';
+
+  await appendOperationalHistory(db, {
+    actorUserId,
+    action,
+    title: !oldCoverage
+      ? 'Cobertura asignada'
+      : !newCoverage
+        ? 'Cobertura retirada'
+        : 'Cobertura modificada',
+    type: 'coverage',
+    targetType: 'absence',
+    targetId: String(after?.id || before?.id || ''),
+    before: {
+      guardia: oldCoverage || null
+    },
+    after: {
+      guardia: newCoverage || null
+    }
   });
 }
 
@@ -163,6 +204,17 @@ router.get('/', async (_req, res, next) => {
   }
 });
 
+router.get('/effective-slots', async (req, res, next) => {
+  try {
+    const date = ensureRequiredString(req.query?.date, 'date');
+    const db = await getDatabase();
+
+    res.json(await buildEffectiveGuardiaDayState(db, { date }));
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/monthly-load', async (_req, res, next) => {
   try {
     const db = await getDatabase();
@@ -208,9 +260,16 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
           if (existing && !payload.replaceIds.includes(Number(existing.id))) {
             await db.run(
               `UPDATE ausencias
-               SET ausente = ?, guardia = '', aula = ?, faena = ?, obs = ?, updated_at = CURRENT_TIMESTAMP
+               SET ausente = ?, guardia = ?, aula = ?, faena = ?, obs = ?, updated_at = CURRENT_TIMESTAMP
                WHERE id = ?`,
-              [payload.profesor, session.aula || '', payload.faena ? 1 : 0, payload.obs || '', existing.id]
+              [
+                payload.profesor,
+                existing.guardia || '',
+                session.aula || '',
+                payload.faena ? 1 : 0,
+                payload.obs || '',
+                existing.id
+              ]
             );
             const row = await db.get('SELECT * FROM ausencias WHERE id = ?', [existing.id]);
             await recordAbsenceChange(db, req.sessionUser.userId, existing, row);
@@ -221,16 +280,62 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
           const result = await db.run(
             `INSERT INTO ausencias (dia, hora, ausente, guardia, aula, faena, obs)
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [payload.dia, session.hora, payload.profesor, '', session.aula || '', payload.faena ? 1 : 0, payload.obs || '']
+            [
+              payload.dia,
+              session.hora,
+              payload.profesor,
+              existing?.guardia || '',
+              session.aula || '',
+              payload.faena ? 1 : 0,
+              payload.obs || ''
+            ]
           );
           logAusenciasDayComplete('creada', { profesor: payload.profesor, dia: payload.dia, hora: session.hora, aula: session.aula || '', grupo: session.grupo || '' });
           const row = await db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]);
           await recordAbsenceChange(db, req.sessionUser.userId, null, row);
           saved.push(row);
         }
-        await ensureCoverageAssignmentsAllowed(db, await db.all('SELECT * FROM ausencias WHERE dia = ?', [payload.dia]));
+        const materializedChanges =
+          await materializeCoverageAssignments(db, {
+            dia: payload.dia,
+            hours: saved.map(row => Number(row.hora))
+          });
+
+        for (const change of materializedChanges) {
+          await recordMaterializedCoverageChange(
+            db,
+            req.sessionUser.userId,
+            change.before,
+            change.after
+          );
+        }
+
+        await ensureCoverageAssignmentsAllowed(
+          db,
+          await db.all(
+            'SELECT * FROM ausencias WHERE dia = ?',
+            [payload.dia]
+          )
+        );
+
         await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
-        return saved.sort((a, b) => Number(a.hora) - Number(b.hora) || Number(a.id) - Number(b.id));
+
+        const refreshedSaved = [];
+
+        for (const savedRow of saved) {
+          const refreshed = await db.get(
+            'SELECT * FROM ausencias WHERE id = ?',
+            [savedRow.id]
+          );
+
+          if (refreshed) refreshedSaved.push(refreshed);
+        }
+
+        return refreshedSaved.sort(
+          (a, b) =>
+            Number(a.hora) - Number(b.hora) ||
+            Number(a.id) - Number(b.id)
+        );
       }, { label: `guardias:full-day:${payload.dia}:${normalizeText(payload.profesor)}` });
       res.status(201).json({
         ok: true,
@@ -259,8 +364,19 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [dia, hora, ausente, guardia, aula, faena ? 1 : 0, obs]
       );
+      await materializeCoverageAssignments(db, {
+        dia,
+        hours: [hora]
+      });
+
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
-      const persisted = await db.get('SELECT * FROM ausencias WHERE id = ?', [result.lastID]);
+
+      const persisted = await db.get(
+        'SELECT * FROM ausencias WHERE id = ?',
+        [result.lastID]
+      );
+
+      guardia_key = normalizeText(persisted?.guardia);
       await recordAbsenceChange(db, req.sessionUser.userId, null, persisted);
       return persisted;
     }, { label: `guardias:create:${dia}:${hora}:${ausente_key || normalizeText(ausente)}` });
@@ -314,8 +430,31 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
         );
       }
 
+      const hoursByDay = new Map();
+
+      for (const row of rows) {
+        const rowDia = Number(row.dia);
+        const rowHora = Number(row.hora);
+
+        if (!hoursByDay.has(rowDia)) {
+          hoursByDay.set(rowDia, new Set());
+        }
+
+        hoursByDay.get(rowDia).add(rowHora);
+      }
+
+      for (const [rowDia, hours] of hoursByDay) {
+        await materializeCoverageAssignments(db, {
+          dia: rowDia,
+          hours: [...hours]
+        });
+      }
+
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
-      const nextRows = await db.all('SELECT * FROM ausencias ORDER BY dia, hora, id');
+
+      const nextRows = await db.all(
+        'SELECT * FROM ausencias ORDER BY dia, hora, id'
+      );
       const logicKey = row => `${Number(row.dia)}|${Number(row.hora)}|${normalizeText(row.ausente)}`;
       const beforeByKey = new Map(currentRows.map(row => [logicKey(row), row]));
       const afterByKey = new Map(nextRows.map(row => [logicKey(row), row]));
@@ -373,8 +512,19 @@ router.put('/:id', requireRole('admin'), async (req, res, next) => {
       if (!result.changes) {
         throw notFound('No existe una ausencia con ese id.');
       }
+      await materializeCoverageAssignments(db, {
+        dia,
+        hours: [hora]
+      });
+
       await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
-      const persisted = await db.get('SELECT * FROM ausencias WHERE id = ?', [id]);
+
+      const persisted = await db.get(
+        'SELECT * FROM ausencias WHERE id = ?',
+        [id]
+      );
+
+      guardia_key = normalizeText(persisted?.guardia);
       await recordAbsenceChange(db, req.sessionUser.userId, before, persisted);
       return persisted;
     }, { label: `guardias:update:${id}` });

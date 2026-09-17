@@ -374,6 +374,9 @@
     const buildTvAbsenceAssignment=requireFn('buildTvAbsenceAssignment',options.buildTvAbsenceAssignment);
     const getEffectiveSpecialAssignments=requireFn('getEffectiveSpecialAssignments',options.getEffectiveSpecialAssignments);
     const rowNeedsCoverage=requireFn('rowNeedsCoverage',options.rowNeedsCoverage);
+    const getEffectiveGuardiaSlot=isFn(options.getEffectiveGuardiaSlot)
+      ?options.getEffectiveGuardiaSlot
+      :()=>null;
     const getPatioCoverageSummary=isFn(options.getPatioCoverageSummary)?options.getPatioCoverageSummary:null;
     const getPatioSectors=isFn(options.getPatioSectors)?options.getPatioSectors:()=>Array.isArray(options.patioSectors)?options.patioSectors:[];
     const getPatioExtraPosts=isFn(options.getPatioExtraPosts)?options.getPatioExtraPosts:null;
@@ -483,27 +486,127 @@
       const destination=getPrintRouteUrl(getDay(),getWeekOffset());
       shared.window.location.href=destination;
     }
+    function buildAuthoritativeTvAssignments(effectiveSlot){
+      const assignments=[];
+
+      (Array.isArray(effectiveSlot?.coverage)?effectiveSlot.coverage:[]).forEach(item=>{
+        const covered=item?.status==='covered'&&shared.cleanText(item?.teacher);
+        const statusLabel=item?.status==='covered'
+          ?'Cubierta'
+          :(item?.status==='invalid'?'Asignación inválida':'Pendiente');
+
+        const location=[
+          shared.cleanText(item?.group)?`Grupo ${shared.cleanText(item.group)}`:'Grupo no indicado',
+          shared.cleanText(item?.room)?`Aula ${shared.cleanText(item.room)}`:'Aula no indicada'
+        ].join(' · ');
+
+        const meta=[
+          statusLabel,
+          shared.cleanText(item?.absentTeacher)?`Ausente: ${shared.cleanText(item.absentTeacher)}`:'',
+          shared.cleanText(item?.subject)
+        ].filter(Boolean).join(' · ');
+
+        assignments.push({
+          teacher:covered?shared.cleanText(item.teacher):'Sin cubrir',
+          location,
+          meta,
+          tone:'general'
+        });
+      });
+
+      if(shared.cleanText(effectiveSlot?.biblioteca?.teacher)){
+        assignments.push({
+          teacher:shared.cleanText(effectiveSlot.biblioteca.teacher),
+          location:'Biblioteca',
+          meta:'Puesto de apoyo',
+          tone:'biblioteca'
+        });
+      }
+
+      if(shared.cleanText(effectiveSlot?.banos?.teacher)){
+        assignments.push({
+          teacher:shared.cleanText(effectiveSlot.banos.teacher),
+          location:'Baños',
+          meta:'Puesto de apoyo',
+          tone:'banos'
+        });
+      }
+
+      (Array.isArray(effectiveSlot?.unassignedGuards)?effectiveSlot.unassignedGuards:[]).forEach(item=>{
+        const teacher=shared.cleanText(item?.teacher);
+        if(!teacher) return;
+
+        assignments.push({
+          teacher,
+          location:'Guardia disponible',
+          meta:item?.reason==='cobertura-pendiente'
+            ?'Cobertura pendiente · Sin asignación'
+            :'Sin asignación',
+          tone:'general'
+        });
+      });
+
+      return assignments;
+    }
+
     function getTvSlotAssignments(slot,rowsSource){
       if(!slot) return [];
+
+      const effectiveSlot=getEffectiveGuardiaSlot(slot.dia,slot.hora);
+
+      if(effectiveSlot){
+        return buildAuthoritativeTvAssignments(effectiveSlot);
+      }
+
+      // Con backend, la TV no puede reconstruir decisiones operativas.
+      // Espera el read-model autoritativo del servidor.
+      if(shared.storage&&isFn(shared.storage.hasBackend)&&shared.storage.hasBackend()){
+        return [{
+          teacher:'Estado no disponible',
+          location:'Guardias',
+          meta:'Esperando estado operativo del servidor',
+          tone:'general'
+        }];
+      }
+
+      // Compatibilidad únicamente para ejecución offline/file.
       const currentRows=Array.isArray(rowsSource)?rowsSource:[];
       const slotRows=currentRows
         .filter(row=>row.dia===slot.dia&&row.hora===slot.hora&&rowNeedsCoverage(row))
         .sort((a,b)=>String(a&&a.id||'').localeCompare(String(b&&b.id||'')));
+
       const assignments=slotRows.map(buildTvAbsenceAssignment);
-      const assignedTeachers=new Set(assignments.map(item=>shared.cleanText(item.teacher)).filter(Boolean));
-      const {biblioteca,banos}=getEffectiveSpecialAssignments(slot.dia,slot.hora,currentRows);
+      const assignedTeachers=new Set(
+        assignments.map(item=>shared.cleanText(item.teacher)).filter(Boolean)
+      );
+
+      const {biblioteca,banos}=getEffectiveSpecialAssignments(
+        slot.dia,
+        slot.hora,
+        currentRows
+      );
+
       if(biblioteca&&!assignedTeachers.has(shared.cleanText(getVisibleTeacherName(biblioteca)))){
-        assignments.push({teacher:getVisibleTeacherName(biblioteca),location:'Biblioteca',meta:'Puesto de apoyo',tone:'biblioteca'});
+        assignments.push({
+          teacher:getVisibleTeacherName(biblioteca),
+          location:'Biblioteca',
+          meta:'Puesto de apoyo',
+          tone:'biblioteca'
+        });
       }
+
       if(banos&&!assignedTeachers.has(shared.cleanText(getVisibleTeacherName(banos)))){
-        assignments.push({teacher:getVisibleTeacherName(banos),location:'Banos',meta:'Puesto de apoyo',tone:'banos'});
+        assignments.push({
+          teacher:getVisibleTeacherName(banos),
+          location:'Baños',
+          meta:'Puesto de apoyo',
+          tone:'banos'
+        });
       }
-      if(assignments.length) return assignments.slice();
-      const fallbackAssignments=[];
-      if(biblioteca) fallbackAssignments.push({teacher:getVisibleTeacherName(biblioteca),location:'Biblioteca',meta:'Puesto de apoyo',tone:'biblioteca'});
-      if(banos) fallbackAssignments.push({teacher:getVisibleTeacherName(banos),location:'Banos',meta:'Puesto de apoyo',tone:'banos'});
-      return fallbackAssignments;
+
+      return assignments;
     }
+
     function getPrintableSlotsForDay(targetDay,rowsSource){
       return Object.keys(shared.horaMap)
         .map(Number)

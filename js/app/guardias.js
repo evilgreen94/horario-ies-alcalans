@@ -1676,6 +1676,14 @@ function getGuardiaSugerida(dia,hora,turno,rowsSource=data){
     .filter(item=>isProfesorDisponible(item.nombre,dia,hora,{rowsSource,ignoreAssignedGuardiasAtSlot:false}))
     [turno-1]?.nombre||'';
 }
+
+function getOperationalCoverageName(row,rowsSource=data){
+  const persisted=cleanText(row?.guardia);
+  if(persisted) return persisted;
+  if(storage.hasBackend()) return '';
+  if(!rowNeedsCoverage(row)) return '';
+  return getGuardiaSugerida(row.dia,row.hora,1,rowsSource);
+}
 function isPracticasSessionEligible(sesion){
   if(!sesion||sesion.tipo==='guardia') return false;
   const texto=[sesion.materia,sesion.grupo,sesion.detalle,sesion.aula].map(cleanText).filter(Boolean).join(' · ');
@@ -2896,6 +2904,7 @@ let backendSyncPendingPatioTeacherBlocks=false;
 let backendHydrated=false;
 let backendHydrationPromise=null;
 let backendPollingInFlight=false;
+const effectiveGuardiaDayStates=new Map();
 let pendingDeletedAbsenceKeys=new Set();
 let absenceSaveInFlight=false;
 let futureAbsenceSyncFlags=new Set();
@@ -3100,6 +3109,7 @@ const tvPanelDomain=auxPanelsSuite?.createTvPanelDomain({
   buildTvAbsenceAssignment,
   getEffectiveSpecialAssignments,
   rowNeedsCoverage,
+  getEffectiveGuardiaSlot,
   getPatioCoverageSummary:(dia,hora)=>getPatioCoverageSummary(dia,hora,getCurrentSchoolWeekKey()),
   getPatioSectors:(dia,hora)=>getPatioPhysicalPositionsForSlot(dia,hora,getCurrentSchoolWeekKey()),
   getPatioExtraPosts:(dia,hora)=>getPatioExtraPostsForSlot(dia,hora,getCurrentSchoolWeekKey()),
@@ -3455,9 +3465,12 @@ function formatStatusTimestamp(value){
   return date.toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 }
 function getAdminFilteredRows(rows){
+  const rowsSource=getRowsForWeekOffset(weekOffset);
+  const hasCoverage=row=>!!getOperationalCoverageName(row,rowsSource);
+
   switch(adminTableFilter){
     case 'uncovered':
-      return rows.filter(row=>rowNeedsCoverage(row)&&!((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,getRowsForWeekOffset(weekOffset))));
+      return rows.filter(row=>rowNeedsCoverage(row)&&!hasCoverage(row));
     case 'pending':
       return rows.filter(row=>row.futurePlanned&&row.futureStatus==='pending');
     case 'notask':
@@ -3465,7 +3478,7 @@ function getAdminFilteredRows(rows){
     case 'attention':
       return rows.filter(row=>
         (row.futurePlanned&&row.futureStatus==='pending')||
-        (rowNeedsCoverage(row)&&!((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,getRowsForWeekOffset(weekOffset))))||
+        (rowNeedsCoverage(row)&&!hasCoverage(row))||
         (!row.futurePlanned&&!resolveFaena(row).faena)
       );
     default:
@@ -3474,11 +3487,14 @@ function getAdminFilteredRows(rows){
 }
 function getAdminDayInsight(rows){
   const rowsSource=getRowsForWeekOffset(weekOffset);
-  const uncovered=rows.filter(row=>rowNeedsCoverage(row)&&!((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,rowsSource)));
+  const hasCoverage=row=>!!getOperationalCoverageName(row,rowsSource);
+
+  const uncovered=rows.filter(row=>rowNeedsCoverage(row)&&!hasCoverage(row));
   const withoutTask=rows.filter(row=>!row.futurePlanned&&!resolveFaena(row).faena);
   const pendingFuture=rows.filter(row=>row.futurePlanned&&row.futureStatus==='pending');
-  const covered=rows.filter(row=>rowNeedsCoverage(row)&&((row.guardia&&row.guardia.trim())||getGuardiaSugerida(day,row.hora,1,rowsSource)));
+  const covered=rows.filter(row=>rowNeedsCoverage(row)&&hasCoverage(row));
   const corredor=getAlumnosFueraSummary();
+
   return {uncovered,withoutTask,pendingFuture,covered,corredor};
 }
 function setAdminTableFilter(filter){
@@ -4630,47 +4646,116 @@ function getPrintRouteUrl(targetDay=day,targetWeekOffset=weekOffset){
   url.pathname='/';
   return `${url.pathname}${url.search}`;
 }
-function buildPrintScheduleSnapshot(targetDay=day,targetWeekOffset=weekOffset){
+function buildPrintScheduleSnapshot(
+  targetDay=day,
+  targetWeekOffset=weekOffset
+){
   const rowsSource=getRowsForWeekOffset(targetWeekOffset);
-  const assignedRows=assignGuardiasForRows(rowsSource).filter(row=>Number(row.dia)===Number(targetDay));
-  const slots=Object.keys(HORA_MAP).map(Number).filter(hora=>!HORAS_PATIO.has(hora)).map(hora=>{
-    const info=HORA_MAP[hora]||{label:`${hora}a`,rango:''};
-    const hourRows=assignedRows
-      .filter(row=>Number(row.hora)===hora&&rowNeedsCoverage(row))
-      .sort((a,b)=>String(getVisibleTeacherName(a.guardia||'')).localeCompare(getVisibleTeacherName(b.guardia||''),'es'));
-    const assignments=hourRows.map(row=>({
-      teacher:getVisibleTeacherName(row.guardia||'')||'Sin cubrir',
-      location:resolveAulaRegistro(row)||'Sin ubicacion',
-      meta:getVisibleTeacherName(row.ausente||'')?`Cubre a ${getVisibleTeacherName(row.ausente)}`:'',
-      tone:'general'
-    }));
-    const assignedTeachers=new Set(assignments.map(item=>cleanText(item.teacher)).filter(Boolean));
-    const {biblioteca,banos}=getEffectiveSpecialAssignments(targetDay,hora,assignedRows);
-    if(biblioteca&&!assignedTeachers.has(cleanText(getVisibleTeacherName(biblioteca)))){
-      assignments.push({teacher:getVisibleTeacherName(biblioteca),location:'Biblioteca',meta:'Puesto de apoyo',tone:'biblioteca'});
-    }
-    if(banos&&!assignedTeachers.has(cleanText(getVisibleTeacherName(banos)))){
-      assignments.push({teacher:getVisibleTeacherName(banos),location:'Banos',meta:'Puesto de apoyo',tone:'banos'});
-    }
-    return {
-      hora,
-      info:{label:info.label,rango:info.rango},
-      assignments
-    };
-  });
-  const weekKey=getSelectedWeekKey();
+
+  const slots=Object.keys(HORA_MAP)
+    .map(Number)
+    .filter(hora=>!HORAS_PATIO.has(hora))
+    .map(hora=>{
+      const info=HORA_MAP[hora]||{label:`${hora}a`,rango:''};
+
+      if(storage.hasBackend()){
+        const effectiveSlot=getEffectiveGuardiaSlot(
+          targetDay,
+          hora,
+          targetWeekOffset
+        );
+
+        return {
+          hora,
+          info:{label:info.label,rango:info.rango},
+          assignments:effectiveSlot
+            ?buildAuthoritativeSlotAssignments(effectiveSlot)
+            :[{
+              teacher:'Estado no disponible',
+              location:'Guardias',
+              meta:'No se recibió el estado operativo del servidor',
+              tone:'general'
+            }]
+        };
+      }
+
+      const assignedRows=assignGuardiasForRows(rowsSource)
+        .filter(row=>Number(row.dia)===Number(targetDay));
+
+      const hourRows=assignedRows
+        .filter(row=>Number(row.hora)===hora&&rowNeedsCoverage(row))
+        .sort((a,b)=>
+          String(getVisibleTeacherName(a.guardia||''))
+            .localeCompare(getVisibleTeacherName(b.guardia||''),'es')
+        );
+
+      const assignments=hourRows.map(row=>({
+        teacher:getVisibleTeacherName(row.guardia||'')||'Sin cubrir',
+        location:resolveAulaRegistro(row)||'Sin ubicación',
+        meta:getVisibleTeacherName(row.ausente||'')
+          ?`Cubre a ${getVisibleTeacherName(row.ausente)}`
+          :'',
+        tone:'general'
+      }));
+
+      const assignedTeachers=new Set(
+        assignments.map(item=>cleanText(item.teacher)).filter(Boolean)
+      );
+
+      const {biblioteca,banos}=getEffectiveSpecialAssignments(
+        targetDay,
+        hora,
+        assignedRows
+      );
+
+      if(
+        biblioteca&&
+        !assignedTeachers.has(cleanText(getVisibleTeacherName(biblioteca)))
+      ){
+        assignments.push({
+          teacher:getVisibleTeacherName(biblioteca),
+          location:'Biblioteca',
+          meta:'Puesto de apoyo',
+          tone:'biblioteca'
+        });
+      }
+
+      if(
+        banos&&
+        !assignedTeachers.has(cleanText(getVisibleTeacherName(banos)))
+      ){
+        assignments.push({
+          teacher:getVisibleTeacherName(banos),
+          location:'Baños',
+          meta:'Puesto de apoyo',
+          tone:'banos'
+        });
+      }
+
+      return {
+        hora,
+        info:{label:info.label,rango:info.rango},
+        assignments
+      };
+    });
+
+  const weekKey=getSchoolWeekKeyFromOffset(targetWeekOffset);
+
   return {
-    version:1,
+    version:2,
     createdAt:new Date().toISOString(),
     day:targetDay,
     weekOffset:targetWeekOffset,
     weekKey,
     dayLabel:DIAS[targetDay]||'Jornada lectiva',
     weekLabel:formatWeekRangeLabel(weekKey,targetWeekOffset),
-    dateLabel:formatPrintableDateLabel(getDateForSchoolWeekDay(weekKey,targetDay)),
+    dateLabel:formatPrintableDateLabel(
+      getDateForSchoolWeekDay(weekKey,targetDay)
+    ),
     slots
   };
 }
+
 function getMainRouteUrl(){
   if(window.location.protocol==='file:') return 'guardias.html';
   const url=new URL(window.location.href);
@@ -4692,12 +4777,24 @@ function openTvPanel(){
 function closeTvPanel(){
   window.location.href=getMainRouteUrl();
 }
-function openPrintableSchedule(){
+async function openPrintableSchedule(){
   if(!isAdmin) return;
+
+  await refreshEffectiveGuardiaDayState(
+    day,
+    weekOffset,
+    {render:false}
+  );
+
   const destination=getPrintRouteUrl(day,weekOffset);
+
   try{
-    window.sessionStorage.setItem(KEY_PRINT_SNAPSHOT,JSON.stringify(buildPrintScheduleSnapshot(day,weekOffset)));
+    window.sessionStorage.setItem(
+      KEY_PRINT_SNAPSHOT,
+      JSON.stringify(buildPrintScheduleSnapshot(day,weekOffset))
+    );
   }catch(_error){}
+
   window.location.href=destination;
 }
 async function persistTvAnnouncementState(nextState,successMessage){
@@ -4808,15 +4905,101 @@ function getUpcomingSchoolSlotsForToday(limit=2){
   }
   return upcoming;
 }
+function buildAuthoritativeSlotAssignments(effectiveSlot){
+  if(!effectiveSlot) return [];
+
+  const assignments=[];
+
+  (Array.isArray(effectiveSlot.coverage)?effectiveSlot.coverage:[]).forEach(item=>{
+    const covered=item?.status==='covered'&&cleanText(item?.teacher);
+
+    assignments.push({
+      teacher:covered?cleanText(item.teacher):'Sin cubrir',
+      location:[
+        cleanText(item?.group)?`Grupo ${cleanText(item.group)}`:'Grupo no indicado',
+        cleanText(item?.room)?`Aula ${cleanText(item.room)}`:'Aula no indicada'
+      ].join(' · '),
+      meta:[
+        item?.status==='covered'?'Cubierta':'Pendiente',
+        cleanText(item?.absentTeacher)?`Ausente: ${cleanText(item.absentTeacher)}`:'',
+        cleanText(item?.subject)
+      ].filter(Boolean).join(' · '),
+      tone:'general'
+    });
+  });
+
+  if(cleanText(effectiveSlot?.biblioteca?.teacher)){
+    assignments.push({
+      teacher:cleanText(effectiveSlot.biblioteca.teacher),
+      location:'Biblioteca',
+      meta:'Puesto de apoyo',
+      tone:'biblioteca'
+    });
+  }
+
+  if(cleanText(effectiveSlot?.banos?.teacher)){
+    assignments.push({
+      teacher:cleanText(effectiveSlot.banos.teacher),
+      location:'Baños',
+      meta:'Puesto de apoyo',
+      tone:'banos'
+    });
+  }
+
+  (Array.isArray(effectiveSlot?.unassignedGuards)?effectiveSlot.unassignedGuards:[])
+    .forEach(item=>{
+      const teacher=cleanText(item?.teacher);
+      if(!teacher) return;
+
+      assignments.push({
+        teacher,
+        location:'Guardia disponible',
+        meta:'Sin asignación',
+        tone:'general'
+      });
+    });
+
+  return assignments;
+}
+
 function getTvSlotAssignments(slot,rowsSource){
   if(!slot) return [];
+
+  const effectiveSlot=getEffectiveGuardiaSlot(
+    slot.dia,
+    slot.hora,
+    weekOffset
+  );
+
+  if(effectiveSlot){
+    return buildAuthoritativeSlotAssignments(effectiveSlot);
+  }
+
+  if(storage.hasBackend()){
+    return [{
+      teacher:'Estado no disponible',
+      location:'Guardias',
+      meta:'Esperando estado operativo del servidor',
+      tone:'general'
+    }];
+  }
+
   const rows=(rowsSource||[])
     .filter(row=>row.dia===slot.dia&&row.hora===slot.hora&&rowNeedsCoverage(row))
     .sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
+
   const assignments=rows.map(buildTvAbsenceAssignment);
-  const assignedTeachers=new Set(assignments.map(item=>cleanText(item.teacher)).filter(Boolean));
-  const {biblioteca,banos}=getEffectiveSpecialAssignments(slot.dia,slot.hora,rowsSource);
-  if(biblioteca && !assignedTeachers.has(cleanText(getVisibleTeacherName(biblioteca)))){
+  const assignedTeachers=new Set(
+    assignments.map(item=>cleanText(item.teacher)).filter(Boolean)
+  );
+
+  const {biblioteca,banos}=getEffectiveSpecialAssignments(
+    slot.dia,
+    slot.hora,
+    rowsSource
+  );
+
+  if(biblioteca&&!assignedTeachers.has(cleanText(getVisibleTeacherName(biblioteca)))){
     assignments.push({
       teacher:getVisibleTeacherName(biblioteca),
       location:'Biblioteca',
@@ -4824,7 +5007,8 @@ function getTvSlotAssignments(slot,rowsSource){
       tone:'biblioteca'
     });
   }
-  if(banos && !assignedTeachers.has(cleanText(getVisibleTeacherName(banos)))){
+
+  if(banos&&!assignedTeachers.has(cleanText(getVisibleTeacherName(banos)))){
     assignments.push({
       teacher:getVisibleTeacherName(banos),
       location:'Baños',
@@ -4832,38 +5016,10 @@ function getTvSlotAssignments(slot,rowsSource){
       tone:'banos'
     });
   }
-  if(assignments.length){
-    return assignments.map(item=>({
-      ...item
-    }));
-  }
-  if(rows.length){
-    return rows.map(row=>({
-      teacher:getVisibleTeacherName(row.guardia||'')||'Sin cubrir',
-      location:resolveAulaRegistro(row)||'Sin ubicación',
-      meta:getVisibleTeacherName(row.ausente)?`Cubre a ${getVisibleTeacherName(row.ausente)}`:'',
-      tone:'general'
-    }));
-  }
-  const fallbackAssignments=[];
-  if(biblioteca){
-    fallbackAssignments.push({
-      teacher:getVisibleTeacherName(biblioteca),
-      location:'Biblioteca',
-      meta:'Puesto de apoyo',
-      tone:'biblioteca'
-    });
-  }
-  if(banos){
-    fallbackAssignments.push({
-      teacher:getVisibleTeacherName(banos),
-      location:'Baños',
-      meta:'Puesto de apoyo',
-      tone:'banos'
-    });
-  }
-  return fallbackAssignments;
+
+  return assignments;
 }
+
 function renderTvSlotPanel(containerId,slot,badgeId,rowsSource,options={}){
   const container=document.getElementById(containerId);
   const badge=document.getElementById(badgeId);
@@ -4981,6 +5137,91 @@ function renderPrintSchedule(){
 function hasSuccessfulBackendRead(results){
   return Array.isArray(results)&&results.some(result=>result?.status==='fulfilled');
 }
+function formatLocalDateKey(date){
+  if(!(date instanceof Date)||Number.isNaN(date.getTime())) return '';
+  return [
+    date.getFullYear(),
+    String(date.getMonth()+1).padStart(2,'0'),
+    String(date.getDate()).padStart(2,'0')
+  ].join('-');
+}
+
+function normalizeEffectiveGuardiaDayState(raw){
+  if(!raw||typeof raw!=='object'||!Array.isArray(raw.slots)) return null;
+  const dia=Number(raw.dia);
+  if(!Number.isInteger(dia)||dia<0||dia>4) return null;
+  return {
+    ...raw,
+    dia,
+    date:cleanText(raw.date),
+    slots:raw.slots.filter(slot=>
+      slot&&Number(slot.dia)===dia&&Number.isInteger(Number(slot.hora))
+    )
+  };
+}
+
+function getEffectiveGuardiaDateKey(targetDay=day,targetWeekOffset=weekOffset){
+  const safeDay=Number(targetDay);
+  if(!Number.isInteger(safeDay)||safeDay<0||safeDay>4) return '';
+  const weekKey=getSchoolWeekKeyFromOffset(targetWeekOffset);
+  const targetDate=getDateForSchoolWeekDay(weekKey,safeDay);
+  return formatLocalDateKey(targetDate);
+}
+
+function getEffectiveGuardiaDayState(targetDay=day,targetWeekOffset=weekOffset){
+  const dateKey=getEffectiveGuardiaDateKey(targetDay,targetWeekOffset);
+  return dateKey?(effectiveGuardiaDayStates.get(dateKey)||null):null;
+}
+
+function getEffectiveGuardiaSlot(dia,hora,targetWeekOffset=weekOffset){
+  const state=getEffectiveGuardiaDayState(Number(dia),targetWeekOffset);
+  if(!state||Number(state.dia)!==Number(dia)) return null;
+  return state.slots.find(slot=>Number(slot.hora)===Number(hora))||null;
+}
+
+async function refreshEffectiveGuardiaDayState(
+  targetDay=day,
+  targetWeekOffset=weekOffset,
+  options={}
+){
+  if(!storage.hasBackend()) return null;
+
+  const dateKey=getEffectiveGuardiaDateKey(targetDay,targetWeekOffset);
+  if(!dateKey) return null;
+
+  try{
+    const raw=await storage.fetchEffectiveGuardiaSlots(dateKey);
+    const normalized=normalizeEffectiveGuardiaDayState(raw);
+
+    if(
+      !normalized||
+      normalized.date!==dateKey||
+      Number(normalized.dia)!==Number(targetDay)
+    ){
+      throw new Error('Estado efectivo de guardias inválido para la fecha solicitada.');
+    }
+
+    const previous=effectiveGuardiaDayStates.get(dateKey)||null;
+    const changed=JSON.stringify(previous)!==JSON.stringify(normalized);
+
+    effectiveGuardiaDayStates.set(dateKey,normalized);
+
+    if(options.render===true&&changed){
+      renderGuardiaBoard();
+      renderTable();
+      renderTvPanel();
+    }
+
+    return normalized;
+  }catch(error){
+    console.warn('[guardias] effective slot state refresh failed',{
+      date:dateKey,
+      error
+    });
+    return null;
+  }
+}
+
 async function hydrateFromBackend(){
   if(!storage.hasBackend()) return;
   if(backendHydrated) return;
@@ -5129,6 +5370,7 @@ async function hydrateFromBackend(){
       groupStates=mergeGroupStatesWithDetected(groupStateRows);
       persistGroupStates(groupStates);
     }
+    await refreshEffectiveGuardiaDayState(day,weekOffset,{render:false});
     const needsBootstrapSync=!backendHasData&&!storage.isBackendOnly()&&(data.length||historialCambios.length);
     refreshOrdenGuardias();
     lastBackendSnapshot=makeBackendSnapshot();
@@ -5367,6 +5609,7 @@ async function pollBackendState(force=false){
       groupStates=mergeGroupStatesWithDetected(groupStateRows);
       persistGroupStates(groupStates);
     }
+    await refreshEffectiveGuardiaDayState(day,weekOffset,{render:true});
     refreshOrdenGuardias();
     lastBackendSnapshot=makeBackendSnapshot();
     markAdminStatePersisted();
@@ -5620,54 +5863,165 @@ function renderGuardiaBoard(){
   let firstMobileCard=true;
   const rowsSource=getRowsForWeekOffset(weekOffset);
   const coverageCounter=buildGuardiaCoverageCounter({rowsSource});
+
   for(const hora of ALL_HORAS){
     if(PATIO_RENDER_HORAS.has(hora)){
       cards.push(renderPatioCard(hora));
       firstMobileCard=false;
       continue;
     }
+
     if(HORAS_PATIO.has(hora)) continue;
-    const ordenHora=getOrdenHora(day,hora);
-    const profes=ordenHora.map(item=>item.nombre);
-    const {biblioteca,banos}=getEffectiveSpecialAssignments(day,hora,rowsSource);
-    const teacherAssignedHere=!!(teacherName&&rowsSource.filter(row=>row.dia===day&&row.hora===hora&&sameNormalizedText(row.guardia,teacherName)).length);
-    const asignados=new Set(rowsSource.filter(g=>g.dia===day&&g.hora===hora&&g.guardia&&g.guardia.trim()).map(g=>g.guardia.trim()));
-    const nombres=profes.map(nombre=>{
-      const coverageCount=coverageCounter[nombre]||0;
-      const classes=[
-        'guardia-mini',
-        asignados.has(nombre)?'guardia-mini-assigned':'',
-        teacherAssignedHere&&nombre===teacherName?'guardia-mini-current':'',
-        nombre===biblioteca?'guardia-mini-biblio':'',
-        nombre===banos?'guardia-mini-banos':''
-      ].filter(Boolean).join(' ');
-      const suffix=nombre===biblioteca?' \u00b7 Biblioteca':(nombre===banos?' \u00b7 Ba\u00f1os':'');
-      const counterLabel=` \u00b7 ${coverageCount} ${coverageCount===1?'guardia':'guardias'}`;
-      return `<span class="${classes}" title="${escapeHtml(`${getVisibleTeacherName(nombre)}${counterLabel}`)}">${escapeHtml(getVisibleTeacherName(nombre))}${suffix}<small class="guardia-mini-count">${coverageCount}</small></span>`;
-    }).join('')||'<span class="sin-asignar">Sin profesorado asignado</span>';
+
+    let nombres='';
+    let teacherAssignedHere=false;
+    let visibleTeacherCount=0;
+
+    if(storage.hasBackend()){
+      const effectiveSlot=getEffectiveGuardiaSlot(day,hora,weekOffset);
+
+      if(!effectiveSlot){
+        nombres='<span class="sin-asignar">Estado operativo no disponible</span>';
+      }else{
+        const assignments=buildAuthoritativeSlotAssignments(effectiveSlot);
+        visibleTeacherCount=Number(effectiveSlot?.diagnostics?.eligibleGuards)||0;
+
+        teacherAssignedHere=!!(
+          teacherName&&assignments.some(item=>
+            cleanText(item.teacher)&&
+            item.teacher!=='Sin cubrir'&&
+            sameNormalizedText(item.teacher,teacherName)
+          )
+        );
+
+        nombres=assignments.map(item=>{
+          if(item.teacher==='Sin cubrir'){
+            return `<span class="sin-asignar">Sin cubrir · ${escapeHtml(item.location)}</span>`;
+          }
+
+          const canonical=resolveTeacherCanonicalName(item.teacher)||item.teacher;
+          const coverageCount=coverageCounter[canonical]||0;
+
+          const isBiblioteca=item.location==='Biblioteca';
+          const isBanos=item.location==='Baños';
+          const isFree=item.location==='Guardia disponible';
+          const isCoverage=!isBiblioteca&&!isBanos&&!isFree;
+
+          const classes=[
+            'guardia-mini',
+            isCoverage?'guardia-mini-assigned':'',
+            teacherName&&sameNormalizedText(item.teacher,teacherName)
+              ?'guardia-mini-current'
+              :'',
+            isBiblioteca?'guardia-mini-biblio':'',
+            isBanos?'guardia-mini-banos':''
+          ].filter(Boolean).join(' ');
+
+          const suffix=isBiblioteca
+            ?' · Biblioteca'
+            :(isBanos
+              ?' · Baños'
+              :(isFree?' · Disponible':` · ${item.location}`));
+
+          const title=[
+            item.teacher,
+            item.meta,
+            `${coverageCount} ${coverageCount===1?'guardia':'guardias'} acumuladas`
+          ].filter(Boolean).join(' · ');
+
+          const loadBadge=(canAdmin||canSuperAdmin)
+            ?`<small class="guardia-mini-count">Carga: ${coverageCount}</small>`
+            :'';
+
+          return `<span class="${classes}" title="${escapeHtml(title)}">${escapeHtml(item.teacher)}${escapeHtml(suffix)}${loadBadge}</span>`;
+        }).join('')||'<span class="sin-asignar">Sin profesorado de guardia en este tramo</span>';
+      }
+    }else{
+      const ordenHora=getOrdenHora(day,hora);
+      const profes=ordenHora.map(item=>item.nombre);
+      visibleTeacherCount=profes.length;
+
+      const {biblioteca,banos}=getEffectiveSpecialAssignments(
+        day,
+        hora,
+        rowsSource
+      );
+
+      teacherAssignedHere=!!(
+        teacherName&&
+        rowsSource.some(row=>
+          row.dia===day&&
+          row.hora===hora&&
+          sameNormalizedText(row.guardia,teacherName)
+        )
+      );
+
+      const asignados=new Set(
+        rowsSource
+          .filter(g=>g.dia===day&&g.hora===hora&&cleanText(g.guardia))
+          .map(g=>cleanText(g.guardia))
+      );
+
+      nombres=profes.map(nombre=>{
+        const coverageCount=coverageCounter[nombre]||0;
+
+        const classes=[
+          'guardia-mini',
+          asignados.has(nombre)?'guardia-mini-assigned':'',
+          teacherAssignedHere&&sameNormalizedText(nombre,teacherName)
+            ?'guardia-mini-current'
+            :'',
+          nombre===biblioteca?'guardia-mini-biblio':'',
+          nombre===banos?'guardia-mini-banos':''
+        ].filter(Boolean).join(' ');
+
+        const suffix=nombre===biblioteca
+          ?' · Biblioteca'
+          :(nombre===banos?' · Baños':'');
+
+        const counterLabel=` · ${coverageCount} ${coverageCount===1?'guardia':'guardias'}`;
+
+        const loadBadge=(canAdmin||canSuperAdmin)
+          ?`<small class="guardia-mini-count">Carga: ${coverageCount}</small>`
+          :'';
+
+        return `<span class="${classes}" title="${escapeHtml(`${getVisibleTeacherName(nombre)}${counterLabel}`)}">${escapeHtml(getVisibleTeacherName(nombre))}${suffix}${loadBadge}</span>`;
+      }).join('')||'<span class="sin-asignar">Sin profesorado asignado</span>';
+    }
+
     const cardClasses=['guardia-card'];
     if(firstMobileCard) cardClasses.push('is-open');
     if(teacherAssignedHere) cardClasses.push('guardia-card-current');
+
     cards.push(`<article class="${cardClasses.join(' ')}">
       <button class="guardia-card-toggle" type="button" onclick="toggleGuardiaCard(this)">
         <span class="guardia-card-head">
           <span class="guardia-num">${HORA_MAP[hora].label} hora</span>
-          <span class="guardia-count">${profes.length} profesores</span>
+          <span class="guardia-count">${visibleTeacherCount} profesores</span>
         </span>
       </button>
       <div class="guardia-card-body">
         <div class="guardia-list">${nombres}</div>
       </div>
     </article>`);
+
     firstMobileCard=false;
   }
+
   grid.innerHTML=cards.join('');
 }
+
 function toggleGuardiaCard(button){
   if(window.innerWidth>900) return;
   button.parentElement.classList.toggle('is-open');
 }
-function setDay(i){day=i;renderPills();renderGuardiaBoard();renderTable();}
+async function setDay(i){
+  day=i;
+  renderPills();
+  renderGuardiaBoard();
+  renderTable();
+  await refreshEffectiveGuardiaDayState(day,weekOffset,{render:true});
+}
 function isMobileAbsenceLayout(){
   return window.innerWidth<=900;
 }
@@ -5710,7 +6064,7 @@ function buildAbsenceDisplayModel(g,rowsSource){
   const h=HORA_MAP[g.hora]||{label:g.hora+'a',rango:''};
   const cub=g.guardia&&g.guardia.trim();
   const needsCoverage=rowNeedsCoverage(g);
-  const sugerido=needsCoverage?(cub||getGuardiaSugerida(day,g.hora,1,rowsSource)):'';
+  const sugerido=needsCoverage?getOperationalCoverageName(g,rowsSource):'';
   const faenaInfo=resolveFaena(g);
   const {grupo,aula,materia,substitution}=getAbsenceCoverageDisplay(g);
   const ausenteNombre=substitution?.substitute?.displayName||getVisibleTeacherName(g.ausente);
@@ -5862,6 +6216,7 @@ async function changeWeekOffset(delta){
   updateAdminControls();
   renderGuardiaBoard();
   renderTable();
+  await refreshEffectiveGuardiaDayState(day,weekOffset,{render:true});
 }
 async function sortearGuardiasDia(){
   if(!isAdmin||!isCurrentWeekOffset(weekOffset)){
@@ -5895,11 +6250,25 @@ function buildDailyReportText(){
   if(!rows.length) return cabecera.concat(['No hay ausencias registradas para este d\u00eda.']).join('\n');
   const cuerpo=rows.map(g=>{
     const h=HORA_MAP[g.hora]||{rango:''};
-    const cub=g.guardia&&g.guardia.trim();
-    const sugerido=rowNeedsCoverage(g)?(cub||getGuardiaSugerida(day,g.hora,1)||'Sin asignar'):'No requiere cobertura';
-    const effectiveSpecial=getEffectiveSpecialAssignments(day,g.hora,data);
-    const biblioteca=effectiveSpecial.biblioteca||'Sin asignar';
-    const banos=effectiveSpecial.banos||'Sin asignar';
+    const sugerido=rowNeedsCoverage(g)
+      ?(getOperationalCoverageName(g,data)||'Sin asignar')
+      :'No requiere cobertura';
+
+    const effectiveSlot=storage.hasBackend()
+      ?getEffectiveGuardiaSlot(day,g.hora,weekOffset)
+      :null;
+
+    const effectiveSpecial=storage.hasBackend()
+      ?null
+      :getEffectiveSpecialAssignments(day,g.hora,data);
+
+    const biblioteca=storage.hasBackend()
+      ?(cleanText(effectiveSlot?.biblioteca?.teacher)||'Sin asignar')
+      :(effectiveSpecial?.biblioteca||'Sin asignar');
+
+    const banos=storage.hasBackend()
+      ?(cleanText(effectiveSlot?.banos?.teacher)||'Sin asignar')
+      :(effectiveSpecial?.banos||'Sin asignar');
     const faenaInfo=resolveFaena(g);
     const aula=resolveAulaRegistro(g)||'-';
     return [
@@ -6804,7 +7173,7 @@ function renderTable(){
   const aus=rows.length;
   const rowsSource=getRowsForWeekOffset(weekOffset);
   const rowsNeedingCoverage=rows.filter(row=>rowNeedsCoverage(row));
-  const asig=rowsNeedingCoverage.filter(g=>(g.guardia&&g.guardia.trim())||getGuardiaSugerida(day,g.hora,1,rowsSource)).length;
+  const asig=rowsNeedingCoverage.filter(g=>!!getOperationalCoverageName(g,rowsSource)).length;
   const thAcc=document.getElementById('thAcc');
   if(thAcc){
     thAcc.style.display=isAdmin?'':'none';
@@ -8007,7 +8376,11 @@ async function saveAbsence(){
       if(!affectedHoursByDay.has(diaKey)) affectedHoursByDay.set(diaKey,new Set());
       affectedHoursByDay.get(diaKey).add(Number(row.hora));
     });
-    affectedHoursByDay.forEach((hours,diaKey)=>reassignGuardiasForDayHours(diaKey,[...hours]));
+    if(!storage.hasBackend()){
+      affectedHoursByDay.forEach((hours,diaKey)=>
+        reassignGuardiasForDayHours(diaKey,[...hours])
+      );
+    }
     if(editId){
       addHistoryEntry(
         savedRows.length>1||previousRows.length>1?'Ausencias editadas':'Ausencia editada',
