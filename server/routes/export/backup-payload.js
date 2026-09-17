@@ -7,6 +7,7 @@ const {
   normalizeInteger,
   normalizeString,
   sanitizeBiblioteca,
+  sanitizeBanos,
   sanitizePatioGuardia,
   sanitizePatioTeacherBlock,
   sanitizeSessionOverride,
@@ -120,6 +121,7 @@ function sanitizeBackupPayload(payload) {
   return {
     guardias: ensureBackupSection(input, 'guardias', 'guardias').map(sanitizeRestoreAusencia),
     biblioteca: ensureBackupSection(input, 'biblioteca', 'biblioteca').map(sanitizeBiblioteca),
+    banos: ensureOptionalBackupSection(input, 'banos', 'banos', sanitizeBanos),
     historial: ensureBackupSection(input, 'historial', 'historial').map(sanitizeRestoreHistorial),
     tareasProfesorado: ensureBackupSection(input, 'tareasProfesorado', 'tareasProfesorado').map(sanitizeTareaProfesorado),
     sessionOverrides: ensureBackupSection(input, 'sessionOverrides', 'sessionOverrides').map(sanitizeSessionOverride),

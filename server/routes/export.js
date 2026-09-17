@@ -11,6 +11,10 @@ const { getTelemetrySnapshot } = require('../telemetry');
 const { appendAuditEvent } = require('../audit');
 const { listEffectiveSubstitutions, madridDateKey } = require('../substitution-service');
 const {
+  assertNoSpecialAssignmentConflict,
+  assertUniqueSlotAssignments
+} = require('../special-assignment-policy');
+const {
   FUTURE_ABSENCES_STATE_KEY,
   MONTHLY_GUARDIA_LOAD_STATE_KEY,
   PATIO_GUARDIAS_STATE_KEY,
@@ -76,6 +80,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
     const [
       guardias,
       biblioteca,
+      banos,
       historial,
       tareasProfesorado,
       alumnosFueraAula,
@@ -90,6 +95,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
     ] = await Promise.all([
       db.all('SELECT * FROM ausencias ORDER BY dia, hora, id'),
       db.all('SELECT dia, hora, profesor FROM biblioteca_guardias ORDER BY dia, hora'),
+      db.all('SELECT dia, hora, profesor FROM banos_guardias ORDER BY dia, hora'),
       db.all('SELECT * FROM historial ORDER BY ts DESC'),
       db.all('SELECT * FROM tareas_profesorado ORDER BY profesor, dia, hora'),
       db.all('SELECT * FROM alumnos_fuera_aula ORDER BY dia, hora, profesor, id'),
@@ -125,6 +131,7 @@ router.get('/snapshot.json', requireRole('superadmin'), async (_req, res, next) 
       exportedAt: new Date().toISOString(),
       guardias: guardias.map(row => ({ ...row, faena: !!row.faena })),
       biblioteca,
+      banos,
       historial: historial.map(row => ({
         id: row.id,
         title: row.title,
@@ -273,6 +280,7 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
     const {
       guardias,
       biblioteca,
+      banos,
       historial,
       tareasProfesorado,
       alumnosFueraAula,
@@ -290,10 +298,29 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
     } = payload;
     const ignoredLegacySubstitutions = teacherSubstitutions.length ? teacherSubstitutions : substitutions;
 
+    assertUniqueSlotAssignments(
+      biblioteca,
+      'Las guardias de biblioteca del backup',
+      400
+    );
+
+    assertUniqueSlotAssignments(
+      banos,
+      'Las guardias de baños del backup',
+      400
+    );
+
+    assertNoSpecialAssignmentConflict(
+      biblioteca,
+      banos,
+      400
+    );
+
     const db = await getDatabase();
     await withImmediateTransaction(db, async () => {
       await db.exec('DELETE FROM ausencias');
       await db.exec('DELETE FROM biblioteca_guardias');
+      await db.exec('DELETE FROM banos_guardias');
       await db.exec('DELETE FROM historial');
       await db.exec('DELETE FROM tareas_profesorado');
       await db.exec('DELETE FROM alumnos_fuera_aula');
@@ -334,6 +361,14 @@ router.post('/restore', requireRole('superadmin'), async (req, res, next) => {
       for (const row of biblioteca) {
         await db.run(
           `INSERT INTO biblioteca_guardias (dia, hora, profesor, updated_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+          [row.dia, row.hora, row.profesor]
+        );
+      }
+
+      for (const row of banos) {
+        await db.run(
+          `INSERT INTO banos_guardias (dia, hora, profesor, updated_at)
            VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
           [row.dia, row.hora, row.profesor]
         );

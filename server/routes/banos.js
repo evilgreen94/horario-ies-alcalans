@@ -7,7 +7,7 @@ const {
 
 const {
   ensureArray,
-  sanitizeBiblioteca
+  sanitizeBanos
 } = require('./validation');
 
 const { requireRole } = require('../session');
@@ -24,7 +24,7 @@ router.get('/', async (_req, res, next) => {
     const db = await getDatabase();
 
     const rows = await db.all(
-      'SELECT dia, hora, profesor FROM biblioteca_guardias ORDER BY dia, hora'
+      'SELECT dia, hora, profesor FROM banos_guardias ORDER BY dia, hora'
     );
 
     res.json(rows);
@@ -35,25 +35,24 @@ router.get('/', async (_req, res, next) => {
 
 router.put('/', requireRole('admin'), async (req, res, next) => {
   try {
-    const assignment = sanitizeBiblioteca(req.body);
+    const assignment = sanitizeBanos(req.body);
     const db = await getDatabase();
 
     const persisted = await withImmediateTransaction(db, async () => {
-      const banosRows = await db.all(
+      const bibliotecaRows = await db.all(
         `SELECT dia, hora, profesor
-         FROM banos_guardias
+         FROM biblioteca_guardias
          WHERE dia = ? AND hora = ?`,
         [assignment.dia, assignment.hora]
       );
 
       assertNoSpecialAssignmentConflict(
-        [assignment],
-        banosRows
+        bibliotecaRows,
+        [assignment]
       );
 
       await db.run(
-        `INSERT INTO biblioteca_guardias
-           (dia, hora, profesor, updated_at)
+        `INSERT INTO banos_guardias (dia, hora, profesor, updated_at)
          VALUES (?, ?, ?, CURRENT_TIMESTAMP)
          ON CONFLICT(dia, hora)
          DO UPDATE SET
@@ -68,7 +67,7 @@ router.put('/', requireRole('admin'), async (req, res, next) => {
 
       return db.get(
         `SELECT dia, hora, profesor
-         FROM biblioteca_guardias
+         FROM banos_guardias
          WHERE dia = ? AND hora = ?`,
         [assignment.dia, assignment.hora]
       );
@@ -84,33 +83,33 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
   try {
     const rows = ensureArray(
       req.body,
-      'Las guardias de biblioteca'
-    ).map(sanitizeBiblioteca);
+      'Las guardias de baños'
+    ).map(sanitizeBanos);
 
     assertUniqueSlotAssignments(
       rows,
-      'Las guardias de biblioteca'
+      'Las guardias de baños'
     );
 
     const db = await getDatabase();
 
     const persisted = await withImmediateTransaction(db, async () => {
-      const banosRows = await db.all(
+      const bibliotecaRows = await db.all(
         `SELECT dia, hora, profesor
-         FROM banos_guardias
+         FROM biblioteca_guardias
          ORDER BY dia, hora`
       );
 
       assertNoSpecialAssignmentConflict(
-        rows,
-        banosRows
+        bibliotecaRows,
+        rows
       );
 
-      await db.exec('DELETE FROM biblioteca_guardias');
+      await db.exec('DELETE FROM banos_guardias');
 
       for (const row of rows) {
         await db.run(
-          `INSERT INTO biblioteca_guardias
+          `INSERT INTO banos_guardias
              (dia, hora, profesor, updated_at)
            VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
           [row.dia, row.hora, row.profesor]
@@ -118,7 +117,7 @@ router.put('/replace', requireRole('admin'), async (req, res, next) => {
       }
 
       return db.all(
-        'SELECT dia, hora, profesor FROM biblioteca_guardias ORDER BY dia, hora'
+        'SELECT dia, hora, profesor FROM banos_guardias ORDER BY dia, hora'
       );
     });
 

@@ -8,6 +8,8 @@ const { getSessionSecret } = require('./session');
 const { requestTelemetryMiddleware } = require('./telemetry');
 const guardiasRouter = require('./routes/guardias');
 const bibliotecaRouter = require('./routes/biblioteca');
+const banosRouter = require('./routes/banos');
+const specialAssignmentsRouter = require('./routes/special-assignments');
 const historialRouter = require('./routes/historial');
 const profesoradoRouter = require('./routes/profesorado');
 const reportRouter = require('./routes/report');
@@ -152,6 +154,8 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/guardias', guardiasRouter);
 app.use('/api/biblioteca', bibliotecaRouter);
+app.use('/api/banos', banosRouter);
+app.use('/api/special-assignments', specialAssignmentsRouter);
 app.use('/api/historial', historialRouter);
 app.use('/api/profesorado', profesoradoRouter);
 app.use('/api/report', reportRouter);

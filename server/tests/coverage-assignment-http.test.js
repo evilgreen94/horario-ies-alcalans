@@ -100,8 +100,8 @@ function tvAssignments(rows, buildTvAbsenceAssignment) {
     getRowsForWeekOffset: () => rows,
     getVisibleTeacherName: value => value,
     buildTvAbsenceAssignment,
-    getBibliotecaAsignada: () => '',
-    getBanosAsignado: () => ''
+    getEffectiveSpecialAssignments: () => ({ biblioteca: '', banos: '' }),
+    rowNeedsCoverage: () => true
   }).getTvSlotAssignments({ dia: 0, hora: 1 }, rows);
 }
 

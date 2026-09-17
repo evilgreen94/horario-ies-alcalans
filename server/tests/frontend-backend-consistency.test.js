@@ -276,8 +276,8 @@ module.exports = [
       assert.ok(storageSource.includes("request('/users/provisioning'"));
       assert.ok(appSource.includes("new Blob([`\\uFEFF${lines.join('\\r\\n')}\\r\\n`]"));
       assert.ok(appSource.includes('URL.createObjectURL(blob)'));
-      assert.ok(appSource.includes('superAdminProvisioningCredentials=[];\n  renderProvisioningCredentials();'));
-      assert.ok(appSource.includes('clearTeacherProvisioningState();\n  if(storage.hasBackend())'));
+      assert.match(appSource,/superAdminProvisioningCredentials=\[\];\r?\n\s*renderProvisioningCredentials\(\);/);
+      assert.match(appSource,/clearTeacherProvisioningState\(\);\r?\n\s*if\(storage\.hasBackend\(\)\)/);
       assert.equal(/provisioning[^'"\n]*\.csv[^'"\n]*request\(/i.test(storageSource), false);
     }
   },

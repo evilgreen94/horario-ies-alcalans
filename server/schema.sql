@@ -20,6 +20,15 @@ CREATE TABLE IF NOT EXISTS biblioteca_guardias (
   UNIQUE(dia, hora)
 );
 
+CREATE TABLE IF NOT EXISTS banos_guardias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  dia INTEGER NOT NULL,
+  hora INTEGER NOT NULL,
+  profesor TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(dia, hora)
+);
+
 CREATE TABLE IF NOT EXISTS historial (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,

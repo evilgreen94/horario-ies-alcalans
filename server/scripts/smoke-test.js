@@ -80,6 +80,7 @@ async function testProtectedWithoutAuth() {
   const publicReadChecks = [
     ['/api/guardias', 200],
     ['/api/biblioteca', 200],
+    ['/api/banos', 200],
     ['/api/historial', 200],
     ['/api/profesorado/tareas', 200],
     ['/api/profesorado/session-overrides', 200],
@@ -164,6 +165,8 @@ async function testAnonymousWriteProtection() {
   const checks = [
     ['/api/guardias/replace', 'PUT', [], 401],
     ['/api/biblioteca/replace', 'PUT', [], 401],
+    ['/api/banos/replace', 'PUT', [], 401],
+    ['/api/special-assignments/bootstrap', 'POST', { biblioteca: [], banos: [] }, 401],
     ['/api/historial/replace', 'PUT', [], 401],
     ['/api/profesorado/tareas/replace', 'PUT', [], 401],
     ['/api/profesorado/tareas', 'POST', {}, 401],

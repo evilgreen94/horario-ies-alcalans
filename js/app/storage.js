@@ -141,6 +141,27 @@
         body: JSON.stringify(rows)
       });
     },
+    fetchBanos(){
+      return request('/banos');
+    },
+    saveBanos(row){
+      return request('/banos', {
+        method: 'PUT',
+        body: JSON.stringify(row)
+      });
+    },
+    replaceBanos(rows){
+      return request('/banos/replace', {
+        method: 'PUT',
+        body: JSON.stringify(rows)
+      });
+    },
+    bootstrapSpecialAssignments(payload){
+      return request('/special-assignments/bootstrap', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
     fetchHistorial(){
       return request('/historial');
     },

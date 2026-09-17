@@ -101,8 +101,8 @@ function renderUnallocatedPatioDuties() {
     getRowsForWeekOffset: () => [],
     getVisibleTeacherName: value => value,
     buildTvAbsenceAssignment: () => ({ teacher: 'Sin cubrir', location: 'Grupo no indicado · Aula no indicada', meta: 'Pendiente', tone: 'general' }),
-    getBibliotecaAsignada: () => '',
-    getBanosAsignado: () => '',
+    getEffectiveSpecialAssignments: () => ({ biblioteca: '', banos: '' }),
+    rowNeedsCoverage: () => true,
     getPatioCoverageSummary: () => ({
       total: 1,
       covered: 1,

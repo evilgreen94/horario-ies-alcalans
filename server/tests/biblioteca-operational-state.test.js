@@ -190,7 +190,7 @@ module.exports = [
       const serializerSource = section(
         appSource,
         'function serializeBibliotecaAssignments(',
-        'function serializeTeacherTasks('
+        'function serializeBanosAssignments('
       );
 
       const payloadSource = section(
@@ -245,16 +245,27 @@ module.exports = [
         /if\(!storage\.hasBackend\(\)\) return getSpecialAssignments/
       );
 
-      // Baños remains provisional for now, but must never duplicate
-      // the persisted Biblioteca assignment.
+      // Baños is now authoritative persisted state whenever the
+      // application is connected to the backend. The motor remains only
+      // as a local/offline proposal fallback.
       assert.match(
         specialAssignmentsSource,
-        /proposal\.banos&&proposal\.banos!==biblioteca/
+        /const persisted=banosGuardias\.find/
       );
 
       assert.match(
         specialAssignmentsSource,
-        /proposal\.biblioteca&&proposal\.biblioteca!==biblioteca/
+        /if\(persisted\) return persisted\.profesor/
+      );
+
+      assert.match(
+        specialAssignmentsSource,
+        /if\(!storage\.hasBackend\(\)\)\{/
+      );
+
+      assert.match(
+        specialAssignmentsSource,
+        /const proposal=getSpecialAssignments/
       );
 
       // Serialization represents persisted state; it must not run the motor.

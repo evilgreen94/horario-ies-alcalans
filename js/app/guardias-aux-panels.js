@@ -35,7 +35,7 @@
     {
       scope:'tvPanel.assignments',
       reason:'Las tarjetas TV y la vista de impresion no pueden reconstruir coberturas por si solas sin los calculos del dominio principal.',
-      requiredHost:['buildTvAbsenceAssignment','getBibliotecaAsignada','getBanosAsignado']
+      requiredHost:['buildTvAbsenceAssignment','getEffectiveSpecialAssignments','rowNeedsCoverage']
     }
   ];
 
@@ -372,8 +372,8 @@
     const getRowsForWeekOffset=requireFn('getRowsForWeekOffset',options.getRowsForWeekOffset);
     const getVisibleTeacherName=requireFn('getVisibleTeacherName',options.getVisibleTeacherName);
     const buildTvAbsenceAssignment=requireFn('buildTvAbsenceAssignment',options.buildTvAbsenceAssignment);
-    const getBibliotecaAsignada=requireFn('getBibliotecaAsignada',options.getBibliotecaAsignada);
-    const getBanosAsignado=requireFn('getBanosAsignado',options.getBanosAsignado);
+    const getEffectiveSpecialAssignments=requireFn('getEffectiveSpecialAssignments',options.getEffectiveSpecialAssignments);
+    const rowNeedsCoverage=requireFn('rowNeedsCoverage',options.rowNeedsCoverage);
     const getPatioCoverageSummary=isFn(options.getPatioCoverageSummary)?options.getPatioCoverageSummary:null;
     const getPatioSectors=isFn(options.getPatioSectors)?options.getPatioSectors:()=>Array.isArray(options.patioSectors)?options.patioSectors:[];
     const getPatioExtraPosts=isFn(options.getPatioExtraPosts)?options.getPatioExtraPosts:null;
@@ -487,12 +487,11 @@
       if(!slot) return [];
       const currentRows=Array.isArray(rowsSource)?rowsSource:[];
       const slotRows=currentRows
-        .filter(row=>row.dia===slot.dia&&row.hora===slot.hora)
+        .filter(row=>row.dia===slot.dia&&row.hora===slot.hora&&rowNeedsCoverage(row))
         .sort((a,b)=>String(a&&a.id||'').localeCompare(String(b&&b.id||'')));
       const assignments=slotRows.map(buildTvAbsenceAssignment);
       const assignedTeachers=new Set(assignments.map(item=>shared.cleanText(item.teacher)).filter(Boolean));
-      const biblioteca=getBibliotecaAsignada(slot.dia,slot.hora,currentRows);
-      const banos=getBanosAsignado(slot.dia,slot.hora,currentRows);
+      const {biblioteca,banos}=getEffectiveSpecialAssignments(slot.dia,slot.hora,currentRows);
       if(biblioteca&&!assignedTeachers.has(shared.cleanText(getVisibleTeacherName(biblioteca)))){
         assignments.push({teacher:getVisibleTeacherName(biblioteca),location:'Biblioteca',meta:'Puesto de apoyo',tone:'biblioteca'});
       }

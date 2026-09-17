@@ -103,6 +103,15 @@ function sanitizeBiblioteca(row) {
   };
 }
 
+function sanitizeBanos(row) {
+  const input = ensureObject(row, 'Guardia de baños');
+  return {
+    dia: normalizeInteger(input.dia, 'dia', 0, 4),
+    hora: normalizeInteger(input.hora, 'hora', 0, 10000),
+    profesor: ensureRequiredString(input.profesor, 'profesor')
+  };
+}
+
 function sanitizeHistorial(row) {
   const input = ensureObject(row, 'Entrada de historial');
   return {
@@ -254,6 +263,7 @@ module.exports = {
   sanitizeAlumnosFueraAula,
   sanitizeAusencia,
   sanitizeBiblioteca,
+  sanitizeBanos,
   sanitizeTeacherFutureAbsence,
   sanitizePatioGuardia,
   sanitizePatioTeacherBlock,

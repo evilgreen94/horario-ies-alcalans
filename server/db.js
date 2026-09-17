@@ -251,6 +251,7 @@ async function ensureWeeklyResetIfNeeded(dbInstance) {
   await withImmediateTransaction(db, async () => {
     await db.exec('DELETE FROM ausencias');
     await db.exec('DELETE FROM biblioteca_guardias');
+    await db.exec('DELETE FROM banos_guardias');
     await db.run(
       `UPDATE historial SET archived_at = CURRENT_TIMESTAMP
        WHERE archived_at IS NULL`

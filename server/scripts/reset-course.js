@@ -50,6 +50,7 @@ async function main() {
   try {
     await db.exec('DELETE FROM ausencias');
     await db.exec('DELETE FROM biblioteca_guardias');
+    await db.exec('DELETE FROM banos_guardias');
     await db.exec("UPDATE historial SET archived_at = CURRENT_TIMESTAMP WHERE archived_at IS NULL");
     await db.exec('DELETE FROM tareas_profesorado');
     await db.exec('DELETE FROM session_overrides');
