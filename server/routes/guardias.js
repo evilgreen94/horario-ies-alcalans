@@ -215,7 +215,7 @@ router.get('/effective-slots', async (req, res, next) => {
   }
 });
 
-router.get('/monthly-load', async (_req, res, next) => {
+router.get('/monthly-load', requireRole('admin'), async (_req, res, next) => {
   try {
     const db = await getDatabase();
     const state = await ensureMonthlyGuardiaLoadState(db);

@@ -4268,8 +4268,12 @@ async function runAdminStateSync(){
     }
     await refreshGuardiasFromBackend({render:false});
     try{
-      guardiaMonthlyLoad=normalizeGuardiaMonthlyLoadState(await storage.fetchGuardiaMonthlyLoad());
-      persistGuardiaMonthlyLoad(guardiaMonthlyLoad);
+      if(canAdmin||canSuperAdmin){
+        guardiaMonthlyLoad=normalizeGuardiaMonthlyLoadState(
+          await storage.fetchGuardiaMonthlyLoad()
+        );
+        persistGuardiaMonthlyLoad(guardiaMonthlyLoad);
+      }
     }catch(monthlyLoadError){
       console.warn('Monthly guardia load refresh failed',monthlyLoadError);
     }
@@ -5242,7 +5246,9 @@ async function hydrateFromBackend(){
       storage.fetchPatioGuardias(),
       storage.fetchPatioTeacherBlocks(),
       storage.fetchTvAnnouncement(),
-      storage.fetchGuardiaMonthlyLoad(),
+      (canAdmin||canSuperAdmin)
+        ?storage.fetchGuardiaMonthlyLoad()
+        :Promise.resolve(null),
       storage.fetchGroups()
     ]);
     if(!hasSuccessfulBackendRead(backendReadResults)) throw new Error('No se pudo completar ninguna lectura del backend.');
@@ -5498,7 +5504,9 @@ async function pollBackendState(force=false){
       storage.fetchPatioGuardias(),
       storage.fetchPatioTeacherBlocks(),
       storage.fetchTvAnnouncement(),
-      storage.fetchGuardiaMonthlyLoad(),
+      (canAdmin||canSuperAdmin)
+        ?storage.fetchGuardiaMonthlyLoad()
+        :Promise.resolve(null),
       storage.fetchGroups()
     ]);
     if(!hasSuccessfulBackendRead(backendReadResults)) throw new Error('No se pudo completar ninguna lectura del backend.');
@@ -5926,7 +5934,9 @@ function renderGuardiaBoard(){
           const title=[
             item.teacher,
             item.meta,
-            `${coverageCount} ${coverageCount===1?'guardia':'guardias'} acumuladas`
+            (canAdmin||canSuperAdmin)
+              ?`${coverageCount} ${coverageCount===1?'guardia':'guardias'} acumuladas`
+              :''
           ].filter(Boolean).join(' · ');
 
           const loadBadge=(canAdmin||canSuperAdmin)
@@ -5979,7 +5989,9 @@ function renderGuardiaBoard(){
           ?' · Biblioteca'
           :(nombre===banos?' · Baños':'');
 
-        const counterLabel=` · ${coverageCount} ${coverageCount===1?'guardia':'guardias'}`;
+        const counterLabel=(canAdmin||canSuperAdmin)
+          ?` · ${coverageCount} ${coverageCount===1?'guardia':'guardias'}`
+          :'';
 
         const loadBadge=(canAdmin||canSuperAdmin)
           ?`<small class="guardia-mini-count">Carga: ${coverageCount}</small>`
