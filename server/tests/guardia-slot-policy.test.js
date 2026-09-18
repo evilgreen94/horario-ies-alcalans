@@ -210,5 +210,73 @@ module.exports = [
 
       assert.equal(new Set(occupied).size, occupied.length);
     }
+  },
+
+  {
+    name: 'standby queue preserves candidate order and excludes guards reserved for coverage',
+    fn() {
+      const result = deriveEffectiveGuardiaSlotState({
+        dia: 0,
+        hora: 1,
+        date: '2026-09-14',
+        candidates: [
+          teacher(1, 'Rafa', 1),
+          teacher(2, 'Joaquín', 2),
+          teacher(3, 'Marta', 3),
+          teacher(4, 'Laura', 4),
+          teacher(5, 'Pedro', 5)
+        ],
+        coverageRows: [
+          {
+            id: 1,
+            absentTeacher: 'Belén',
+            assignedProfileId: null
+          }
+        ]
+      });
+
+      /*
+       * Rafa queda reservado para la clase pendiente.
+       * Joaquín y Marta son consumidos por Biblioteca/Baños.
+       * Laura y Pedro quedan realmente libres.
+       */
+      assert.deepStrictEqual(
+        result.unassignedGuards.map(row => [
+          row.teacher,
+          row.reason,
+          row.standbyRank ?? null
+        ]),
+        [
+          ['Rafa', 'cobertura-pendiente', null],
+          ['Laura', 'sin-asignacion', 1],
+          ['Pedro', 'sin-asignacion', 2]
+        ]
+      );
+
+      assert.deepStrictEqual(
+        result.standbyQueue,
+        [
+          {
+            profileId: 4,
+            teacher: 'Laura',
+            sourceCode: 'T4',
+            rank: 1
+          },
+          {
+            profileId: 5,
+            teacher: 'Pedro',
+            sourceCode: 'T5',
+            rank: 2
+          }
+        ]
+      );
+
+      assert.equal(
+        result.standbyQueue.some(row => row.profileId === 1),
+        false,
+        'Un docente reservado para cobertura no puede aparecer como disponible'
+      );
+    }
   }
+
 ];

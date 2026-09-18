@@ -607,7 +607,7 @@ module.exports = [
               2,
               'Teacher ABS',
               'Teacher G2',
-              'A-102'
+              'A-CONFLICT'
             ]
           );
         } finally {
@@ -618,12 +618,7 @@ module.exports = [
           f,
           `/api/profesorado/future-absences/${approved.id}/apply`,
           'POST',
-          {
-            rows: coverageRows(
-              'Teacher ABS',
-              ['Teacher G1', 'Teacher G1']
-            )
-          }
+          {}
         );
 
         assert.equal(result.response.status, 409);
@@ -877,5 +872,100 @@ module.exports = [
         );
       });
     }
+  },
+
+  {
+    name: 'approved future absence outside current operational week cannot be materialized',
+    async fn() {
+      const f = await fixture();
+
+      try {
+        /*
+         * Calculamos el lunes siguiente a la semana operacional real
+         * para que el test no dependa de una fecha fija.
+         */
+        const {
+          getCurrentSchoolWeekKey
+        } = require('../db');
+
+        const currentMonday = new Date(
+          `${getCurrentSchoolWeekKey()}T00:00:00.000Z`
+        );
+
+        currentMonday.setUTCDate(
+          currentMonday.getUTCDate() + 7
+        );
+
+        const nextMonday =
+          currentMonday.toISOString().slice(0, 10);
+
+        const approved = futureEntry({
+          id: 'future-next-operational-week',
+          status: 'approved',
+          date: nextMonday,
+          hours: [1, 2]
+        });
+
+        await writeFutureRows(
+          f.environment.dbPath,
+          [approved]
+        );
+
+        const result = await adminWrite(
+          f,
+          `/api/profesorado/future-absences/${approved.id}/apply`,
+          'POST',
+          {}
+        );
+
+        assert.equal(
+          result.response.status,
+          409,
+          'Una ausencia de otra semana no puede materializarse todavía'
+        );
+
+        const operational =
+          await readOperationalAbsences(
+            f.environment.dbPath,
+            'Teacher ABS'
+          );
+
+        assert.equal(
+          operational.length,
+          0,
+          'Aplicar una ausencia futura no debe contaminar la semana operacional'
+        );
+
+        const futureRows =
+          await readFutureRows(
+            f.environment.dbPath
+          );
+
+        const stored = futureRows.find(
+          row => row.id === approved.id
+        );
+
+        assert.ok(
+          stored,
+          'La ausencia futura debe seguir almacenada'
+        );
+
+        assert.equal(
+          stored.status,
+          'approved',
+          'La ausencia debe seguir validada, no applied'
+        );
+
+        assert.equal(
+          stored.appliedAt,
+          '',
+          'No debe registrarse appliedAt antes de su semana operacional'
+        );
+      } finally {
+        await stopServer(f.server);
+        cleanupTestEnvironment(f.environment);
+      }
+    }
   }
+
 ];

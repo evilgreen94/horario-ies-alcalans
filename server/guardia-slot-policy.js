@@ -137,6 +137,13 @@ function deriveEffectiveGuardiaSlotState(input = {}) {
 
   if (banos) usedProfiles.add(banos.profileId);
 
+  const standbyQueue = remaining.map((candidate, index) => ({
+    profileId: candidate.profileId,
+    teacher: candidate.displayName,
+    sourceCode: candidate.sourceCode,
+    rank: index + 1
+  }));
+
   const unassignedGuards = [
     ...reservedForCoverage.map(candidate => ({
       profileId: candidate.profileId,
@@ -144,11 +151,12 @@ function deriveEffectiveGuardiaSlotState(input = {}) {
       sourceCode: candidate.sourceCode,
       reason: 'cobertura-pendiente'
     })),
-    ...remaining.map(candidate => ({
+    ...standbyQueue.map(candidate => ({
       profileId: candidate.profileId,
-      teacher: candidate.displayName,
+      teacher: candidate.teacher,
       sourceCode: candidate.sourceCode,
-      reason: 'sin-asignacion'
+      reason: 'sin-asignacion',
+      standbyRank: candidate.rank
     }))
   ];
 
@@ -171,6 +179,7 @@ function deriveEffectiveGuardiaSlotState(input = {}) {
           sourceCode: banos.sourceCode
         }
       : null,
+    standbyQueue,
     unassignedGuards,
     diagnostics: {
       eligibleGuards: candidates.length,

@@ -1,5 +1,9 @@
 const express = require('express');
-const { getDatabase, withImmediateTransaction } = require('../db');
+const {
+  getDatabase,
+  withImmediateTransaction,
+  getCurrentSchoolWeekKey
+} = require('../db');
 const { buildCanonicalSchedule, parseAnnualXml } = require('../annual-source');
 const { importScheduleDataset, importTeacherProfiles, validateCanonicalSchedule } = require('../schedule-model');
 const { parseGhcXml } = require('../ghc-xml-import');
@@ -25,6 +29,8 @@ const { ensureCoverageAssignmentsAllowed } = require('../coverage-assignment');
 const { shouldSkipAbsenceRowByInactiveGroup } = require('../absence-policy');
 const { rebuildMonthlyGuardiaLoadForCurrentWeek } = require('./guardias/monthly-load');
 const { resolveActiveTeacherContext } = require('../teacher-identity');
+const { getResolvedTeacherSession } = require('../teacher-schedule');
+const { materializeCoverageAssignments } = require('../coverage-materialization');
 const {
   badRequest,
   notFound,
@@ -86,6 +92,9 @@ registerStateCollectionRoutes(router, {
   ensureCoverageAssignmentsAllowed,
   shouldSkipAbsenceRowByInactiveGroup,
   rebuildMonthlyGuardiaLoadForCurrentWeek,
+  getCurrentSchoolWeekKey,
+  getResolvedTeacherSession,
+  materializeCoverageAssignments,
   requireAuthenticated,
   requireRole,
   resolveActiveTeacherContext,

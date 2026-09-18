@@ -882,7 +882,6 @@
 
   function buildProjectedRowsForWeek(weekKey){
     requireHostFunction('getAulaProfesor', 'future absence projection');
-    requireHostFunction('assignGuardiasForRows', 'future absence projection');
     const rows = [];
     const seen = new Set();
     state.rows
@@ -912,7 +911,7 @@
           });
         });
       });
-    return callHost('assignGuardiasForRows', rows);
+    return rows;
   }
 
   async function applyApprovedForCurrentWeek(){
@@ -922,8 +921,6 @@
     requireHostFunction('normalizeStoredRows', 'future absence apply');
     requireHostFunction('renderGuardiaBoard', 'future absence apply');
     requireHostFunction('renderTable', 'future absence apply');
-    requireHostFunction('getAulaProfesor', 'future absence apply');
-    requireHostFunction('assignGuardiasForRows', 'future absence apply');
 
     const storage = readHostValue('storage');
 
@@ -962,38 +959,14 @@
       const horasLectivas = getFutureAbsenceHoursForEntry(item);
       if(!horasLectivas.length) continue;
 
-      const proposalRows = callHost(
-        'assignGuardiasForRows',
-        horasLectivas.map(hora => ({
-          dia: weekInfo.dayIndex,
-          hora,
-          ausente: item.profesor,
-          guardia: '',
-          aula:
-            callHost(
-              'getAulaProfesor',
-              item.profesor,
-              weekInfo.dayIndex,
-              hora
-            ) || '',
-          faena: false,
-          obs: ''
-        }))
-      ).map(row => ({
-        dia: Number(row.dia),
-        hora: Number(row.hora),
-        ausente: row.ausente,
-        guardia: row.guardia || '',
-        aula: row.aula || '',
-        faena: !!row.faena,
-        obs: row.obs || ''
-      }));
-
+      /*
+       * El navegador no propone coberturas.
+       * Solo solicita al servidor materializar esta ausencia.
+       */
       try{
         const result =
           await storage.applyTeacherFutureAbsence(
-            item.id,
-            proposalRows
+            item.id
           );
 
         if(

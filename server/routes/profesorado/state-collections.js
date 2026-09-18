@@ -40,6 +40,9 @@ function registerStateCollectionRoutes(router, deps) {
     ensureCoverageAssignmentsAllowed,
     shouldSkipAbsenceRowByInactiveGroup,
     rebuildMonthlyGuardiaLoadForCurrentWeek,
+    getCurrentSchoolWeekKey,
+    getResolvedTeacherSession,
+    materializeCoverageAssignments,
     requireAuthenticated,
     requireRole,
     resolveActiveTeacherContext,
@@ -110,12 +113,48 @@ function registerStateCollectionRoutes(router, deps) {
     return weekday - 1;
   }
 
+  function schoolWeekKeyFromDate(date) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(
+      String(date || '').trim()
+    );
+
+    if (!match) {
+      throw httpError(
+        400,
+        'La ausencia futura no tiene una fecha válida.'
+      );
+    }
+
+    const [, yearRaw, monthRaw, dayRaw] = match;
+
+    const value = new Date(Date.UTC(
+      Number(yearRaw),
+      Number(monthRaw) - 1,
+      Number(dayRaw)
+    ));
+
+    const weekday = value.getUTCDay();
+
+    if (weekday < 1 || weekday > 5) {
+      throw httpError(
+        409,
+        'La ausencia futura no corresponde a un día lectivo.'
+      );
+    }
+
+    const monday = new Date(value);
+    monday.setUTCDate(
+      value.getUTCDate() - (weekday - 1)
+    );
+
+    return monday.toISOString().slice(0, 10);
+  }
+
   function sameOperationalAbsence(left, right) {
     return (
       Number(left?.dia) === Number(right?.dia) &&
       Number(left?.hora) === Number(right?.hora) &&
       normalizeText(left?.ausente) === normalizeText(right?.ausente) &&
-      String(left?.guardia || '').trim() === String(right?.guardia || '').trim() &&
       String(left?.aula || '').trim() === String(right?.aula || '').trim() &&
       Boolean(left?.faena) === Boolean(right?.faena) &&
       String(left?.obs || '').trim() === String(right?.obs || '').trim()
@@ -125,11 +164,21 @@ function registerStateCollectionRoutes(router, deps) {
   async function materializeFutureAbsenceRows(
     db,
     futureEntry,
-    requestedRows,
     actorUserId
   ) {
     const future = sanitizeTeacherFutureAbsence(futureEntry);
     const expectedDay = futureDateDayIndex(future.date);
+
+    const targetWeekKey = schoolWeekKeyFromDate(future.date);
+    const currentWeekKey = getCurrentSchoolWeekKey();
+
+    if (targetWeekKey !== currentWeekKey) {
+      throw httpError(
+        409,
+        'La ausencia todavía no pertenece a la semana operacional actual.',
+        'FUTURE_ABSENCE_NOT_CURRENT_WEEK'
+      );
+    }
 
     const expectedHours = [...new Set(
       (Array.isArray(future.hours) ? future.hours : [])
@@ -140,56 +189,71 @@ function registerStateCollectionRoutes(router, deps) {
     if (!expectedHours.length) {
       throw httpError(
         409,
-        'La ausencia futura no contiene horas lectivas que materializar.'
+        'La ausencia futura no contiene horas que materializar.'
       );
     }
 
-    const rows = ensureArray(
-      requestedRows,
-      'Las coberturas de la ausencia futura'
-    ).map(sanitizeAusencia);
+    /*
+     * La ausencia futura conoce la NECESIDAD, no la cobertura.
+     *
+     * El servidor reconstruye las filas desde el horario real.
+     * Nunca acepta del cliente qué profesor debe cubrirlas.
+     */
+    const rows = [];
 
-    if (rows.length !== expectedHours.length) {
-      throw httpError(
-        409,
-        'Las coberturas propuestas no coinciden con las horas de la ausencia futura.'
+    for (const hora of expectedHours) {
+      const teacherRefs = [
+        future.sourceCode,
+        future.profesor
+      ]
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .filter((value, index, values) =>
+          values.indexOf(value) === index
+        );
+
+      let session = null;
+
+      for (const teacherRef of teacherRefs) {
+        session = await getResolvedTeacherSession(
+          db,
+          teacherRef,
+          expectedDay,
+          hora
+        );
+
+        if (session) break;
+      }
+
+      if (!session) {
+        throw httpError(
+          409,
+          `No existe una sesión válida para ${future.profesor} en la hora ${hora}.`,
+          'FUTURE_ABSENCE_SCHEDULE_MISMATCH'
+        );
+      }
+
+      rows.push(
+        sanitizeAusencia({
+          dia: expectedDay,
+          hora,
+          ausente: future.profesor,
+          guardia: '',
+          aula:
+            String(
+              session.aula ||
+              session.room ||
+              ''
+            ).trim(),
+          faena: false,
+          obs: ''
+        })
       );
     }
 
-    const expectedHourSet = new Set(expectedHours);
-    const seenHours = new Set();
+    const persistedIds = [];
 
     for (const row of rows) {
-      if (Number(row.dia) !== expectedDay) {
-        throw httpError(
-          409,
-          'La cobertura propuesta no corresponde al día de la ausencia futura.'
-        );
-      }
-
-      if (
-        !expectedHourSet.has(Number(row.hora)) ||
-        seenHours.has(Number(row.hora))
-      ) {
-        throw httpError(
-          409,
-          'Las coberturas propuestas no coinciden con los tramos de la ausencia futura.'
-        );
-      }
-
-      if (normalizeText(row.ausente) !== normalizeText(future.profesor)) {
-        throw httpError(
-          409,
-          'La cobertura propuesta pertenece a otro docente.'
-        );
-      }
-
-      seenHours.add(Number(row.hora));
-    }
-
-    const persistedRows = [];
-
-    for (const row of rows.sort((a, b) => Number(a.hora) - Number(b.hora))) {
       if (await shouldSkipAbsenceRowByInactiveGroup(db, row)) {
         throw httpError(
           409,
@@ -204,7 +268,9 @@ function registerStateCollectionRoutes(router, deps) {
       );
 
       const existing = currentAtSlot.find(
-        item => normalizeText(item?.ausente) === normalizeText(row.ausente)
+        item =>
+          normalizeText(item?.ausente) ===
+          normalizeText(row.ausente)
       ) || null;
 
       if (existing) {
@@ -216,7 +282,7 @@ function registerStateCollectionRoutes(router, deps) {
           );
         }
 
-        persistedRows.push(existing);
+        persistedIds.push(Number(existing.id));
         continue;
       }
 
@@ -233,7 +299,7 @@ function registerStateCollectionRoutes(router, deps) {
           row.dia,
           row.hora,
           row.ausente,
-          row.guardia || '',
+          '',
           row.aula || '',
           row.faena ? 1 : 0,
           row.obs || ''
@@ -244,6 +310,8 @@ function registerStateCollectionRoutes(router, deps) {
         'SELECT * FROM ausencias WHERE id = ?',
         [insert.lastID]
       );
+
+      persistedIds.push(Number(persisted.id));
 
       await appendOperationalHistory(db, {
         actorUserId,
@@ -258,33 +326,67 @@ function registerStateCollectionRoutes(router, deps) {
           dia: Number(persisted.dia),
           hora: Number(persisted.hora),
           ausente: String(persisted.ausente || ''),
-          guardia: String(persisted.guardia || ''),
+          guardia: '',
           aula: String(persisted.aula || ''),
           faena: !!persisted.faena,
           obs: String(persisted.obs || '')
         }
       });
-
-      if (String(persisted.guardia || '').trim()) {
-        await appendOperationalHistory(db, {
-          actorUserId,
-          action: 'coverage.assigned',
-          title: 'Cobertura asignada',
-          type: 'coverage',
-          targetType: 'absence',
-          targetId: String(persisted.id),
-          before: { guardia: null },
-          after: { guardia: String(persisted.guardia || '') }
-        });
-      }
-
-      persistedRows.push(persisted);
     }
 
-    await rebuildMonthlyGuardiaLoadForCurrentWeek(db);
+    /*
+     * AHORA, y solo ahora, el motor decide quién cubre.
+     *
+     * materializeCoverageAssignments procesa tramo a tramo,
+     * recalculando la carga entre asignaciones.
+     */
+    const coverageChanges =
+      await materializeCoverageAssignments(db, {
+        dia: expectedDay,
+        hours: expectedHours
+      });
+
+    for (const change of coverageChanges) {
+      const beforeGuardia =
+        String(change?.before?.guardia || '').trim();
+
+      const afterGuardia =
+        String(change?.after?.guardia || '').trim();
+
+      if (!afterGuardia || beforeGuardia === afterGuardia) {
+        continue;
+      }
+
+      await appendOperationalHistory(db, {
+        actorUserId,
+        action: 'coverage.assigned',
+        title: 'Cobertura asignada',
+        type: 'coverage',
+        targetType: 'absence',
+        targetId: String(change.after.id),
+        before: {
+          guardia: beforeGuardia || null
+        },
+        after: {
+          guardia: afterGuardia
+        }
+      });
+    }
+
+    const persistedRows = [];
+
+    for (const id of persistedIds) {
+      const persisted = await db.get(
+        'SELECT * FROM ausencias WHERE id = ?',
+        [id]
+      );
+
+      if (persisted) persistedRows.push(persisted);
+    }
 
     return persistedRows;
   }
+
 
   router.get('/substitutions', async (req, res, next) => {
     try {
@@ -571,7 +673,6 @@ function registerStateCollectionRoutes(router, deps) {
             const rows = await materializeFutureAbsenceRows(
               db,
               future,
-              req.body?.rows,
               req.sessionUser.userId
             );
 
