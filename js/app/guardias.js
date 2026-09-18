@@ -4955,10 +4955,16 @@ function buildAuthoritativeSlotAssignments(effectiveSlot){
       const teacher=cleanText(item?.teacher);
       if(!teacher) return;
 
+      const standbyRank=Number(item?.standbyRank);
+
       assignments.push({
         teacher,
         location:'Guardia disponible',
-        meta:'Sin asignación',
+        meta:item?.reason==='cobertura-pendiente'
+          ?'Cobertura pendiente · Sin asignación'
+          :(Number.isInteger(standbyRank)&&standbyRank>0
+            ?`${standbyRank}.º en intervención`
+            :'Sin asignación'),
         tone:'general'
       });
     });
@@ -5947,7 +5953,9 @@ function renderGuardiaBoard(){
             ?' · Biblioteca'
             :(isBanos
               ?' · Baños'
-              :(isFree?' · Disponible':` · ${item.location}`));
+              :(isFree
+                ?` · ${item.meta||'Disponible'}`
+                :` · ${item.location}`));
 
           const title=[
             item.teacher,

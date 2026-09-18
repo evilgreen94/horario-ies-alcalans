@@ -536,12 +536,16 @@
         const teacher=shared.cleanText(item?.teacher);
         if(!teacher) return;
 
+        const standbyRank=Number(item?.standbyRank);
+
         assignments.push({
           teacher,
           location:'Guardia disponible',
           meta:item?.reason==='cobertura-pendiente'
             ?'Cobertura pendiente · Sin asignación'
-            :'Sin asignación',
+            :(Number.isInteger(standbyRank)&&standbyRank>0
+              ?`${standbyRank}.º en intervención`
+              :'Sin asignación'),
           tone:'general'
         });
       });
