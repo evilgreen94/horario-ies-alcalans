@@ -181,18 +181,48 @@ module.exports = [
         cookie,
         origin: 'http://guardias.test'
       }), res);
-      const normalizedEntry = {
-        ...entry,
-        reviewedAt: '',
-        reviewerNote: '',
-        appliedAt: ''
-      };
-
       assert.equal(error, null);
-      assert.equal(res.statusCode, 200);
-      assert.deepEqual(res.body, { ok: true, entry: normalizedEntry });
-      assert.deepEqual(db.getRows(), [normalizedEntry]);
-      assert.equal(db.getWriteCount(), 1);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body?.ok, true);
+
+    const saved = res.body?.entry;
+
+    assert.ok(saved);
+
+    /*
+     * Jefatura expresa la intención de registrar la ausencia,
+     * pero el servidor es autoritativo sobre identidad, estado
+     * y timestamps.
+     */
+    assert.match(saved.id, /^future-/);
+    assert.notEqual(saved.id, entry.id);
+
+    assert.equal(saved.profesor, entry.profesor);
+    assert.equal(saved.date, entry.date);
+    assert.deepEqual(saved.hours, entry.hours);
+    assert.equal(saved.note, entry.note);
+
+    assert.equal(saved.status, 'approved');
+    assert.equal(saved.reviewerNote, '');
+    assert.equal(saved.appliedAt, '');
+
+    assert.ok(
+      Number.isFinite(Date.parse(saved.createdAt)),
+      'createdAt debe ser generado por el servidor'
+    );
+
+    assert.ok(
+      Number.isFinite(Date.parse(saved.reviewedAt)),
+      'reviewedAt debe ser generado por el servidor'
+    );
+
+    assert.deepEqual(
+      db.getRows(),
+      [saved],
+      'La persistencia debe contener exactamente el estado confirmado por el servidor'
+    );
+
+    assert.equal(db.getWriteCount(), 1);
     }
   }
 ];

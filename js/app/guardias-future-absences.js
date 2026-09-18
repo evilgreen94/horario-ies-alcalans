@@ -798,6 +798,23 @@
     try{
       const result = await requireStorageMethod('createTeacherFutureAbsence', 'future absence create')(normalized);
       const saved = normalizeTeacherFutureAbsence(result && result.entry || normalized);
+
+      /*
+       * Jefatura envía un ID provisional únicamente para satisfacer
+       * el modelo local. El servidor genera la identidad definitiva.
+       *
+       * En backend-only nunca se insertó el provisional; en modo
+       * híbrido lo retiramos antes de guardar el confirmado.
+       */
+      if(
+        cleanText(saved.id) &&
+        cleanText(normalized.id) &&
+        cleanText(saved.id)!==cleanText(normalized.id)
+      ){
+        removeRowLocal(normalized.id);
+      }
+
+      state.syncFlags.delete(`upsert:${normalized.id}`);
       state.syncFlags.delete(`upsert:${saved.id}`);
       upsertRowLocal(saved);
       clearSuperAdminError();

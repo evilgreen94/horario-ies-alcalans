@@ -52,6 +52,32 @@ function registerStateCollectionRoutes(router, deps) {
 
   async function buildOwnedFutureAbsence(req, db) {
     const roles = Array.isArray(req.sessionUser?.roles) ? req.sessionUser.roles : [];
+
+    /*
+     * Jefatura registra directamente una ausencia futura validada.
+     *
+     * El cliente aporta la intención:
+     * profesor + fecha + horas + nota.
+     *
+     * ID, estado y timestamps pertenecen al servidor.
+     *
+     * Admin se evalúa antes que teacher porque una cuenta de Jefatura
+     * puede disponer también del rol docente.
+     */
+    if (roles.includes('admin')) {
+      const now = new Date().toISOString();
+
+      return sanitizeTeacherFutureAbsence({
+        ...req.body,
+        id: `future-${crypto.randomUUID()}`,
+        status: 'approved',
+        reviewedAt: now,
+        reviewerNote: '',
+        appliedAt: '',
+        createdAt: now
+      });
+    }
+
     if (roles.includes('teacher')) {
       const requested = sanitizeTeacherFutureAbsence(req.body);
       const context = await resolveActiveTeacherContext(db, req.sessionUser.userId, requested.date);
@@ -76,7 +102,7 @@ function registerStateCollectionRoutes(router, deps) {
         appliedAt: ''
       });
     }
-    if (roles.includes('admin')) return sanitizeTeacherFutureAbsence(req.body);
+
     const error = new Error('Permisos insuficientes.');
     error.status = 403;
     throw error;
@@ -560,12 +586,54 @@ function registerStateCollectionRoutes(router, deps) {
       const entry = await buildOwnedFutureAbsence(req, db);
       await withImmediateTransaction(db, async () => {
         const current = await getStateRows(db, FUTURE_ABSENCES_STATE_KEY);
-        const nextRows = [...current.filter(row => row?.id !== entry.id), entry];
-        await replaceStateRows(db, FUTURE_ABSENCES_STATE_KEY, nextRows);
+
+        const entryHours = new Set(
+          (Array.isArray(entry.hours) ? entry.hours : [])
+            .map(Number)
+            .filter(Number.isInteger)
+        );
+
+        const overlapping = current.find(row => {
+          const status = String(row?.status || '').trim();
+
+          if (status === 'rejected') return false;
+
+          if (
+            normalizeText(row?.profesor) !== normalizeText(entry.profesor) ||
+            String(row?.date || '').trim() !== String(entry.date || '').trim()
+          ) {
+            return false;
+          }
+
+          return (Array.isArray(row?.hours) ? row.hours : [])
+            .map(Number)
+            .some(hora => entryHours.has(hora));
+        });
+
+        if (overlapping) {
+          throw httpError(
+            409,
+            'Ya existe una ausencia futura para ese docente en alguno de los tramos seleccionados.',
+            'FUTURE_ABSENCE_OVERLAP'
+          );
+        }
+
+        const nextRows = [
+          ...current.filter(row => row?.id !== entry.id),
+          entry
+        ];
+
+        await replaceStateRows(
+          db,
+          FUTURE_ABSENCES_STATE_KEY,
+          nextRows
+        );
       });
       await appendAuditEvent(db, {
         actorUserId: req.sessionUser.userId,
-        action: 'teacher.future_absence.created',
+        action: entry.status === 'approved'
+          ? 'admin.future_absence.created'
+          : 'teacher.future_absence.created',
         targetType: 'teacher_profile',
         targetId: entry.sourceCode || entry.profesor,
         details: { absenceId: entry.id, date: entry.date, hours: entry.hours }

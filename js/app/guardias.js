@@ -5660,9 +5660,24 @@ function updateAdminControls(){
   const btnSorteo=document.getElementById('btnSorteo');
   const btnInforme=document.getElementById('btnInforme');
   const btnInformeSemanal=document.getElementById('btnInformeSemanal');
+
   const currentWeek=isCurrentWeekOffset(weekOffset);
-  if(btnAddAusencia) btnAddAusencia.style.display=isAdmin&&currentWeek?'':'none';
+  const futurePlanning=Number(weekOffset)>0;
+  const canCreateAbsence=isAdmin&&(currentWeek||futurePlanning);
+
+  if(btnAddAusencia){
+    btnAddAusencia.style.display=canCreateAbsence?'':'none';
+    btnAddAusencia.title=futurePlanning
+      ? 'Registrar una ausencia futura'
+      : 'Registrar una ausencia';
+  }
+
+  /*
+   * El sorteo sigue siendo exclusivamente operacional.
+   * Nunca debe ejecutarse sobre una semana futura.
+   */
   if(btnSorteo) btnSorteo.style.display=isAdmin&&currentWeek?'':'none';
+
   if(btnInforme) btnInforme.style.display=isAdmin?'':'none';
   if(btnInformeSemanal) btnInformeSemanal.style.display=isAdmin?'':'none';
 }
@@ -5855,7 +5870,10 @@ function renderWeekLabel(){
   if(teacherWeekLabel) teacherWeekLabel.textContent=formatWeekRangeLabel(getTeacherSelectedWeekKey(),teacherWeekOffset);
   const saveTs=document.getElementById('saveTs');
   if(saveTs&&!isCurrentWeekOffset(weekOffset)){
-    saveTs.textContent='Vista de planificación. La edición sigue reservada a la semana actual.';
+    saveTs.textContent=
+      Number(weekOffset)>0&&isAdmin
+        ? 'Vista de planificación. Jefatura puede registrar ausencias futuras; las coberturas se asignarán al llegar su semana.'
+        : 'Vista de solo lectura.';
   }
 }
 function renderPills(){
@@ -6162,9 +6180,11 @@ function renderMobileAbsenceGroups(filteredRows,rows,editableWeek){
         :(model.faenaInfo.faena
           ?`<div class="faena-status"><span class="badge b-ok">Con tarea</span>${model.faenaInfo.obs?`<div class="mobile-absence-task-note">${escapeHtml(model.faenaInfo.obs)}</div>`:''}</div>`
           :'<span class="badge b-nok">Sin tarea</span>');
-      const coverageMarkup=model.sugerido
-        ?`<div class="chip ${model.guardiaChipClass}"><div class="avatar av-yellow">${initials(model.guardiaNombre)}</div>${escapeHtml(model.guardiaNombre)}${model.guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(model.guardiaMood.label)}">${model.guardiaMood.emoji}</span>`:''}</div>`
-        :`<span class="sin-asignar">${model.needsCoverage?'Sin asignar':'No aplica'}</span>`;
+      const coverageMarkup=row.futurePlanned
+        ?`<span class="sin-asignar">${model.needsCoverage?'Pendiente de asignación':'No aplica'}</span>`
+        :(model.sugerido
+          ?`<div class="chip ${model.guardiaChipClass}"><div class="avatar av-yellow">${initials(model.guardiaNombre)}</div>${escapeHtml(model.guardiaNombre)}${model.guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(model.guardiaMood.label)}">${model.guardiaMood.emoji}</span>`:''}</div>`
+          :`<span class="sin-asignar">${model.needsCoverage?'Sin asignar':'No aplica'}</span>`);
       const actionMarkup=canEditRow
         ?`<div class="mobile-absence-actions"><button class="btn-edit" type="button" onclick="openModal(${numericId})">Editar</button><label class="row-selector"><input type="checkbox" ${selectedAbsenceIds.has(numericId)?'checked':''} onchange="toggleAbsenceSelection(${numericId}, this.checked)"><span>Seleccionar</span></label></div>`
         :'';
@@ -7156,7 +7176,11 @@ function renderTable(){
           </div>
         </td>
         <td>
-          ${model.sugerido?`<div class="cell-stack"><div class="cell-label">Cubre</div><div class="guardia-slot"><div class="chip ${model.guardiaChipClass}"><div class="avatar av-yellow">${initials(model.guardiaNombre)}</div>${escapeHtml(model.guardiaNombre)}${model.guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(model.guardiaMood.label)}">${model.guardiaMood.emoji}</span>`:''}</div></div><div class="cell-meta">${model.guardiaEstado}</div></div>`:`<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">${model.needsCoverage?'Sin asignar':'No aplica'}</span><div class="cell-meta">${model.needsCoverage?'No hay docentes disponibles en este turno.':'Esta sesión no requiere cobertura automática.'}</div></div>`}
+          ${g.futurePlanned
+            ? `<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">${model.needsCoverage?'Pendiente de asignación':'No aplica'}</span><div class="cell-meta">${model.needsCoverage?'ARGOS asignará la cobertura cuando esta semana pase a ser operacional.':'Esta sesión no requiere cobertura automática.'}</div></div>`
+            : (model.sugerido
+              ? `<div class="cell-stack"><div class="cell-label">Cubre</div><div class="guardia-slot"><div class="chip ${model.guardiaChipClass}"><div class="avatar av-yellow">${initials(model.guardiaNombre)}</div>${escapeHtml(model.guardiaNombre)}${model.guardiaMood?`<span class="chip-mood-tag" title="${escapeHtml(model.guardiaMood.label)}">${model.guardiaMood.emoji}</span>`:''}</div></div><div class="cell-meta">${model.guardiaEstado}</div></div>`
+              : `<div class="cell-stack"><div class="cell-label">Cubre</div><span class="sin-asignar">${model.needsCoverage?'Sin asignar':'No aplica'}</span><div class="cell-meta">${model.needsCoverage?'No hay docentes disponibles en este turno.':'Esta sesión no requiere cobertura automática.'}</div></div>`)}
         </td>
         <td>
           <div class="cell-stack cell-stack-compact">
@@ -8003,7 +8027,7 @@ function renderTeacherAdminStats(nombre,dia){
     </article>
   `).join('');
 }
-function openModal(id){if(!isCurrentWeekOffset(weekOffset)){showToast('La edición solo está disponible en la semana actual.','info');return;}editId=id||null;const g=id?data.find(x=>x.id===id):null;const editRows=g?getAbsenceEditRowsForBaseRow(g):[];editAbsenceGroupIds=editRows.map(row=>Number(row.id)).filter(Number.isInteger);const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=g?(editRows.length>1?`Editar ausencia (${editRows.length} horas)`:'Editar ausencia'):'Nueva ausencia';document.getElementById('btnDel').style.display=g?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;setAusenteSelection(g?g.ausente:'');if(!g){document.getElementById('fAusente').value='';editAbsenceGroupIds=[];}document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fTodoDia').checked=false;setAbsenceSelectedHours(g?(editRows.length?editRows.map(row=>row.hora):[g.hora]):[]);document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';renderAbsenceHourChoices();populateProfesoresGuardia();syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
+function openModal(id){const futurePlanning=Number(weekOffset)>0;if(!isCurrentWeekOffset(weekOffset)&&!(isAdmin&&futurePlanning)){showToast(weekOffset<0?'Las semanas anteriores son de solo lectura.':'Solo Jefatura puede registrar ausencias futuras.','info');return;}if(futurePlanning&&id){showToast('Las ausencias futuras se editan desde su registro de planificación.','info');return;}editId=id||null;const g=id?data.find(x=>x.id===id):null;const editRows=g?getAbsenceEditRowsForBaseRow(g):[];editAbsenceGroupIds=editRows.map(row=>Number(row.id)).filter(Number.isInteger);const faenaInfo=g?resolveFaena(g):{faena:false,obs:''};clearAbsenceFormErrors();document.getElementById('mTitle').textContent=futurePlanning?'Registrar ausencia futura':(g?(editRows.length>1?`Editar ausencia (${editRows.length} horas)`:'Editar ausencia'):'Nueva ausencia');document.getElementById('btnDel').style.display=(g&&!futurePlanning)?'':'none';document.getElementById('fDia').value=g?g.dia:day;document.getElementById('fHora').value=g?g.hora:1;setAusenteSelection(g?g.ausente:'');if(!g){document.getElementById('fAusente').value='';editAbsenceGroupIds=[];}document.getElementById('fGuardia').value=g?getVisibleTeacherName(g.guardia):'';document.getElementById('fTodoDia').checked=false;setAbsenceSelectedHours(g?(editRows.length?editRows.map(row=>row.hora):[g.hora]):[]);document.getElementById('fFaena').checked=faenaInfo.faena;document.getElementById('fObs').value=faenaInfo.obs||'';renderAbsenceHourChoices();populateProfesoresGuardia();syncTodoDiaMode();syncGuardiaPreview();renderAusentePreview();renderAbsenceDecisionBar();closeAusenteSuggestions();document.getElementById('overlay').classList.add('open');}
 function renderAusentePreview(){
   const input=document.getElementById('fAusente');
   const preview=document.getElementById('ausentePreview');
@@ -8040,7 +8064,8 @@ function renderAbsenceDecisionBar(){
   const todoDia=!!document.getElementById('fTodoDia')?.checked;
   const selectedHours=getAbsenceSelectedHours();
   const aula=getAulaProfesor(nombre,dia,hora)||'Sin aula';
-  const guardia=getGuardiaSugerida(dia,hora,1);
+  const futurePlanning=Number(weekOffset)>0;
+  const guardia=futurePlanning?'':getGuardiaSugerida(dia,hora,1);
   const formObs=document.getElementById('fObs')?.value.trim()||'';
   const formFaena=!!document.getElementById('fFaena')?.checked||!!formObs;
   const tarea=getAbsenceTaskState(nombre,dia,hora,formFaena,formObs);
@@ -8054,7 +8079,7 @@ function renderAbsenceDecisionBar(){
   panel.innerHTML=`
     <div class="absence-decision-grid">
       <div class="absence-decision-item"><span class="absence-decision-k">Aula</span><strong>${escapeHtml(aula)}</strong></div>
-      <div class="absence-decision-item"><span class="absence-decision-k">Guardia prevista</span><strong>${escapeHtml(guardia?getVisibleTeacherName(guardia):'Sin cobertura')}</strong></div>
+      <div class="absence-decision-item"><span class="absence-decision-k">${futurePlanning?'Cobertura':'Guardia prevista'}</span><strong>${escapeHtml(futurePlanning?'Pendiente de asignación':(guardia?getVisibleTeacherName(guardia):'Sin cobertura'))}</strong></div>
       <div class="absence-decision-item"><span class="absence-decision-k">Tarea</span><strong>${tarea.faena?'Disponible':'No registrada'}</strong></div>
     </div>
     ${extras.length?`<div class="absence-decision-extra">${extras.join(' · ')}</div>`:''}
@@ -8217,7 +8242,9 @@ function validateAbsenceForm(){
     setFieldError('fHora','No hay ninguna hora válida para guardar.');
     return {valid:false,focus:document.getElementById('fHora')};
   }
-  const duplicateHour=horasObjetivo.find(horaItem=>findDuplicateAbsence(dia,horaItem,ausente));
+  const duplicateHour=isCurrentWeekOffset(weekOffset)
+    ? horasObjetivo.find(horaItem=>findDuplicateAbsence(dia,horaItem,ausente))
+    : null;
   if(duplicateHour!=null){
     setFieldError(selectedHours.length>1?'fHorasMulti':'fAusente',`Ya existe una ausencia registrada para ese docente en ${formatHoraLabel(duplicateHour)}.`);
     return {valid:false,focus:ausenteInput};
@@ -8259,6 +8286,11 @@ function syncGuardiaPreview(){
   const guardiaInput=document.getElementById('fGuardia');
   const todoDiaInput=document.getElementById('fTodoDia');
   if(!fDia||!fHora||!guardiaInput||!todoDiaInput) return;
+  if(Number(weekOffset)>0){
+    guardiaInput.value='';
+    guardiaInput.placeholder='Se asignar\u00e1 al entrar en su semana operacional';
+    return;
+  }
   if(todoDiaInput.checked){
     guardiaInput.value='';
     guardiaInput.placeholder='Se asignar\u00e1 autom\u00e1ticamente en cada hora';
@@ -8276,7 +8308,9 @@ function setAbsenceSavingState(isSaving){
   const deleteButton=document.getElementById('btnDel');
   if(saveButton){
     saveButton.disabled=!!isSaving;
-    saveButton.textContent=isSaving?'Guardando...':'Guardar';
+    saveButton.textContent=isSaving
+      ? 'Guardando...'
+      : (Number(weekOffset)>0 ? 'Registrar ausencia futura' : 'Guardar');
   }
   if(cancelButton) cancelButton.disabled=!!isSaving;
   if(deleteButton) deleteButton.disabled=!!isSaving;
@@ -8307,6 +8341,110 @@ async function saveAbsence(){
     const obs=document.getElementById('fObs').value.trim();
     const faena=!!document.getElementById('fFaena').checked||!!obs;
     const horasObjetivo=validation.horasLectivas;
+
+    /*
+     * PLANIFICACIÓN FUTURA
+     *
+     * No se toca `data`.
+     * No se crea todavía una ausencia operacional.
+     * No se decide ninguna cobertura.
+     *
+     * Solo se registra la necesidad futura.
+     */
+    if(Number(weekOffset)>0){
+      if(!isAdmin){
+        showToast(
+          'Solo Jefatura puede registrar ausencias desde una semana futura.',
+          'error'
+        );
+        return;
+      }
+
+      const selectedWeekKey=getSelectedWeekKey();
+      const targetDateObject=getDateForSchoolWeekDay(
+        selectedWeekKey,
+        dia
+      );
+      const targetDate=formatLocalDateKey(
+        targetDateObject
+      );
+
+      if(!targetDate){
+        showToast(
+          'No se ha podido resolver la fecha de la ausencia futura.',
+          'error'
+        );
+        return;
+      }
+
+      const sourceCode=cleanText(
+        getProfesor(ausente)?.sourceCode || ''
+      );
+
+      /*
+       * createEntry todavía normaliza localmente el objeto antes de enviarlo.
+       * Estos valores son provisionales: para Jefatura, el servidor sustituye
+       * ID, estado y timestamps por sus valores autoritativos.
+       */
+      const now=new Date().toISOString();
+      const provisionalId=
+        `future-ui-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      const result=await createTeacherFutureAbsenceEntry({
+        id:provisionalId,
+        profesor:ausente,
+        sourceCode,
+        date:targetDate,
+        note:obs,
+        hours:horasObjetivo,
+        status:'approved',
+        reviewedAt:now,
+        reviewerNote:'',
+        appliedAt:'',
+        createdAt:now
+      });
+
+      if(
+        !result ||
+        result.ok===false ||
+        !result.entry
+      ){
+        const status=Number(result?.status)||0;
+
+        showToast(
+          status===409
+            ? 'Ya existe una ausencia futura para ese docente en alguno de los tramos seleccionados.'
+            : 'El servidor no ha confirmado la ausencia futura.',
+          'error'
+        );
+
+        return;
+      }
+
+      clearAbsenceFormErrors();
+      closeModal();
+
+      const saveTs=document.getElementById('saveTs');
+      if(saveTs){
+        saveTs.textContent=
+          'Planificación guardada - '+
+          new Date().toLocaleTimeString(
+            'es-ES',
+            {hour:'2-digit',minute:'2-digit'}
+          );
+      }
+
+      renderGuardiaBoard();
+      renderTable();
+
+      showToast(
+        `Ausencia futura registrada para ${formatFutureAbsenceDateLabel(targetDate)} · ${horasObjetivo.map(formatHoraLabel).join(', ')}. La cobertura se asignará cuando llegue su semana.`,
+        'success'
+      );
+
+      return;
+    }
+
     const previousRow=editId?data.find(g=>g&&g.id===editId):null;
     const undoState=buildUndoState(dia);
 
