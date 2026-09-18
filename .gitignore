@@ -14,3 +14,6 @@ server-local*.log
 /guardias-release-*-linux-x64.tar.gz
 /guardias-release-*-linux-x64.tar.gz.sha256
 /inputs/
+
+# Local editor/workspace state
+.obsidian/
